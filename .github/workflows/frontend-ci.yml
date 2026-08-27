@@ -41,3 +41,17 @@ jobs:
 
       - name: Test frontend
         run: yarn workspace @truestub/frontend test:ci
+
+  secret-scan:
+    name: Secret scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE is optional — only needed for org-level scanning features.
+          # Public repos and personal forks work without it.
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

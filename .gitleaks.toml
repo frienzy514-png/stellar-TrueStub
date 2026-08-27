@@ -1,0 +1,46 @@
+# .gitleaks.toml — TrueStub gitleaks configuration
+# Extends the default gitleaks ruleset with project-specific allowlists.
+# See: https://github.com/gitleaks/gitleaks#configuration
+
+title = "TrueStub Gitleaks Config"
+
+[extend]
+# Use the default rules shipped with gitleaks as the base.
+useDefault = true
+
+[allowlist]
+description = "Project-wide allowlist — placeholder values and example files"
+
+# Exclude files that are intentionally allowed to contain placeholder secrets.
+paths = [
+  # .env.example files use placeholder values like <your apiKey> — not real secrets.
+  '''^\.env\.example$''',
+  '''\.env\.example$''',
+  # Test fixtures may embed fake credentials for unit tests.
+  '''tests?/.*fixtures?/''',
+  '''__fixtures__/''',
+  '''__mocks__/''',
+  # Docs and changelogs sometimes quote example key formats.
+  '''docs/''',
+  '''CHANGELOG''',
+]
+
+# Regex patterns that match placeholder / example values and should never be
+# flagged, regardless of which file they appear in.
+regexes = [
+  # Generic angle-bracket placeholders used throughout the project's example files.
+  '''<your[- _]?[a-zA-Z0-9_\-]*>''',
+  # Common "replace me" sentinels.
+  '''YOUR_[A-Z_]+_HERE''',
+  '''REPLACE_ME''',
+  '''example\.com''',
+  # Firebase placeholder format from .env.example
+  '''<your-project-id>''',
+  '''<your-app-id>''',
+  '''<your-api-key>''',
+  '''<your-messaging-sender-id>''',
+  '''<your-storage-bucket>''',
+  # Trustless Work / Stellar placeholder format
+  '''<your-trustless-work-api-key>''',
+  '''<your-stellar-account>''',
+]
