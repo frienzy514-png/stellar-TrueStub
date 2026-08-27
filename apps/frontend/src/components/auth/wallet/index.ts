@@ -6,6 +6,8 @@ export {
   getAvailableWallets,
   isWalletAvailable,
 } from './hooks/useWalletDetection';
+export { useAccountSwitcher } from './hooks/useAccountSwitcher';
+export type { AccountSwitcherOptions, AccountSwitcherResult } from './hooks/useAccountSwitcher';
 
 // Components
 export { WalletSelectionModal } from './components/WalletSelectionModal';
