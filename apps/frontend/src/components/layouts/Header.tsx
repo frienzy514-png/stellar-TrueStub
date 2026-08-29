@@ -8,6 +8,7 @@ import { SearchHeader } from "@/components/layouts/SearchHeader";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import LanguageSwitcher from "@/components/language/LanguageSwitcher";
 import { useTranslation } from "react-i18next";
+import { ConnectionStatus } from "@/components/notifications/ConnectionStatus";
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -82,6 +83,8 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
       </header>
       {/* Spacer div to prevent content from being hidden under fixed header */}
       <div className="h-16" />
+      {/* WebSocket connection status pill — hidden when connected */}
+      <ConnectionStatus />
     </>
   );
 };

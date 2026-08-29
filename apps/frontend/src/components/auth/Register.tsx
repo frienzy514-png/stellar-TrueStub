@@ -28,6 +28,7 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import LanguageSwitcher from "@/components/language/LanguageSwitcher";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
+import zxcvbn from "zxcvbn";
 
 const COUNTRY_CODES = [
   { code: "+506", country: "Costa Rica", flag: "🇨🇷" },
@@ -42,6 +43,33 @@ const COUNTRY_CODES = [
   { code: "+54",  country: "Argentina", flag: "🇦🇷" },
 ];
 
+const STRENGTH_LABELS = ["Very weak", "Weak", "Fair", "Strong", "Very strong"];
+const STRENGTH_COLORS = [
+  "bg-red-500",
+  "bg-orange-500",
+  "bg-yellow-500",
+  "bg-lime-500",
+  "bg-green-500",
+];
+
+function PasswordStrengthBar({ score }: { score: number }) {
+  return (
+    <div className="space-y-1" aria-label={`Password strength: ${STRENGTH_LABELS[score]}`}>
+      <div className="flex gap-1">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
+              i <= score ? STRENGTH_COLORS[score] : "bg-gray-200 dark:bg-gray-700"
+            }`}
+          />
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">{STRENGTH_LABELS[score]}</p>
+    </div>
+  );
+}
+
 export default function RegisterPage() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -54,6 +82,7 @@ export default function RegisterPage() {
   const [location, setLocation] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [passwordStrength, setPasswordStrength] = useState<number>(-1);
 
   const clearError = () => setError("");
 
@@ -258,7 +287,11 @@ export default function RegisterPage() {
                 required
                 minLength={6}
                 value={password}
-                onChange={(e) => { setPassword(e.target.value); clearError(); }}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setPasswordStrength(e.target.value ? zxcvbn(e.target.value).score : -1);
+                  clearError();
+                }}
               />
               <PasswordStrengthMeter password={password} />
             </div>

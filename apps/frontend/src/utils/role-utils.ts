@@ -1,5 +1,11 @@
 type UserRole = 'admin' | 'event' | 'guest' | null;
 
+// Client-only heuristic for deciding what the UI *shows* — trivially
+// spoofable via localStorage/devtools, so it must never be relied on to
+// decide what the backend *allows*. Actual enforcement belongs in Hasura
+// permissions keyed off the verified Firebase session, not here.
+// See docs/ROLE_ACCESS_CONTROL_AUDIT.md for the full audit and the
+// split-responsibility model every role-gated feature must follow.
 export function getUserRole(): UserRole {
   const storedAddress = localStorage.getItem('address-wallet');
   

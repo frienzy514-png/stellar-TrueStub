@@ -2,6 +2,8 @@
 
 import type { EventListing } from '@/types/event';
 import { useEffect, useState } from 'react';
+import { CalendarSearch } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import EventSuggestionCard from './EventSuggestionCard';
 
 interface EventSuggestionsListProps {
@@ -44,24 +46,32 @@ export default function EventSuggestionsList({
         </p>
       </div>
 
-      <div className="space-y-4">
-        {listings.slice(0, 5).map((listing) => (
-          <EventSuggestionCard
-            key={listing.id}
-            id={listing.id}
-            name={listing.name}
-            address={listing.address}
-            price={listing.price}
-            seatCount={listing.seatCount}
-            rowCount={listing.rowCount}
-            mobileTransfer={listing.mobileTransfer}
-            image={listing.images[0]}
-            isLiked={likedById[listing.id] ?? listing.favorite ?? false}
-            onLike={handleLike}
-            onClick={onSelect}
-          />
-        ))}
-      </div>
+      {listings.length === 0 ? (
+        <EmptyState
+          icon={CalendarSearch}
+          title="No suggestions available"
+          description="Check back later for events that match your interests."
+        />
+      ) : (
+        <div className="space-y-4">
+          {listings.slice(0, 5).map((listing) => (
+            <EventSuggestionCard
+              key={listing.id}
+              id={listing.id}
+              name={listing.name}
+              address={listing.address}
+              price={listing.price}
+              seatCount={listing.seatCount}
+              rowCount={listing.rowCount}
+              mobileTransfer={listing.mobileTransfer}
+              image={listing.images[0]}
+              isLiked={likedById[listing.id] ?? listing.favorite ?? false}
+              onLike={handleLike}
+              onClick={onSelect}
+            />
+          ))}
+        </div>
+      )}
     </aside>
   );
 }

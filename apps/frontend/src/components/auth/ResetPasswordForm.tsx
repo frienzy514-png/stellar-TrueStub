@@ -8,6 +8,34 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
+import zxcvbn from "zxcvbn";
+
+const STRENGTH_LABELS = ["Very weak", "Weak", "Fair", "Strong", "Very strong"];
+const STRENGTH_COLORS = [
+  "bg-red-500",
+  "bg-orange-500",
+  "bg-yellow-500",
+  "bg-lime-500",
+  "bg-green-500",
+];
+
+function PasswordStrengthBar({ score }: { score: number }) {
+  return (
+    <div className="space-y-1" aria-label={`Password strength: ${STRENGTH_LABELS[score]}`}>
+      <div className="flex gap-1">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
+              i <= score ? STRENGTH_COLORS[score] : "bg-gray-200 dark:bg-gray-700"
+            }`}
+          />
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">{STRENGTH_LABELS[score]}</p>
+    </div>
+  );
+}
 
 interface ResetPasswordFormProps {
   onSubmit: (password: string, confirmPassword: string) => Promise<void>;
@@ -21,6 +49,7 @@ export default function ResetPasswordForm({
   const { t } = useTranslation();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordStrength, setPasswordStrength] = useState<number>(-1);
   const [status, setStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
@@ -65,10 +94,16 @@ export default function ResetPasswordForm({
           type="password"
           placeholder="********"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            setPasswordStrength(e.target.value ? zxcvbn(e.target.value).score : -1);
+          }}
           required
           minLength={8}
         />
+        {passwordStrength >= 0 && (
+          <PasswordStrengthBar score={passwordStrength} />
+        )}
       </div>
 
       <div className="space-y-2 text-left">

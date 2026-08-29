@@ -1,8 +1,11 @@
 "use client";
 
+"use client";
+
 import Link from "next/link";
 import { ChevronRight, SlidersHorizontal, Download } from "lucide-react";
 import { useEffect, useRef, useState, useMemo } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Popover,
   PopoverContent,
@@ -18,6 +21,18 @@ import { QuickActions } from "./QuickActions";
 import { EscrowTable } from "./EscrowTable";
 import { AnalyticsDashboard } from "./analytics";
 import { useTranslation } from "react-i18next";
+import { ErrorBoundaryWithCache } from "@/components/performance/ErrorBoundaryWithCache";
+
+/** Compact fallback shown when a single dashboard widget throws. */
+function SimpleErrorFallback({ label }: { label: string }) {
+  return (
+    <div className="flex items-center justify-center p-6 rounded-xl border border-red-500/20 bg-red-50 dark:bg-red-900/10 text-center">
+      <p className="text-sm text-red-600 dark:text-red-400">
+        Failed to load <span className="font-semibold">{label}</span>. Please refresh the page.
+      </p>
+    </div>
+  );
+}
 
 // Placeholder functions for notifications - in a real app, these would be API calls
 async function checkPendingNotifications(): Promise<NotificationData[]> {
@@ -210,6 +225,18 @@ export function RoleEscrowDashboard({
     return result;
   }, [statusFilter, minAmount, maxAmount, sortBy, transferFrom, transferTo, eventFrom, eventTo, escrows]);
 
+  const handleExportTransactions = () => {
+    const rows: TransactionRow[] = filteredTransactions.map((escrow) => ({
+      purchaseId: escrow.metadata?.purchaseId || escrow.id,
+      event: escrow.metadata?.eventName || "",
+      transferInitiated: escrow.metadata?.transferDate || "",
+      transferCompleted: escrow.metadata?.eventDate || "",
+      amount: escrow.amount,
+      status: escrow.status,
+    }));
+    exportTransactionsToCSV(rows);
+  };
+
   // Real-time updates using Trustless Work notifications
   useEffect(() => {
     if (isLoading) return;
@@ -267,8 +294,99 @@ export function RoleEscrowDashboard({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary dark:border-white"></div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
+        <div className="max-w-8xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-6">
+          {/* Header skeleton */}
+          <div className="mb-6 sm:mb-8 flex items-center justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-7 w-48" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+            <Skeleton className="h-9 w-32" />
+          </div>
+
+          {/* Stat card skeletons (4-column grid) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-8 w-16" />
+                  </div>
+                  <Skeleton className="h-12 w-12 rounded-lg" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Main content grid skeleton */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            {/* Left column — escrow status + recent activity */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* EscrowsByStatus skeleton */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 space-y-3">
+                <Skeleton className="h-5 w-40" />
+                <div className="space-y-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* RecentActivity skeleton */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 space-y-4">
+                <Skeleton className="h-5 w-32" />
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-start space-x-3">
+                    <Skeleton className="mt-0.5 h-4 w-4 rounded-full flex-shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex justify-between gap-2">
+                        <Skeleton className="h-4 w-48" />
+                        <Skeleton className="h-5 w-20 rounded-full flex-shrink-0" />
+                      </div>
+                      <Skeleton className="h-3 w-32" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right column — quick actions */}
+            <div className="space-y-4">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 space-y-3">
+                <Skeleton className="h-5 w-28" />
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full rounded-md" />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Table skeleton */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 space-y-3">
+            <div className="flex items-center justify-between mb-4">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-9 w-28" />
+            </div>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="h-4 w-4" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+                <Skeleton className="h-8 w-8" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -434,7 +552,9 @@ export function RoleEscrowDashboard({
         {/* Analytics Panel (toggled from the header) */}
         {showAnalytics && (
           <div className="mb-6">
-            <AnalyticsDashboard />
+            <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Analytics Dashboard" />}>
+              <AnalyticsDashboard />
+            </ErrorBoundaryWithCache>
           </div>
         )}
 
@@ -463,7 +583,9 @@ export function RoleEscrowDashboard({
                 </h2>
               </div>
               <div className="p-4">
-                <EscrowsByStatus escrows={escrows} userRole={userRole} />
+                <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Escrows by Status" />}>
+                  <EscrowsByStatus escrows={escrows} userRole={userRole} />
+                </ErrorBoundaryWithCache>
               </div>
             </div>
 
@@ -488,7 +610,9 @@ export function RoleEscrowDashboard({
                 </h2>
               </div>
               <div className="p-4">
-                <RecentActivity escrows={escrows} />
+                <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Recent Activity" />}>
+                  <RecentActivity escrows={escrows} />
+                </ErrorBoundaryWithCache>
               </div>
             </div>
           </div>
@@ -516,7 +640,9 @@ export function RoleEscrowDashboard({
                 </h2>
               </div>
               <div className="p-4">
-                <QuickActions userRole={userRole} />
+                <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Quick Actions" />}>
+                  <QuickActions userRole={userRole} />
+                </ErrorBoundaryWithCache>
               </div>
             </div>
 
@@ -839,6 +965,18 @@ export function RoleEscrowDashboard({
                   </button>
                 </PopoverContent>
               </Popover>
+              <button
+                onClick={handleExportTransactions}
+                disabled={filteredTransactions.length === 0}
+                className="flex items-center gap-2 text-sm
+                           border border-slate-600 rounded-lg
+                           px-3 py-1.5 hover:bg-slate-700
+                           transition-colors text-gray-700 dark:text-gray-300
+                           disabled:opacity-50 disabled:pointer-events-none"
+              >
+                <Download className="h-4 w-4" />
+                <span>{t("dashboard.exportCsv")}</span>
+              </button>
               <Link
                 href="/dashboard/escrow"
                 className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
@@ -849,7 +987,9 @@ export function RoleEscrowDashboard({
             </div>
           </div>
           <div className="overflow-x-auto">
-            <EscrowTable escrows={filteredTransactions} userRole={userRole} />
+            <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Escrow Table" />}>
+              <EscrowTable escrows={filteredTransactions} userRole={userRole} />
+            </ErrorBoundaryWithCache>
           </div>
         </div>
       </div>

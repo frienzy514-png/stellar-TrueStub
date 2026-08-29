@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { EmptyState } from '@/components/ui/empty-state';
 import { format } from 'date-fns';
 import { EscrowData } from './RoleEscrowDashboard';
 import { useRouter } from 'next/navigation';
@@ -32,6 +34,27 @@ type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
 interface EscrowTableProps {
   escrows: EscrowData[];
   userRole: 'guest' | 'event' | 'admin';
+  /** Show skeleton rows instead of data while a GraphQL query resolves. */
+  isLoading?: boolean;
+}
+
+/** Skeleton placeholder for a single table row while data loads. */
+function EscrowTableRowSkeleton() {
+  return (
+    <TableRow className="border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+      <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-32 mb-1" />
+        <Skeleton className="h-3 w-16" />
+      </TableCell>
+      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+      <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+      <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+    </TableRow>
+  );
 }
 
 const statusBadgeVariant = {
@@ -43,9 +66,11 @@ const statusBadgeVariant = {
   cancelled: 'destructive',
 } as const;
 
-export function EscrowTable({ escrows, userRole }: EscrowTableProps) {
+export function EscrowTable({ escrows, userRole, isLoading = false }: EscrowTableProps) {
   const { t } = useTranslation();
   const router = useRouter();
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(10);
@@ -90,6 +115,48 @@ export function EscrowTable({ escrows, userRole }: EscrowTableProps) {
     }
   };
 
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedEscrows = useMemo(() => {
+    if (!sortKey) return escrows;
+
+    const dateValue = (value?: string) => (value ? new Date(value).getTime() : 0);
+
+    const sorted = [...escrows].sort((a, b) => {
+      let comparison = 0;
+      switch (sortKey) {
+        case 'purchaseId':
+          comparison = (a.metadata?.purchaseId || '').localeCompare(b.metadata?.purchaseId || '');
+          break;
+        case 'eventName':
+          comparison = (a.metadata?.eventName || '').localeCompare(b.metadata?.eventName || '');
+          break;
+        case 'transferDate':
+          comparison = dateValue(a.metadata?.transferDate) - dateValue(b.metadata?.transferDate);
+          break;
+        case 'eventDate':
+          comparison = dateValue(a.metadata?.eventDate) - dateValue(b.metadata?.eventDate);
+          break;
+        case 'amount':
+          comparison = a.amount - b.amount;
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return sorted;
+  }, [escrows, sortKey, sortDirection]);
+
   const getActionButton = (escrow: EscrowData) => {
     if (userRole === 'event' && escrow.status === 'funded' && escrow.nextMilestone === 'transfer_initiated') {
       return (
@@ -129,6 +196,76 @@ export function EscrowTable({ escrows, userRole }: EscrowTableProps) {
       </Button>
     );
   };
+
+  const SortableHeader = ({ sortKey: key, label, className }: { sortKey: SortKey; label: string; className?: string }) => (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() => handleSort(key)}
+        className="flex items-center gap-1 font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+      >
+        {label}
+        {sortKey === key ? (
+          sortDirection === 'asc' ? (
+            <ArrowUp className="h-3.5 w-3.5" />
+          ) : (
+            <ArrowDown className="h-3.5 w-3.5" />
+          )
+        ) : (
+          <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+        )}
+      </button>
+    </TableHead>
+  );
+
+  if (error) {
+    return (
+      <div className="bg-white dark:bg-slate-800 rounded-md border border-gray-200 dark:border-slate-700">
+        <EmptyState
+          icon={AlertTriangle}
+          variant="error"
+          title={t('dashboard.errorLoadingEscrows')}
+          description={error}
+          actionLabel={onRetry ? t('dashboard.retry') : undefined}
+          onAction={onRetry}
+        />
+      </div>
+    );
+  }
+
+  const renderMobileCard = (escrow: EscrowData) => (
+    <div
+      key={escrow.id}
+      className="border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 last:border-b-0"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-medium text-gray-900 dark:text-white truncate">
+            {escrow.metadata?.eventName || '—'}
+          </p>
+          <p className="font-mono text-xs text-gray-500 dark:text-gray-400">
+            {escrow.metadata?.purchaseId || '—'}
+          </p>
+        </div>
+        <Badge variant={statusBadgeVariant[escrow.status] || 'outline'} className="whitespace-nowrap shrink-0">
+          {getStatusText(escrow.status)}
+        </Badge>
+      </div>
+
+      <dl className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1.5 text-sm">
+        <dt className="text-gray-500 dark:text-gray-400">{t('dashboard.tableAmount')}</dt>
+        <dd className="text-right text-gray-900 dark:text-white font-medium">
+          {formatCurrency(escrow.amount, escrow.asset.code)}
+        </dd>
+        <dt className="text-gray-500 dark:text-gray-400">{t('dashboard.transferDate')}</dt>
+        <dd className="text-right text-gray-900 dark:text-white">{formatDate(escrow.metadata?.transferDate)}</dd>
+        <dt className="text-gray-500 dark:text-gray-400">{t('dashboard.tableDates')}</dt>
+        <dd className="text-right text-gray-900 dark:text-white">{formatDate(escrow.metadata?.eventDate)}</dd>
+      </dl>
+
+      <div className="mt-3">{getActionButton(escrow)}</div>
+    </div>
+  );
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-md border border-gray-200 dark:border-slate-700">
@@ -208,16 +345,13 @@ export function EscrowTable({ escrows, userRole }: EscrowTableProps) {
                         </DropdownMenuItem>
                         {escrow.status === 'completed' && (
                           <DropdownMenuItem className="cursor-pointer">
-                            <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
-                            {t('dashboard.statusCompleted')}
+                            <FileText className="h-4 w-4 mr-2" />
+                            {t('common.view')}
                           </DropdownMenuItem>
-                        )}
-                        {escrow.status !== 'cancelled' && escrow.status !== 'completed' && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600 cursor-pointer">
-                              <XCircle className="h-4 w-4 mr-2" />
-                              {t('common.cancel')}
+                          {escrow.status === 'completed' && (
+                            <DropdownMenuItem className="cursor-pointer">
+                              <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
+                              {t('dashboard.statusCompleted')}
                             </DropdownMenuItem>
                           </>
                         )}

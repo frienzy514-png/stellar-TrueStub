@@ -4,6 +4,7 @@ import { Copy, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -12,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { exportWalletsToCSV } from "@/lib/exportToCSV";
 
 const PAGE_SIZE_OPTIONS = [5, 10, 25] as const;
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
@@ -25,6 +27,8 @@ interface WalletEntry {
 
 interface WalletAddressTableProps {
   wallets: WalletEntry[];
+  /** Show skeleton rows instead of wallet data while a query resolves. */
+  isLoading?: boolean;
 }
 
 function truncateAddress(address: string): string {
@@ -50,16 +54,90 @@ export function WalletAddressTable({ wallets }: WalletAddressTableProps) {
     }
   }
 
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDirection("asc");
+    }
+  }
+
+  function handleExport() {
+    exportWalletsToCSV(
+      wallets.map((w) => ({
+        address: w.fullAddress ?? w.address,
+        network: w.network,
+        isPrimary: w.isPrimary,
+      })),
+    );
+  }
+
+  const sortedWallets = useMemo(() => {
+    if (!sortKey) return wallets;
+
+    const sorted = [...wallets].sort((a, b) => {
+      let comparison = 0;
+      switch (sortKey) {
+        case "address":
+          comparison = (a.fullAddress ?? a.address).localeCompare(b.fullAddress ?? b.address);
+          break;
+        case "network":
+          comparison = a.network.localeCompare(b.network);
+          break;
+        case "isPrimary":
+          comparison = Number(a.isPrimary) - Number(b.isPrimary);
+          break;
+      }
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+    return sorted;
+  }, [wallets, sortKey, sortDirection]);
+
+  const SortableHeader = ({ sortKey: key, label, className }: { sortKey: SortKey; label: string; className?: string }) => (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() => handleSort(key)}
+        className="flex items-center gap-1 font-medium text-foreground hover:text-foreground/80 transition-colors"
+      >
+        {label}
+        {sortKey === key ? (
+          sortDirection === "asc" ? (
+            <ArrowUp className="h-3.5 w-3.5" />
+          ) : (
+            <ArrowDown className="h-3.5 w-3.5" />
+          )
+        ) : (
+          <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+        )}
+      </button>
+    </TableHead>
+  );
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Wallet Addresses
         </CardTitle>
-        <Button variant="outline" size="sm" className="gap-1">
-          <Plus className="h-4 w-4" />
-          Add Wallet
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1"
+            onClick={handleExport}
+            disabled={wallets.length === 0}
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1" onClick={onAddWallet}>
+            <Plus className="h-4 w-4" />
+            Add Wallet
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

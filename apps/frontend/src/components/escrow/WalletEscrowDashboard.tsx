@@ -23,6 +23,18 @@ import { EscrowCard } from './EscrowCard';
 import { useEscrowsBySignerQuery } from '@/components/tw-blocks/tanstack/useEscrowsBySignerQuery';
 import { useWalletContext } from '@/components/tw-blocks/wallet-kit/WalletProvider';
 import type { GetEscrowsFromIndexerResponse } from '@trustless-work/escrow/types';
+import { ErrorBoundaryWithCache } from '@/components/performance/ErrorBoundaryWithCache';
+
+/** Compact fallback shown when a single escrow card section throws. */
+function SimpleErrorFallback({ label }: { label: string }) {
+  return (
+    <div className="flex items-center justify-center p-6 rounded-xl border border-red-500/20 bg-red-50 dark:bg-red-900/10 text-center">
+      <p className="text-sm text-red-600 dark:text-red-400">
+        Failed to load <span className="font-semibold">{label}</span>. Please refresh the page.
+      </p>
+    </div>
+  );
+}
 
 export interface WalletEscrowDashboardProps {
   /**
@@ -199,35 +211,41 @@ export function WalletEscrowDashboard({
 
       {/* Main Grid - Escrow Cards by Role */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <EscrowCard
-          title="As Guest (Approver)"
-          escrows={escrowsByRole.approver}
-          role="approver"
-          signer={address}
-          isLoading={isLoading}
-          error={error}
-          onEscrowClick={onEscrowClick}
-        />
+        <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Approver Escrows" />}>
+          <EscrowCard
+            title="As Guest (Approver)"
+            escrows={escrowsByRole.approver}
+            role="approver"
+            signer={address}
+            isLoading={isLoading}
+            error={error}
+            onEscrowClick={onEscrowClick}
+          />
+        </ErrorBoundaryWithCache>
 
-        <EscrowCard
-          title="As Hotel (Marker)"
-          escrows={escrowsByRole.marker}
-          role="marker"
-          signer={address}
-          isLoading={isLoading}
-          error={error}
-          onEscrowClick={onEscrowClick}
-        />
+        <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Marker Escrows" />}>
+          <EscrowCard
+            title="As Hotel (Marker)"
+            escrows={escrowsByRole.marker}
+            role="marker"
+            signer={address}
+            isLoading={isLoading}
+            error={error}
+            onEscrowClick={onEscrowClick}
+          />
+        </ErrorBoundaryWithCache>
 
-        <EscrowCard
-          title="Platform Managed"
-          escrows={escrowsByRole.releaser}
-          role="releaser"
-          signer={address}
-          isLoading={isLoading}
-          error={error}
-          onEscrowClick={onEscrowClick}
-        />
+        <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Platform Managed Escrows" />}>
+          <EscrowCard
+            title="Platform Managed"
+            escrows={escrowsByRole.releaser}
+            role="releaser"
+            signer={address}
+            isLoading={isLoading}
+            error={error}
+            onEscrowClick={onEscrowClick}
+          />
+        </ErrorBoundaryWithCache>
       </div>
 
       {/* Error Display */}

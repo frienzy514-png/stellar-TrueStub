@@ -1,14 +1,17 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Home, User, Users } from "lucide-react";
+import { Home, Shield, User, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const SIDEBAR_LINKS = [
   {
     section: "General",
-    items: [{ label: "Account", href: "/dashboard/profile", icon: User }],
+    items: [
+      { label: "Account", href: "/dashboard/profile", icon: User },
+      { label: "Security", href: "/dashboard/profile/security", icon: Shield },
+    ],
   },
   {
     section: "Other",
