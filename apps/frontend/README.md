@@ -96,6 +96,12 @@ NEXT_PUBLIC_FIREBASE_APP_ID=<your appId>
 
 Make sure **Email/Password** sign-in is enabled in **Authentication → Sign-in method** for Register and Login to work. 📚 [Firebase Auth docs](https://firebase.google.com/docs/auth)
 
+To let users enable optional TOTP-based two-factor authentication
+(`/dashboard/profile/security`), turn on **Multi-factor authentication →
+TOTP** in **Authentication → Sign-in method** as well — the enroll/verify
+flow in `TwoFactorSettings.tsx` and the step-up prompt in `Login.tsx` both
+fail with a Firebase error until that's enabled on the project.
+
 ---
 
 #### 🌐 2. TrustlessWork API (Optional, don't need it yet)

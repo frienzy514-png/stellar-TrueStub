@@ -2,6 +2,7 @@ import "dotenv/config";
 import express, { type Express } from "express";
 import { env } from "./config/env";
 import { logger } from "./lib/logger";
+import { initSentry, Sentry } from "./lib/sentry";
 import { requestLogger } from "./middleware/requestLogger";
 import { corsMiddleware, helmetMiddleware } from "./middleware/security";
 import { authRateLimiter } from "./middleware/rateLimiter";
