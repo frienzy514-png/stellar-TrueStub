@@ -1,4 +1,4 @@
-import type { EventListing } from '@/@types/event';
+import type { EventListing } from '@/types/event';
 
 export const STUB_EVENTS: EventListing[] = [
   { id: '1', name: 'Coldplay: Music of the Spheres', address: 'Estadio Nacional, San José', price: 405, faceValue: 280, eventDate: '2026-11-14T20:00:00Z', section: 'West Floor', seat: 'Row 12, Seat 8', seatCount: 1, rowCount: 12, mobileTransfer: true, promoted: true, images: ['/img/hotel/hotel1.jpg'], category: 'Concerts', location: 'San José', owner: { name: 'Alberto Casas', avatar: '/img/person.png' }, description: 'Mobile-transfer ticket with a clear view of the main stage. Face value and resale price are shown before purchase.', favorite: false },

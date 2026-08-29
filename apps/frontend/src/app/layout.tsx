@@ -8,6 +8,7 @@ import "./globals.css";
 
 import { ClientProviders } from "@/providers/ClientProviders";
 import { ThemeProvider } from "next-themes";
+import { GraphQLDebugger } from "@/components/dev/GraphQLDebugger";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <TrustlessWorkProvider>
               {children}
               <Toaster richColors position="top-right" />
+              {process.env.NODE_ENV === 'development' && <GraphQLDebugger />}
             </TrustlessWorkProvider>
           </ClientProviders>
         </ThemeProvider>

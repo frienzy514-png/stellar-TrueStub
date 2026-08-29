@@ -1,7 +1,8 @@
 import "dotenv/config";
-import express from "express";
+import express, { type Express } from "express";
 import { env } from "./config/env";
 import { logger } from "./lib/logger";
+import { initSentry, Sentry } from "./lib/sentry";
 import { requestLogger } from "./middleware/requestLogger";
 import { corsMiddleware, helmetMiddleware } from "./middleware/security";
 import { authRateLimiter } from "./middleware/rateLimiter";
@@ -9,40 +10,42 @@ import { errorHandler } from "./middleware/errorHandler";
 import { healthRouter } from "./routes/health";
 import { listingsRouter } from "./routes/listings";
 import { webhookRouter } from "./routes/webhooks";
+// Issues #153–#156
+import { refundsRouter } from "./routes/refunds";
+import { transfersRouter } from "./routes/transfers";
+import { changelogRouter } from "./routes/changelog";
+import { disputesRouter } from "./routes/disputes";
 
-const app = express();
+export function createApp(): Express {
+  const app = express();
 
-// ── 1. Security headers + CORS (#25) ──────────────────────────────────────
-// Must come first so every response — including errors — carries the right
-// headers and CORS preflight requests are handled before any route logic.
-app.use(helmetMiddleware);
-app.use(corsMiddleware);
+  // Sentry request handler must be the very first middleware.
+  app.use(sentryRequestHandler());
 
-// ── 2. Structured request logging (#23) ───────────────────────────────────
-// After security middleware so that blocked CORS requests are still logged,
-// but before body parsing so the request-id is available on `req.log`.
-app.use(requestLogger);
+  app.use(helmetMiddleware);
+  app.use(corsMiddleware);
+  app.use(requestLogger);
+  app.use(express.json());
+  app.use("/api/auth", authRateLimiter);
+  app.use("/health", healthRouter);
+  app.use("/api/listings", listingsRouter);
+  app.use("/webhooks", webhookRouter);
+  // #153 — Refund idempotency
+  app.use("/api/refunds", refundsRouter);
+  // #154 — Atomic ownership transfers
+  app.use("/api/transfers", transfersRouter);
+  // #155 — Immutable changelog
+  app.use("/api/changelog", changelogRouter);
+  // #156 — Dispute state machine
+  app.use("/api/disputes", disputesRouter);
+  app.use(errorHandler);
+  return app;
+}
 
-// ── 3. Body parsing ────────────────────────────────────────────────────────
-app.use(express.json());
+export const app = createApp();
 
-// ── 4. Rate limiting on auth routes (#24) ─────────────────────────────────
-// Scoped to /api/auth/* — protects password-reset and token-validation
-// endpoints from brute-force / enumeration before any route handler runs.
-app.use("/api/auth", authRateLimiter);
-
-// ── 5. Routes ──────────────────────────────────────────────────────────────
-app.use("/health", healthRouter);
-app.use("/api/listings", listingsRouter);
-app.use("/webhooks", webhookRouter);
-
-// ── 6. Centralised error handler (#26) ────────────────────────────────────
-// Must be the last middleware registered. Catches errors forwarded via
-// next(err) from any route and maps them to consistent JSON responses.
-app.use(errorHandler);
-
-// ── Start ──────────────────────────────────────────────────────────────────
-app.listen(env.PORT, () => {
-  logger.info({ port: env.PORT, env: env.NODE_ENV }, "TrueStub backend listening");
-});
-
+if (require.main === module) {
+  app.listen(env.PORT, () => {
+    logger.info({ port: env.PORT, env: env.NODE_ENV }, "TrueStub backend listening");
+  });
+}

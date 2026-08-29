@@ -1,25 +1,41 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWalletDetection } from "./hooks/useWalletDetection";
 import { useMultiWallet } from "./hooks/useMultiWallet";
+import { useWalletSessionGuard } from "./hooks/useWalletSessionGuard";
 import WalletOption from "./WalletOption";
 import ConnectionStatus from "./ConnectionStatus";
+import WalletReconnectPrompt from "./WalletReconnectPrompt";
 import {
   STELLAR_WALLETS,
   ETHEREUM_WALLETS,
   POPULAR_WALLETS,
 } from "./utils/walletConfig";
 import { WalletType } from "./types/wallet.types";
+import { useWalletPersistence } from "./hooks/useWalletPersistence";
 
 interface WalletConnectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onWalletConnected?: (walletInfo: any) => void;
 }
+
+/**
+ * Derive the initial tab from a persisted wallet type so returning users
+ * land on the same category they last used.
+ */
+const deriveTabFromWalletType = (
+  walletType: WalletType | null,
+): "popular" | "stellar" | "ethereum" => {
+  if (!walletType) return "popular";
+  if (STELLAR_WALLETS.includes(walletType)) return "stellar";
+  if (ETHEREUM_WALLETS.includes(walletType)) return "ethereum";
+  return "popular";
+};
 
 export default function WalletConnectionModal({
   isOpen,
@@ -38,6 +54,20 @@ export default function WalletConnectionModal({
     updateWalletAddress,
     reset,
   } = useMultiWallet();
+
+  const { lastWalletType, saveWalletType, clearWalletType } =
+    useWalletPersistence();
+
+  // Pre-select the tab the user last visited.  Initialised to "popular" until
+  // the persistence hook hydrates from localStorage after mount.
+  const [activeTab, setActiveTab] = useState<"popular" | "stellar" | "ethereum">(
+    "popular",
+  );
+
+  // Once the hook hydrates, update the active tab to match the last selection.
+  useEffect(() => {
+    setActiveTab(deriveTabFromWalletType(lastWalletType));
+  }, [lastWalletType]);
 
   useEffect(() => {
     if (selectedWallet && onWalletConnected) {
@@ -58,7 +88,12 @@ export default function WalletConnectionModal({
 
   const handleConnect = async (walletType: WalletType) => {
     try {
+      // If the user is reconnecting after a session loss, clear the prompt.
+      setDisconnectedWallet(null);
       await connectWallet(walletType);
+      // Persist the chosen wallet type so the modal pre-selects it next time.
+      // Only the type identifier is stored — no keys or sensitive data.
+      saveWalletType(walletType);
     } catch (error) {
       console.error("Failed to connect wallet:", error);
     }
@@ -76,29 +111,18 @@ export default function WalletConnectionModal({
     return connectedWallets.some((w) => w.walletType === walletType);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="wallet-connection-modal-title"
-    >
-      <div className="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200 dark:border-gray-800">
-        <div className="flex items-center justify-between mb-6">
-          <h2 id="wallet-connection-modal-title" className="text-xl font-bold text-gray-900 dark:text-white">
-            Connect Wallet
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close connect wallet modal"
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            ×
-          </button>
-        </div>
+    <>
+      {/* Reconnect prompt — shown outside the modal so it is visible even when
+          the modal is closed (e.g. the user is on an escrow creation form). */}
+      {disconnectedWallet && (
+        <WalletReconnectPrompt
+          affectedWalletType={disconnectedWallet.walletType}
+          reason={disconnectedWallet.reason}
+          onReconnect={handleReconnect}
+          onDismiss={handleDismissReconnect}
+        />
+      )}
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg" role="alert">
@@ -106,7 +130,7 @@ export default function WalletConnectionModal({
           </div>
         )}
 
-        <Tabs defaultValue="popular" className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "popular" | "stellar" | "ethereum")} className="w-full">
           <TabsList className="grid w-full grid-cols-3" aria-label="Wallet categories">
             <TabsTrigger value="popular">Popular</TabsTrigger>
             <TabsTrigger value="stellar">Stellar</TabsTrigger>
@@ -194,7 +218,10 @@ export default function WalletConnectionModal({
         {connectedWallets.length > 0 && (
           <Button
             variant="ghost"
-            onClick={reset}
+            onClick={() => {
+              reset();
+              clearWalletType();
+            }}
             className="w-full mt-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
           >
             Disconnect All
@@ -207,7 +234,7 @@ export default function WalletConnectionModal({
             transactions
           </p>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }

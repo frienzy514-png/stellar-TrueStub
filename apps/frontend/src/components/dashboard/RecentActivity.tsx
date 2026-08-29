@@ -3,11 +3,14 @@
 import { Activity, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { EscrowData } from './RoleEscrowDashboard';
 import { useTranslation } from 'react-i18next';
 
 interface RecentActivityProps {
   escrows: EscrowData[];
+  /** Show skeleton rows instead of activity items while a query resolves. */
+  isLoading?: boolean;
 }
 
 const getActivityIcon = (status: string) => {
@@ -38,7 +41,25 @@ const getStatusBadgeVariant = (status: string) => {
   }
 };
 
-export function RecentActivity({ escrows }: RecentActivityProps) {
+/** Skeleton placeholder for a single activity row while data loads. */
+function ActivityItemSkeleton() {
+  return (
+    <div className="flex items-start space-x-3">
+      {/* icon placeholder */}
+      <Skeleton className="mt-0.5 h-4 w-4 rounded-full flex-shrink-0" />
+      <div className="flex-1 space-y-1.5">
+        <div className="flex justify-between items-center gap-2">
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-5 w-20 rounded-full flex-shrink-0" />
+        </div>
+        <Skeleton className="h-3 w-32" />
+        <Skeleton className="h-3 w-40" />
+      </div>
+    </div>
+  );
+}
+
+export function RecentActivity({ escrows, isLoading = false }: RecentActivityProps) {
   const { t } = useTranslation();
 
   const getActivityMessage = (escrow: EscrowData) => {
@@ -75,6 +96,25 @@ export function RecentActivity({ escrows }: RecentActivityProps) {
     }
   };
 
+  // Show skeleton while loading
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium dark:text-white">
+            {t('dashboard.recentActivity')}
+          </CardTitle>
+          <Activity className="h-4 w-4 text-muted-foreground dark:text-gray-400" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <ActivityItemSkeleton key={i} />
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Sort escrows by most recent update
   const recentEscrows = [...escrows]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
@@ -90,9 +130,11 @@ export function RecentActivity({ escrows }: RecentActivityProps) {
           <Activity className="h-4 w-4 text-muted-foreground dark:text-gray-400" />
         </CardHeader>
         <CardContent>
-          <div className="text-sm text-muted-foreground dark:text-gray-400 text-center py-4">
-            {t('dashboard.noActivity')}
-          </div>
+          <EmptyState
+            icon={Activity}
+            title={t('dashboard.noActivity')}
+            description={t('dashboard.noActivityDescription')}
+          />
         </CardContent>
       </Card>
     );

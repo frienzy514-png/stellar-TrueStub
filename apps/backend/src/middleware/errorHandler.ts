@@ -14,6 +14,7 @@
 import { ErrorRequestHandler, Request, Response, NextFunction } from "express";
 import { logger } from "../lib/logger";
 import { env } from "../config/env";
+import { Sentry } from "../lib/sentry";
 
 // ── Typed application error ────────────────────────────────────────────────
 
@@ -84,6 +85,7 @@ export const errorHandler: ErrorRequestHandler = (
   // Log the full error (with stack) but never expose internals to the client.
   const fallbackLogger = req.log ?? logger;
   fallbackLogger.error({ err }, "Unhandled error");
+  Sentry.captureException(err);
 
   const body: { error: { code: string; message: string; stack?: string } } = {
     error: {

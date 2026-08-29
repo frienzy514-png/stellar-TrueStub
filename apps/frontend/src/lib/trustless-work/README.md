@@ -18,6 +18,37 @@ src/lib/trustless-work/
 └── README.md            # This file
 ```
 
+## 🗂️ tw-blocks Escrow Component Trees
+
+The `src/components/tw-blocks/escrows/` directory contains three sub-folders. They are **not duplicates** — each serves a different integration style:
+
+```
+tw-blocks/escrows/
+├── single-release/         # Initialize-escrow form for single-release escrows only
+│   └── initialize-escrow/
+├── multi-release/          # Initialize-escrow form + headless action buttons for multi-release
+│   ├── initialize-escrow/  # Full initialize form; milestones carry individual amounts
+│   ├── approve-milestone/  # Headless <ApproveMilestone> button — all data passed via props,
+│   │                       #   hardcoded type: "multi-release", no EscrowContext dependency
+│   └── change-milestone-status/  # Headless <ChangeMilestoneStatus> button — same pattern
+└── single-multi-release/   # Dialog+form actions that work for BOTH escrow types
+    ├── approve-milestone/  # Self-contained dialog; reads contractId/type from EscrowContext,
+    │                       #   dispatches to "single-release" or "multi-release" automatically
+    ├── change-milestone-status/  # Same — dialog+form+evidence field, type-aware via context
+    └── fund-escrow/        # Dialog+form for funding; no equivalent in the other folders
+```
+
+### Why two "approve-milestone" / "change-milestone-status" implementations?
+
+| | `multi-release/` | `single-multi-release/` |
+|---|---|---|
+| **Style** | Headless button component | Full Dialog + Form component |
+| **Data source** | All data passed as props | Reads from `EscrowContext` (`selectedEscrow`) |
+| **Escrow type** | Hard-coded `"multi-release"` | Auto-detected from `selectedEscrow.type` |
+| **Use case** | Embed in any parent that already has the escrow data | Drop into the tw-blocks demo page / any `EscrowProvider`-wrapped tree |
+
+The `single-multi-release/` name reflects that those dialogs handle **both** escrow types — not that the folder is a hybrid of the `single-release/` and `multi-release/` init forms.
+
 ## 🚀 Getting Started
 
 ### 1. Environment Setup

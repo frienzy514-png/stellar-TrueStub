@@ -11,6 +11,7 @@ import {
 } from "@/interfaces/ticket-purchase-escrow.interface";
 import { EscrowCreationForm } from "./EscrowCreationForm";
 import { EscrowConfirmation } from "./EscrowConfirmation";
+import { useRequireVerifiedEmail } from "@/hooks/useRequireVerifiedEmail";
 
 // Providers
 import { TrustlessWorkProvider } from "@/components/tw-blocks/providers/TrustlessWork";
@@ -165,6 +166,7 @@ export function TicketEscrowWrapper({
   initialEventData,
 }: TicketEscrowWrapperProps) {
   const router = useRouter();
+  const emailVerificationStatus = useRequireVerifiedEmail();
   const [step, setStep] = useState<Step>(initialPurchaseData ? "form" : "loading");
   const [error, setError] = useState<string | null>(null);
   const [escrowData, setEscrowData] = useState<EscrowResponse | null>(null);
@@ -257,6 +259,16 @@ export function TicketEscrowWrapper({
     setError(null);
     setStep("loading");
   };
+
+  // Block escrow creation until the signed-in user has a verified email —
+  // useRequireVerifiedEmail() already redirects to /verify-email if needed.
+  if (emailVerificationStatus !== "verified") {
+    return (
+      <div className="w-full max-w-3xl mx-auto px-4 py-8">
+        <LoadingSpinner message="Checking your account..." />
+      </div>
+    );
+  }
 
   // Render based on current step
   return (

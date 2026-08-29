@@ -7,6 +7,7 @@ import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { useWallet } from "@/components/tw-blocks/wallet-kit/useWallet";
+import { clearPersistedCache } from "@/lib/cache-persistence";
 
 export function LogoutButton() {
   const router = useRouter();
@@ -20,6 +21,9 @@ export function LogoutButton() {
     } catch (error) {
       console.error("Error signing out:", error);
     } finally {
+      // Clear the persisted Apollo cache so a subsequent user on the same
+      // device does not see stale data from this session (shared-device risk).
+      await clearPersistedCache();
       clearAuth();
       router.push("/login");
     }

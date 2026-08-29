@@ -1,0 +1,27 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules for TrueStub
+//
+// NOTE: TrueStub currently uses Firebase for Authentication only.
+// Firebase Storage is not used by the current client code.
+// These rules lock down Storage completely by default.
+//
+// If Storage is adopted in the future (e.g. for ticket image uploads),
+// add targeted rules here.
+//
+// Deploy command:
+//   firebase deploy --only storage
+//
+// References:
+//   https://firebase.google.com/docs/storage/security/get-started
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Default-deny: block all reads and writes.
+    // Add path-specific rules above this catch-all when Storage is used.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

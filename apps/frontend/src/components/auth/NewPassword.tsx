@@ -9,10 +9,15 @@ import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import Illustration from "@/components/auth/ui/Illustration";
+import {
+  PasswordStrengthMeter,
+  getPasswordScore,
+} from "@/components/auth/ui/PasswordStrengthMeter";
 
 export default function NewPassword() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordStrength, setPasswordStrength] = useState<number>(-1);
   const [status, setStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
@@ -77,10 +82,16 @@ export default function NewPassword() {
                 type="password"
                 placeholder="Enter new password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setPasswordStrength(e.target.value ? zxcvbn(e.target.value).score : -1);
+                }}
                 required
                 minLength={8}
               />
+              {passwordStrength >= 0 && (
+                <PasswordStrengthBar score={passwordStrength} />
+              )}
             </div>
 
             <div className="space-y-2">

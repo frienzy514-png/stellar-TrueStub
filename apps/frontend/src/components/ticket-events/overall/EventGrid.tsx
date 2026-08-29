@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Event } from "@/@types/event.entity";
+import { Event } from "@/types/event.entity";
 import { hotelsMockData } from "@/components/ticket-events/mocks/events.mock";
 import EventCard from "./EventCard";
 

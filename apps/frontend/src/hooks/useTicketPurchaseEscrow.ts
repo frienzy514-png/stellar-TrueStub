@@ -14,7 +14,7 @@ import {
   UseTicketPurchaseEscrowOptions,
   UseTicketPurchaseEscrowReturn,
 } from '@/interfaces/ticket-purchase-escrow.interface';
-import { trustlineOptions } from '@/components/tw-blocks/wallet-kit/trustlines';
+import { trustlineOptions, getSupportedAssetsForActiveNetwork } from '@/components/tw-blocks/wallet-kit/trustlines';
 
 // Constants
 const STROOPS_MULTIPLIER = 10000000; // 1 XLM = 10,000,000 stroops
@@ -168,12 +168,14 @@ export function useTicketPurchaseEscrow({
     [purchaseData.totalAmount]
   );
 
-  // Resolve dynamic asset trustline
+  // Resolve dynamic asset trustline — uses network-aware asset list so the
+  // correct mainnet or testnet addresses are resolved automatically.
   const activeTrustline = useMemo(() => {
+    const networkAssets = getSupportedAssetsForActiveNetwork();
     const assetSymbol = (selectedAsset || purchaseData.currency || 'USDC').toUpperCase();
-    const matched = trustlineOptions.find(
+    const matched = networkAssets.find(
       (t) => t.symbol?.toUpperCase() === assetSymbol || t.label.toUpperCase() === assetSymbol
-    ) || trustlineOptions.find((t) => t.label === 'USDC') || trustlineOptions[0];
+    ) || networkAssets.find((t) => t.label === 'USDC') || networkAssets[0];
 
     return {
       address: matched?.value || process.env.NEXT_PUBLIC_USDC_ISSUER || '',

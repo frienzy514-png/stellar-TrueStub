@@ -1,6 +1,6 @@
 "use client";
 
-import type { EventListing } from "@/@types/event";
+import type { EventListing } from "@/types/event";
 import TicketListingGrid from "@/components/events/TicketListingGrid";
 import SectionTabs from "@/components/events/SectionTabs";
 import ListingFilterSidebar from "@/components/events/ListingFilterSidebar";
@@ -9,6 +9,18 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BsSortDownAlt } from "react-icons/bs";
 import GuestPurchasesSummary from "./GuestPurchasesSummary";
+import { ErrorBoundaryWithCache } from "@/components/performance/ErrorBoundaryWithCache";
+
+/** Compact fallback shown when a guest dashboard section throws. */
+function SimpleErrorFallback({ label }: { label: string }) {
+  return (
+    <div className="flex items-center justify-center p-6 rounded-xl border border-red-500/20 bg-red-50 text-center">
+      <p className="text-sm text-red-600">
+        Failed to load <span className="font-semibold">{label}</span>. Please refresh the page.
+      </p>
+    </div>
+  );
+}
 
 export default function GuestDashboard() {
   const router = useRouter();
@@ -127,13 +139,17 @@ export default function GuestDashboard() {
           onSelect={setSelectedBedrooms}
         />
 
-        <TicketListingGrid
-          listings={filteredListings}
-          onApartmentClick={handleApartmentClick}
-        />
+        <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Ticket Listings" />}>
+          <TicketListingGrid
+            listings={filteredListings}
+            onApartmentClick={handleApartmentClick}
+          />
+        </ErrorBoundaryWithCache>
 
         <div className="mt-6">
-          <GuestPurchasesSummary />
+          <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="My Purchases" />}>
+            <GuestPurchasesSummary />
+          </ErrorBoundaryWithCache>
         </div>
       </main>
     </div>

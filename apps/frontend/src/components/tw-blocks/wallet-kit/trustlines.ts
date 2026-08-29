@@ -4,7 +4,13 @@
  * @description Trustlines are the tokens that are used to pay for the escrow
  * @description The trustlines are filtered by the network
  * @description The trustlines are filtered by the network in the trustlineOptions
- * 
+ *
+ * ## Extending the asset list
+ * To add a new asset, append an entry to the `trustlines` array below and
+ * supply both a `testnet` and `mainnet` entry (or whichever networks apply).
+ * Consumer code reads assets through `getSupportedAssets(network)` which
+ * filters by the `network` field — no other changes are required.
+ *
  * Note: For Soroban contracts, `address` is the contract address (starts with C)
  * For traditional assets, `issuer` is the Stellar account that issues the asset (starts with G)
  */
@@ -114,4 +120,118 @@ export const getTrustlineBySymbol = (symbol: string, network = "testnet"): Trust
 };
 
 export const trustlineOptions: TrustlineOption[] = getSupportedAssets("testnet");
+
+// ---------------------------------------------------------------------------
+// Network-aware helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the active Stellar network ("testnet" | "mainnet") from the
+ * NEXT_PUBLIC_TRUSTLESS_NETWORK environment variable, defaulting to
+ * "testnet" in development and "mainnet" in production.
+ *
+ * Call this anywhere you need the network without importing from a context.
+ */
+export const getActiveNetwork = (): "testnet" | "mainnet" => {
+  const fromEnv = process.env.NEXT_PUBLIC_TRUSTLESS_NETWORK;
+  if (fromEnv === "testnet" || fromEnv === "mainnet") return fromEnv;
+  return process.env.NODE_ENV === "production" ? "mainnet" : "testnet";
+};
+
+/**
+ * Return the supported assets for the currently active network.
+ *
+ * Prefer this over the static `trustlineOptions` constant so that
+ * mainnet deployments automatically show mainnet assets.
+ *
+ * @example
+ * const assets = getSupportedAssetsForActiveNetwork();
+ * // → [{ value: "CCW67...", label: "USDC", ... }, ...]  on mainnet
+ */
+export const getSupportedAssetsForActiveNetwork = (): TrustlineOption[] =>
+  getSupportedAssets(getActiveNetwork());
+
+/**
+ * Add a custom asset to the `trustlines` registry at runtime.
+ *
+ * This is the primary extension point for multi-asset escrow work (#94).
+ * Pass a full asset definition and it will be available to all callers of
+ * `getSupportedAssets(network)` and `getSupportedAssetsForActiveNetwork()`
+ * for the remainder of the session.
+ *
+ * @param asset - Asset definition to register.
+ *
+ * @example
+ * addTrustlineAsset({
+ *   name: "yXLM",
+ *   symbol: "yXLM",
+ *   address: "CBIELTK6...",
+ *   issuer: "GBUYYBXWCLT2MOSSHRFCKMEDFOVSCAXNIEW424GLN666OEXHAAWBDYMX",
+ *   decimals: 10000000,
+ *   network: "testnet",
+ *   icon: "💫",
+ *   description: "Yield-bearing XLM",
+ * });
+ */
+export interface TrustlineAssetDefinition {
+  name: string;
+  symbol: string;
+  address: string;
+  issuer: string;
+  decimals: number;
+  network: "testnet" | "mainnet";
+  icon?: string;
+  description?: string;
+}
+
+export const addTrustlineAsset = (asset: TrustlineAssetDefinition): void => {
+  // Prevent duplicate registrations (idempotent by address + network).
+  const duplicate = trustlines.some(
+    (t) => t.address === asset.address && t.network === asset.network,
+  );
+  if (!duplicate) {
+    trustlines.push({
+      ...asset,
+      icon: asset.icon ?? "🪙",
+      description: asset.description ?? "",
+    });
+  }
+};
+
+// ---------------------------------------------------------------------------
+// React hook (client-side only)
+// ---------------------------------------------------------------------------
+
+import { useMemo } from "react";
+
+/**
+ * React hook that returns the trustline assets for a given network.
+ *
+ * Using this hook instead of the static `trustlineOptions` constant means
+ * components automatically receive the correct assets when the network
+ * changes, and pick up any assets registered via `addTrustlineAsset`.
+ *
+ * @param network - Override the network; defaults to `getActiveNetwork()`.
+ *
+ * @example
+ * function AssetSelector() {
+ *   const assets = useTrustlineAssets();
+ *   return (
+ *     <select>
+ *       {assets.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+ *     </select>
+ *   );
+ * }
+ */
+export const useTrustlineAssets = (
+  network?: "testnet" | "mainnet",
+): TrustlineOption[] => {
+  const resolvedNetwork = network ?? getActiveNetwork();
+  return useMemo(
+    () => getSupportedAssets(resolvedNetwork),
+    // Re-compute only when the resolved network changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [resolvedNetwork],
+  );
+};
 

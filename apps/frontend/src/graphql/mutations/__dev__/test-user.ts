@@ -1,3 +1,12 @@
+/**
+ * DEV-ONLY GraphQL mutations.
+ *
+ * These operations are used exclusively by ApolloTestComponent for local
+ * development / health-checking. They must not be imported from production
+ * code. All files in this __dev__/ directory are excluded from the
+ * production bundle by convention — do not add imports to them from any
+ * file outside __dev__/.
+ */
 import { graphql } from "@/graphql/generated";
 
 export const CREATE_TEST_USER = graphql(`

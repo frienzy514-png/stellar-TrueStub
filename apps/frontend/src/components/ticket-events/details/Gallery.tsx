@@ -13,11 +13,15 @@ export default function Gallery({ images }: GalleryProps) {
 
   return (
     <div className="flex flex-col md:flex-row gap-4">
-      <div className="w-full md:w-3/4">
+      {/* Main selected image.  `relative` is required for next/image fill mode. */}
+      <div className="relative w-full md:w-3/4 aspect-video overflow-hidden rounded-lg">
         <Image
           src={selectedImage}
-          alt="Selected Event Image"
-          className="w-full h-auto rounded-lg"
+          alt="Selected event photo"
+          fill
+          className="object-cover"
+          sizes="(max-width: 768px) 100vw, 75vw"
+          priority
         />
       </div>
 

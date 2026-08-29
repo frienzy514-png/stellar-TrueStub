@@ -18,10 +18,11 @@
     "lint:backend": "yarn workspace @truestub/backend lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "yarn workspace @truestub/frontend test",
+    "test": "yarn workspace @truestub/frontend test && yarn workspace @truestub/backend test",
     "typecheck": "yarn workspace @truestub/frontend typecheck && yarn workspace @truestub/backend typecheck",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
+    "release": "semantic-release",
     "prepare": "husky"
   },
   "devDependencies": {
