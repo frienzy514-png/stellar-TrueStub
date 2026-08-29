@@ -131,6 +131,7 @@ async function getTicketPurchase(purchaseId: string): Promise<TicketPurchaseData
         eventId: "event-001",
         totalAmount: 350.0,
         currency: "USDC",
+        quantity: 1,
         transferDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         eventDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
         guestEmail: "guest@example.com",
@@ -168,6 +169,8 @@ async function getTicketListing(listingId: string): Promise<TicketListingData> {
         seatSection: "General Admission",
         listingPrice: 120,
         ticketQuantity: 2,
+        pricePerUnit: 60,
+        allowPartialPurchase: true,
         amenities: ["WiFi", "Air Conditioning", "Mini Bar"],
       });
     }, 300);

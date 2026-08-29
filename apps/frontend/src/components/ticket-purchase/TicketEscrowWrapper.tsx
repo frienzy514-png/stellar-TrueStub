@@ -101,6 +101,7 @@ async function getTicketPurchase(purchaseId: string): Promise<TicketPurchaseData
         eventId: "event-001",
         totalAmount: 450.00,
         currency: "USDC",
+        quantity: 1,
         transferDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         eventDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
         guestEmail: "guest@example.com",
