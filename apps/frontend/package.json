@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "TrueStub — a trustless P2P escrow platform for secondary-market ticket transfers, built on Stellar via the TrustlessWork API.",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0",
+    "yarn": ">=4.0.0"
+  },
   "scripts": {
     "codegen": "graphql-codegen --config codegen.ts",
     "codegen:watch": "graphql-codegen --config codegen.ts --watch",

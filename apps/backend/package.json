@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "TrueStub backend service — scaffold only today (health check + project structure). See README.md for the roadmap.",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0",
+    "yarn": ">=4.0.0"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
