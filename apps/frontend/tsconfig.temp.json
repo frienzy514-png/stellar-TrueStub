@@ -1,7 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "include": [
-    "src/app/dashboard/escrow/[id]/page.tsx",
-    "src/components/dashboard/EscrowTable.tsx"
-  ]
-}
