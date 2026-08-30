@@ -11,14 +11,26 @@ export class PerformanceMonitor {
         return PerformanceMonitor.instance;
     }
 
+    // `window.performance` existing doesn't guarantee the User Timing API
+    // (mark/measure) is implemented — it isn't in some jsdom versions and
+    // some minimal/embedded browser environments — so feature-detect the
+    // methods we actually call, not just the presence of `performance`.
+    private hasUserTiming(): boolean {
+        return (
+            typeof window !== 'undefined' &&
+            typeof window.performance?.mark === 'function' &&
+            typeof window.performance?.measure === 'function'
+        );
+    }
+
     startMeasure(label: string) {
-        if (typeof window !== 'undefined' && window.performance) {
+        if (this.hasUserTiming()) {
             performance.mark(`${label}-start`);
         }
     }
 
     endMeasure(label: string) {
-        if (typeof window !== 'undefined' && window.performance) {
+        if (this.hasUserTiming()) {
             performance.mark(`${label}-end`);
             performance.measure(label, `${label}-start`, `${label}-end`);
 

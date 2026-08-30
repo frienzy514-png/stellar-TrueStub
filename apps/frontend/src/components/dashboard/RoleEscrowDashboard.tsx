@@ -22,6 +22,7 @@ import { EscrowTable } from "./EscrowTable";
 import { AnalyticsDashboard } from "./analytics";
 import { useTranslation } from "react-i18next";
 import { ErrorBoundaryWithCache } from "@/components/performance/ErrorBoundaryWithCache";
+import { usePerformanceTracking } from "@/hooks/usePerformanceTracking";
 
 /** Compact fallback shown when a single dashboard widget throws. */
 function SimpleErrorFallback({ label }: { label: string }) {
@@ -123,6 +124,11 @@ export function RoleEscrowDashboard({
   onRefresh,
 }: RoleEscrowDashboardProps) {
   const { t } = useTranslation();
+  // Reports real dashboard load timing to the dev-only Query Performance
+  // panel (components/dev/QueryPerformance.tsx) so it surfaces actual data
+  // instead of sitting empty. See performanceMonitor in
+  // utils/performance-monitor.ts.
+  usePerformanceTracking(`RoleEscrowDashboard:${userRole}`, isLoading);
   const [notifications, setNotifications] =
     useState<NotificationData[]>(initialNotifications);
   const [showAnalytics, setShowAnalytics] = useState(false);
