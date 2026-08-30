@@ -172,6 +172,21 @@ function PurchaseSummaryCard({
               </span>
             </div>
           </div>
+
+          {purchaseData.quantity > 1 && (
+            <div className="space-y-1">
+              <p className="text-xs uppercase tracking-wider text-slate-400">
+                Tickets
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">
+                  {purchaseData.quantity} x{" "}
+                  {(purchaseData.totalAmount / purchaseData.quantity).toFixed(2)}{" "}
+                  {currency}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Seat Section Badge */}

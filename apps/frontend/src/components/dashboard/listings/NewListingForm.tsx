@@ -42,12 +42,37 @@ export function NewListingForm() {
   const [petFriendly, setPetFriendly] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Multi-ticket / bundle listing fields
+  const [ticketQuantity, setTicketQuantity] = useState("1");
+  const [allowPartialPurchase, setAllowPartialPurchase] = useState(false);
+  const [bundlePrice, setBundlePrice] = useState("");
+
+  const parsedQuantity = Math.max(1, parseInt(ticketQuantity, 10) || 1);
+  const parsedUnitPrice = parseFloat(amount) || 0;
+  const parsedBundlePrice = bundlePrice ? parseFloat(bundlePrice) : undefined;
+  const isBundle = parsedQuantity > 1;
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
 
     try {
+      // TODO: Replace with actual API call
+      const payload = {
+        name,
+        location,
+        pricePerUnit: parsedUnitPrice,
+        ticketQuantity: parsedQuantity,
+        allowPartialPurchase: isBundle ? allowPartialPurchase : false,
+        bundlePrice: isBundle ? parsedBundlePrice : undefined,
+        promotion,
+        details,
+        rooms,
+        baths,
+        petFriendly,
+      };
       await new Promise((resolve) => setTimeout(resolve, 800));
+      console.log("New listing submitted:", payload);
       router.push("/dashboard/listings");
     } finally {
       setIsLoading(false);
@@ -73,7 +98,7 @@ export function NewListingForm() {
     },
     {
       id: "apt-amount",
-      label: "Amount to pay",
+      label: "Price per ticket",
       icon: DollarSign,
       value: amount,
       set: setAmount,
@@ -128,6 +153,59 @@ export function NewListingForm() {
               </Select>
             </div>
           </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="ticket-quantity">Number of tickets</Label>
+            <Input
+              id="ticket-quantity"
+              type="number"
+              min={1}
+              step={1}
+              className="w-28"
+              value={ticketQuantity}
+              onChange={(event) => setTicketQuantity(event.target.value)}
+              required
+            />
+          </div>
+
+          {isBundle && (
+            <div className="space-y-3 rounded-md border border-orange-200 bg-orange-50/50 p-4 dark:border-gray-600 dark:bg-gray-800/50">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="allow-partial-purchase"
+                  checked={allowPartialPurchase}
+                  onCheckedChange={(checked) => setAllowPartialPurchase(Boolean(checked))}
+                  className="border-orange-400 data-[state=checked]:border-orange-500 data-[state=checked]:bg-orange-500"
+                />
+                <Label htmlFor="allow-partial-purchase">
+                  Allow buyers to purchase individual tickets
+                </Label>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="bundle-price">
+                  Full bundle price (optional discount)
+                </Label>
+                <Input
+                  id="bundle-price"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder={`Defaults to ${parsedQuantity} x $${parsedUnitPrice || 0}`}
+                  value={bundlePrice}
+                  onChange={(event) => setBundlePrice(event.target.value)}
+                />
+              </div>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {allowPartialPurchase
+                  ? `Buyers can purchase 1-${parsedQuantity} ticket(s) at $${parsedUnitPrice || 0} each.`
+                  : `Buyers must purchase all ${parsedQuantity} tickets together${
+                      parsedBundlePrice ? ` for $${parsedBundlePrice}` : ""
+                    }.`}
+              </p>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-end gap-4">
             <div className="space-y-1.5">
