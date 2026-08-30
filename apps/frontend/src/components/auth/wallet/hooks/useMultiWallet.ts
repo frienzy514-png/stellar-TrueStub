@@ -356,6 +356,29 @@ export const useMultiWallet = (
   }, [selectedWallet, refreshBalancesForKey]);
 
   /**
+   * Update an already-connected wallet's address after an account switch.
+   * The wallet type must already be in connectedWallets; only the address
+   * (and derived fields) are replaced — the wallet remains connected.
+   */
+  const updateWalletAddress = useCallback(
+    (updatedWallet: WalletInfo) => {
+      setConnectedWallets((prev) =>
+        prev.map((w) =>
+          w.walletType === updatedWallet.walletType ? updatedWallet : w,
+        ),
+      );
+      // If this is the selected wallet, update that too.
+      setSelectedWallet((prev) =>
+        prev?.walletType === updatedWallet.walletType ? updatedWallet : prev,
+      );
+      if (updatedWallet.chain === "stellar") {
+        refreshBalancesForKey(updatedWallet.address);
+      }
+    },
+    [refreshBalancesForKey],
+  );
+
+  /**
    * Send payment using the selected Stellar wallet
    */
   const sendPayment = useCallback(
@@ -421,6 +444,7 @@ export const useMultiWallet = (
     connectWallet,
     disconnectWallet,
     selectWallet,
+    updateWalletAddress,
     reset,
     balances,
     refreshBalances,

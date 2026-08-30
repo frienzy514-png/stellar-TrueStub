@@ -51,6 +51,7 @@ export default function WalletConnectionModal({
     connectWallet,
     disconnectWallet,
     selectWallet,
+    updateWalletAddress,
     reset,
   } = useMultiWallet();
 
@@ -190,6 +191,7 @@ export default function WalletConnectionModal({
               selectedWallet={selectedWallet}
               onSelectWallet={selectWallet}
               onDisconnect={handleDisconnect}
+              onAccountSwitched={updateWalletAddress}
             />
           </>
         )}
