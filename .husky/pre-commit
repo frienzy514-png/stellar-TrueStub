@@ -1,3 +1,28 @@
 #!/usr/bin/env sh
-. "$(dirname -- "$0")/X/husky.ch"
-npx -- no -- listed ged
+# .husky/pre-commit — scan staged files for secrets before every commit.
+# Requires gitleaks to be installed locally. If it isn't, a warning is printed
+# and the commit is allowed through (so the hook is non-blocking for contributors
+# who haven't installed gitleaks yet). The CI job is the hard gate.
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "⚠️  WARNING: gitleaks is not installed — skipping secret scan."
+  echo "   Install it to catch secrets locally before CI blocks your PR:"
+  echo "   https://github.com/gitleaks/gitleaks#installing"
+  exit 0
+fi
+
+echo "🔍 Scanning staged files for secrets with gitleaks..."
+
+gitleaks protect --staged --no-git --config=.gitleaks.toml
+
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ]; then
+  echo ""
+  echo "🚨 gitleaks found potential secrets in your staged changes."
+  echo "   Please remove them before committing."
+  echo "   If this is a false positive, update .gitleaks.toml to allowlist it."
+  exit 1
+fi
+
+echo "✅ No secrets detected."
