@@ -1,4 +1,13 @@
-import EthereumProvider from "@walletconnect/ethereum-provider";
+import type EthereumProvider from "@walletconnect/ethereum-provider";
+
+// @walletconnect/ethereum-provider pulls in a large dependency tree
+// (~500 KB+ gzipped).  We load it dynamically so it's only fetched when
+// the user explicitly opens the WalletConnect flow, not on every page.
+async function getEthereumProvider() {
+  const mod = await import("@walletconnect/ethereum-provider");
+  // CJS interop: the default export may be on `.default`
+  return (mod.default ?? mod) as typeof EthereumProvider;
+}
 
 // WalletConnect Project ID - Replace with your actual project ID from WalletConnect Cloud
 const WALLETCONNECT_PROJECT_ID =
@@ -12,7 +21,10 @@ export const initializeWalletConnect = async () => {
   }
 
   try {
-    ethereumProvider = await EthereumProvider.init({
+    // Dynamic import — WalletConnect is only fetched when this function runs
+    const EthereumProviderClass = await getEthereumProvider();
+
+    ethereumProvider = await EthereumProviderClass.init({
       projectId: WALLETCONNECT_PROJECT_ID,
       chains: [1, 56], // Ethereum mainnet and BSC
       showQrModal: true,

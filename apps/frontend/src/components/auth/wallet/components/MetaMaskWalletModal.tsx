@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ethers } from "ethers";
+
+// ethers is only needed when the user clicks "Connect MetaMask", so we
+// load it lazily to keep it out of the initial page bundle.
+async function getEthers() {
+  const { ethers } = await import("ethers");
+  return ethers;
+}
 import { Button } from "@/components/ui/button";
 import { 
   X, 
@@ -57,15 +63,15 @@ export const MetaMaskWalletModal: React.FC<MetaMaskWalletModalProps> = ({
       setIsConnecting(true);
       setError(null);
 
-      let signer = null;
-      let provider;
-
       if (window.ethereum == null) {
         throw new Error("MetaMask is not installed");
-      } else {
-        provider = new ethers.BrowserProvider(window.ethereum);
-        signer = await provider.getSigner();
       }
+
+      // Dynamic import — only fetched when the user clicks Connect
+      const ethers = await getEthers();
+
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
 
       // Get account details
       const address = await signer.getAddress();

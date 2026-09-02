@@ -1,6 +1,6 @@
 'use client';
 
-import type { EventListing } from '@/@types/event';
+import type { EventListing } from '@/types/event';
 import ListingCard from './ListingCard';
 
 interface TicketListingGridProps {

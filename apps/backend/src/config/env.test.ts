@@ -8,7 +8,7 @@ describe("Backend Environment Validation", () => {
     assert.equal(parsed.PORT, 4000);
     assert.equal(parsed.NODE_ENV, "development");
     assert.equal(parsed.TRUSTLESS_WORK_WEBHOOK_SECRET, undefined);
-    assert.equal(parsed.HASURA_GRAPHQL_ENDPOINT, undefined);
+    assert.equal(parsed.HASURA_GRAPHQL_URL, undefined);
     assert.equal(parsed.HASURA_GRAPHQL_ADMIN_SECRET, undefined);
   });
 
@@ -26,11 +26,11 @@ describe("Backend Environment Validation", () => {
       PORT: "4000",
       NODE_ENV: "test",
       TRUSTLESS_WORK_WEBHOOK_SECRET: "whsec_test123",
-      HASURA_GRAPHQL_ENDPOINT: "https://graphql.example.com/v1/graphql",
+      HASURA_GRAPHQL_URL: "https://graphql.example.com/v1/graphql",
       HASURA_GRAPHQL_ADMIN_SECRET: "admin_secret_456",
     });
     assert.equal(parsed.TRUSTLESS_WORK_WEBHOOK_SECRET, "whsec_test123");
-    assert.equal(parsed.HASURA_GRAPHQL_ENDPOINT, "https://graphql.example.com/v1/graphql");
+    assert.equal(parsed.HASURA_GRAPHQL_URL, "https://graphql.example.com/v1/graphql");
     assert.equal(parsed.HASURA_GRAPHQL_ADMIN_SECRET, "admin_secret_456");
   });
 
@@ -41,7 +41,7 @@ describe("Backend Environment Validation", () => {
         assert.match(err.message, /Invalid environment variables/);
         assert.match(err.message, /PORT/);
         return true;
-      },
+      }
     );
   });
 
@@ -51,7 +51,7 @@ describe("Backend Environment Validation", () => {
       (err: Error) => {
         assert.match(err.message, /PORT/);
         return true;
-      },
+      }
     );
 
     assert.throws(
@@ -59,7 +59,7 @@ describe("Backend Environment Validation", () => {
       (err: Error) => {
         assert.match(err.message, /PORT/);
         return true;
-      },
+      }
     );
   });
 
@@ -69,17 +69,17 @@ describe("Backend Environment Validation", () => {
       (err: Error) => {
         assert.match(err.message, /NODE_ENV/);
         return true;
-      },
+      }
     );
   });
 
-  it("should throw on invalid HASURA_GRAPHQL_ENDPOINT URL format", () => {
+  it("should throw on invalid HASURA_GRAPHQL_URL URL format", () => {
     assert.throws(
-      () => validateEnv({ HASURA_GRAPHQL_ENDPOINT: "not-a-valid-url" }),
+      () => validateEnv({ HASURA_GRAPHQL_URL: "not-a-valid-url" }),
       (err: Error) => {
-        assert.match(err.message, /HASURA_GRAPHQL_ENDPOINT/);
+        assert.match(err.message, /HASURA_GRAPHQL_URL/);
         return true;
-      },
+      }
     );
   });
 });

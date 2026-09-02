@@ -11,6 +11,8 @@ export interface TicketPurchaseData {
   eventId: string;
   totalAmount: number;
   currency: string;
+  /** Number of ticket units this purchase covers (must be <= listing's available ticketQuantity) */
+  quantity: number;
   transferDate: string;
   eventDate: string;
   guestEmail: string;
@@ -37,6 +39,12 @@ export interface TicketListingData {
   seatSection: string;
   listingPrice: number;
   ticketQuantity: number;
+  /** Price for a single ticket unit */
+  pricePerUnit: number;
+  /** Whether a buyer may purchase fewer than ticketQuantity units */
+  allowPartialPurchase: boolean;
+  /** Optional flat price for buying the full bundle (ticketQuantity units) at a discount. Falls back to ticketQuantity * pricePerUnit when omitted. */
+  bundlePrice?: number;
   amenities?: string[];
   imageUrl?: string;
 }

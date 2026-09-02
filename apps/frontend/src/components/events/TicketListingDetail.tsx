@@ -1,6 +1,6 @@
 'use client';
 
-import type { EventListing } from '@/@types/event';
+import type { EventListing } from '@/types/event';
 import Image from 'next/image';
 import { FaMapMarkerAlt } from 'react-icons/fa';
 import ListingFeatureIcons from './ListingFeatureIcons';

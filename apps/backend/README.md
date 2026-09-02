@@ -51,6 +51,21 @@ private key. The Hasura admin secret must **only** ever live here, never in
 `apps/frontend` — see the security note in
 [`apps/frontend/README.md`](../frontend/README.md#-3-hasura-graphql).
 
+## Observability
+
+- **Error tracking**: `src/lib/sentry.ts` initializes Sentry when the
+  `SENTRY_DSN` env var is set (see `.env.example`); it's a no-op otherwise,
+  so local dev and CI don't need a Sentry project. Once set, unhandled
+  exceptions in any route are reported to Sentry in addition to the
+  structured logs from `src/lib/logger.ts`.
+- **Uptime monitoring**: `.github/workflows/backend-uptime.yml` pings
+  `/health` on a schedule and fails the run (triggering GitHub's workflow
+  failure notification) if it doesn't respond `200` with
+  `{ "status": "ok" }`. It's skipped until this service is deployed
+  somewhere and a `BACKEND_HEALTH_URL` repository variable
+  (Settings → Secrets and variables → Actions → Variables) is set to that
+  deployment's `/health` URL.
+
 ## Roadmap: routes to migrate here
 
 These currently live in `apps/frontend` as proxies to external URLs. Moving

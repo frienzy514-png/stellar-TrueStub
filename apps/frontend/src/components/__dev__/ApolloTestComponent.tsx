@@ -1,10 +1,28 @@
+/**
+ * DEV-ONLY COMPONENT
+ *
+ * This component is intentionally kept out of the production bundle.
+ * It lives under __dev__/ alongside the test-only GraphQL operations it imports.
+ *
+ * Do NOT import this component from any production page or provider.
+ * If you need it locally, import it inside a `process.env.NODE_ENV !== 'production'`
+ * guard or use it only on a dev-only route (e.g. /dev/apollo-test).
+ */
+
 "use client";
 
 import { useQuery, useMutation } from "@apollo/client/react";
-import { GET_ESCROW_TRANSACTIONS } from "@/graphql/queries/testQuery.graphql";
-import { CREATE_TEST_USER } from "@/graphql/mutations/test-user";
+import { GET_ESCROW_TRANSACTIONS } from "@/graphql/queries/__dev__/testQuery.graphql";
+import { CREATE_TEST_USER } from "@/graphql/mutations/__dev__/test-user";
 import { useState } from "react";
 import { ToastContainer, toast } from "react-toastify";
+
+if (process.env.NODE_ENV === "production") {
+  throw new Error(
+    "ApolloTestComponent must not be rendered in production. " +
+      "Import it only inside a dev-only route or a NODE_ENV guard.",
+  );
+}
 
 export default function ApolloTestComponent() {
   const [email, setEmail] = useState("");

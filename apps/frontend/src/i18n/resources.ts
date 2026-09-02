@@ -118,6 +118,37 @@ const resources = {
         metaMaskWallet: "MetaMask",
         disconnectWallet: "Disconnect Wallet",
         connectedAs: "Connected as",
+
+        // Two-Factor Authentication
+        twoFactor: {
+          title: "Two-Factor Authentication",
+          description:
+            "Add an extra layer of security to your account by requiring a code from an authenticator app when you sign in.",
+          statusEnabled: "Enabled",
+          statusDisabled: "Disabled",
+          enableButton: "Enable 2FA",
+          disableButton: "Disable 2FA",
+          cancel: "Cancel",
+          step1Title: "Scan this QR code",
+          step1Description:
+            "Scan the QR code below with an authenticator app (such as Google Authenticator or Authy), or enter the key manually.",
+          manualKeyLabel: "Or enter this key manually",
+          codeLabel: "Enter the 6-digit code from your app",
+          codePlaceholder: "123456",
+          verifyButton: "Verify and enable",
+          verifying: "Verifying...",
+          disabling: "Disabling...",
+          enrollSuccess: "Two-factor authentication is now enabled.",
+          disableSuccess: "Two-factor authentication has been disabled.",
+          disableConfirm: "Are you sure you want to disable two-factor authentication?",
+          genericError: "Something went wrong. Please try again.",
+          invalidCode: "That code is invalid or has expired — please try again.",
+          requiresRecentLogin:
+            "For your security, please sign out and sign in again before changing this setting.",
+          mfaPromptTitle: "Enter your authentication code",
+          mfaPromptDescription: "Enter the 6-digit code from your authenticator app to finish signing in.",
+          mfaVerifyButton: "Verify",
+        },
       },
 
       dashboard: {
@@ -154,8 +185,13 @@ const resources = {
         max: "Max $",
         retry: "Retry",
         noActivity: "No recent activity",
+        noActivityDescription: "Activity on your escrows will show up here.",
         itemsPerPage: "Items per page",
         showingCount: "Showing {{current}} of {{total}}",
+        exportCsv: "Export CSV",
+        errorLoadingEscrows: "Couldn't load escrows",
+        noEscrowsTitle: "No escrows yet",
+        noEscrowsDescription: "Once you create or receive an escrow, it will show up here.",
 
         // Status badges
         statusPending: "Pending",
@@ -268,6 +304,14 @@ const resources = {
 
       toast: {
         walletError: "Please connect your wallet first",
+      },
+
+      wallet: {
+        networkMismatch: {
+          title: "Network mismatch",
+          description:
+            "Your wallet is on '{{actual}}' but the app expects '{{expected}}'. Please switch networks in your wallet before creating or funding an escrow.",
+        },
       },
 
       propertyList: {
@@ -582,6 +626,38 @@ const resources = {
         metaMaskWallet: "MetaMask",
         disconnectWallet: "Desconectar Billetera",
         connectedAs: "Conectado como",
+
+        // Autenticación de dos factores
+        twoFactor: {
+          title: "Autenticación de dos factores",
+          description:
+            "Añade una capa extra de seguridad a tu cuenta solicitando un código de una app de autenticación al iniciar sesión.",
+          statusEnabled: "Activada",
+          statusDisabled: "Desactivada",
+          enableButton: "Activar 2FA",
+          disableButton: "Desactivar 2FA",
+          cancel: "Cancelar",
+          step1Title: "Escanea este código QR",
+          step1Description:
+            "Escanea el código QR con una app de autenticación (como Google Authenticator o Authy), o introduce la clave manualmente.",
+          manualKeyLabel: "O introduce esta clave manualmente",
+          codeLabel: "Introduce el código de 6 dígitos de tu app",
+          codePlaceholder: "123456",
+          verifyButton: "Verificar y activar",
+          verifying: "Verificando...",
+          disabling: "Desactivando...",
+          enrollSuccess: "La autenticación de dos factores está activada.",
+          disableSuccess: "La autenticación de dos factores ha sido desactivada.",
+          disableConfirm: "¿Seguro que quieres desactivar la autenticación de dos factores?",
+          genericError: "Algo salió mal. Por favor intenta de nuevo.",
+          invalidCode: "Ese código no es válido o ha expirado — inténtalo de nuevo.",
+          requiresRecentLogin:
+            "Por tu seguridad, cierra sesión y vuelve a iniciar sesión antes de cambiar esta opción.",
+          mfaPromptTitle: "Introduce tu código de autenticación",
+          mfaPromptDescription:
+            "Introduce el código de 6 dígitos de tu app de autenticación para completar el inicio de sesión.",
+          mfaVerifyButton: "Verificar",
+        },
       },
 
       dashboard: {
@@ -618,8 +694,13 @@ const resources = {
         max: "Máx $",
         retry: "Reintentar",
         noActivity: "Sin actividad reciente",
+        noActivityDescription: "La actividad de tus fideicomisos aparecerá aquí.",
         itemsPerPage: "Elementos por página",
         showingCount: "Mostrando {{current}} de {{total}}",
+        exportCsv: "Exportar CSV",
+        errorLoadingEscrows: "No se pudieron cargar los fideicomisos",
+        noEscrowsTitle: "Aún no hay fideicomisos",
+        noEscrowsDescription: "Cuando crees o recibas un fideicomiso, aparecerá aquí.",
 
         // Status badges
         statusPending: "Pendiente",
@@ -732,6 +813,14 @@ const resources = {
 
       toast: {
         walletError: "Por favor conecta tu billetera primero",
+      },
+
+      wallet: {
+        networkMismatch: {
+          title: "Red incorrecta",
+          description:
+            "Tu billetera está en '{{actual}}' pero la aplicación espera '{{expected}}'. Por favor cambia de red en tu billetera antes de crear o financiar un fideicomiso.",
+        },
       },
 
       propertyList: {

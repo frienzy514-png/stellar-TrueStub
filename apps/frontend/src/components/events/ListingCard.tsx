@@ -1,6 +1,6 @@
 "use client";
 
-import type { EventListing } from "@/@types/event";
+import type { EventListing } from "@/types/event";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { AiOutlineHeart } from "react-icons/ai";

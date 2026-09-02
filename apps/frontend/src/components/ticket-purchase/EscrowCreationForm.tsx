@@ -43,7 +43,7 @@ import {
   Info,
 } from "lucide-react";
 
-import { trustlineOptions, TrustlineOption } from "@/components/tw-blocks/wallet-kit/trustlines";
+import { useTrustlineAssets, TrustlineOption } from "@/components/tw-blocks/wallet-kit/trustlines";
 import { Coins } from "lucide-react";
 
 export interface EscrowCreationFormProps {
@@ -172,6 +172,21 @@ function PurchaseSummaryCard({
               </span>
             </div>
           </div>
+
+          {purchaseData.quantity > 1 && (
+            <div className="space-y-1">
+              <p className="text-xs uppercase tracking-wider text-slate-400">
+                Tickets
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">
+                  {purchaseData.quantity} x{" "}
+                  {(purchaseData.totalAmount / purchaseData.quantity).toFixed(2)}{" "}
+                  {currency}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Seat Section Badge */}
@@ -342,6 +357,10 @@ export function EscrowCreationForm({
     initialAsset || purchaseData.currency || "USDC"
   );
 
+  // Network-aware trustline assets so the currency selector always shows the
+  // correct set for testnet or mainnet.
+  const trustlineAssets = useTrustlineAssets();
+
   const {
     escrowFormData,
     milestones,
@@ -429,7 +448,7 @@ export function EscrowCreationForm({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {trustlineOptions.map((asset) => {
+              {trustlineAssets.map((asset) => {
                 const isSelected = selectedCurrency.toUpperCase() === asset.symbol.toUpperCase();
                 return (
                   <button

@@ -3,6 +3,9 @@ src/graphql/generated/
 
 # testing
 /coverage
+**/__snapshots__/
+**/test_snapshots/
+jest-results.json
 
 # next.js
 /.next/
@@ -20,3 +23,14 @@ src/graphql/generated/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+tsconfig.temp.json
+
+# cypress
+cypress/videos/
+cypress/screenshots/
+cypress/downloads/
+cypress/fixtures/example.json
+
+# misc
+.DS_Store
+*.pem
