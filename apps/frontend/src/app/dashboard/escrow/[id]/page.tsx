@@ -11,6 +11,7 @@ import { formatEscrowAmount } from "@/lib/formatEscrowAmount";
 import { RatingReviewModal } from "@/components/ratings/RatingReviewModal";
 import { RaiseDisputeModal } from "@/components/dispute/RaiseDisputeModal";
 import { DisputeArbitrationCard } from "@/components/dispute/DisputeArbitrationCard";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 import type { Milestone } from "@/components/dashboard/RoleEscrowDashboard";
 
 
@@ -69,6 +70,16 @@ export default async function EscrowDetailPage({
       </div>
 
       <InvoiceHeader invoiceNumber={escrow.invoiceNumber} status={escrow.status} />
+
+      {isFeatureEnabled("ESCROW_RECEIPTS") &&
+        (["RELEASED", "COMPLETED"] as string[]).includes(escrow.status) && (
+          <Link
+            href={`/dashboard/escrow/${encodeURIComponent(id)}/receipt`}
+            className="inline-block text-sm text-blue-600 underline"
+          >
+            View printable receipt
+          </Link>
+        )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-6">
         <div className="space-y-6">
