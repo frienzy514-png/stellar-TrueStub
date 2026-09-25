@@ -82,7 +82,7 @@ export const MOCK_LISTINGS: TicketListing[] = [
     price: 1500,
     warranty_deposit: 3000,
     is_available: false,
-    image_urls: ["/img/hotel/hotel1.jpg"],
+    image_urls: ["/img/event/event1.jpg"],
     address: {
       street: "Avenida Central",
       neighborhood: "Centro",

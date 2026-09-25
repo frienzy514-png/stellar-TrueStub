@@ -29,8 +29,8 @@ export default function EventPage() {
           <div className="w-full md:w-2/3 flex flex-wrap">
             <div className="w-full md:w-3/4 lg:w-3/4">
               <Information
-                name="Shikara Hotel"
-                location="329 Calle Santos, Paseo Colón, San José, Costa Rica"
+                name="Coldplay Live"
+                location="Estadio Nacional, La Sabana, San José, Costa Rica"
                 price="$40.18"
               />
             </div>
@@ -47,7 +47,7 @@ export default function EventPage() {
                 />
               </div>
               <div className="w-full md:w-1/2 min-h-[250px]">
-                <EventMap coordinates={coordinates} eventName="Shikara Hotel" />
+                <EventMap coordinates={coordinates} eventName="Coldplay Live" />
               </div>
             </div>
             <div className="hidden md:block md:w-1/4 lg:w-1/4"></div>

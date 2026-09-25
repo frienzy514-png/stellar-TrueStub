@@ -71,8 +71,9 @@ etc.).
 
 ## Code of conduct
 
-Be respectful and constructive in issues, PRs, and reviews. Disagreements
-about code are fine; personal attacks aren't.
+This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
+By participating, you are expected to uphold it. Please report unacceptable
+behaviour via the process described in [SECURITY.md](SECURITY.md).
 
 ---
 

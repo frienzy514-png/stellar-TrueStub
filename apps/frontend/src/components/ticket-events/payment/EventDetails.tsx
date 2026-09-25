@@ -18,6 +18,7 @@ interface EventDetailsProps {
 
 const EventDetails: React.FC<EventDetailsProps> = ({
   eventName,
+  description,
   details,
   goodToKnow,
   location,
@@ -30,7 +31,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({
       <div className="flex flex-col md:flex-row gap-8 mb-6">
         <div className="w-full md:w-1/3 flex-shrink-0">
           <Image
-            src={imageUrl || "/img/hotel/hotel1.jpg"}
+            src={imageUrl || "/img/event/event1.jpg"}
             alt={`${eventName} view`}
             width={316}
             height={265}
@@ -41,7 +42,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({
         <div className="flex flex-col justify-center">
           <h2 className="text-3xl font-bold text-gray-800 mb-3">{eventName}</h2>
           <p className="text-xl text-gray-600 mb-6">
-            King bed stylish Apartment
+            {description}
           </p>
           <div className="flex items-center mb-6">
             {[...Array(5)].map((_, i) => (

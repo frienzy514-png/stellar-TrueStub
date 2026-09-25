@@ -9,7 +9,6 @@ export { EscrowDisputedView } from "./EscrowDisputedView";
 export { getViewForStatus } from "./getViewForStatus";
 
 export type { EscrowViewKind } from "./getViewForStatus";
-export { getStubEscrow } from "./stubEscrow";
 export { InvoiceMetadata } from "./InvoiceMetadata";
 export { PaymentBatchTable } from "./PaymentBatchTable";
-export type { StubEscrowDetail } from "./types";
+export type { EscrowDetail } from "./types";

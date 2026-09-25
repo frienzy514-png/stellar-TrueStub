@@ -3,7 +3,31 @@
 import Link from "next/link";
 import { useQuery } from "@apollo/client/react";
 import { PlusCircle } from "lucide-react";
-import { GET_EVENTS, type EventRow } from "@/graphql/queries/event-queries";
+
+// TODO: replace with Hasura query → public.events
+const STUB_EVENTS = [
+  {
+    id: "1",
+    name: "Coldplay Live",
+    address: "Estadio Nacional, La Sabana, San José",
+    location_area: "San José Centro",
+    description: "Music of the Spheres world tour",
+  },
+  {
+    id: "2",
+    name: "Costa Rica vs Mexico",
+    address: "Estadio Nacional, La Sabana, San José",
+    location_area: "San José Centro",
+    description: "International football friendly",
+  },
+  {
+    id: "3",
+    name: "Hamilton",
+    address: "Teatro Popular Melico Salazar, San José",
+    location_area: "San José Centro",
+    description: "Broadway musical, touring production",
+  },
+];
 
 export default function EventsPage() {
   const { data, loading, error } = useQuery<{ events: EventRow[] }>(GET_EVENTS, {
@@ -19,7 +43,7 @@ export default function EventsPage() {
             Events
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage your event properties
+            Manage your events
           </p>
         </div>
         <Link
@@ -53,17 +77,7 @@ export default function EventsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-            {events.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
-                  {loading
-                    ? "Loading events..."
-                    : error
-                      ? "Failed to load events."
-                      : "No events yet."}
-                </td>
-              </tr>
-            ) : events.map((event) => (
+            {STUB_EVENTS.map((event) => (
               <tr
                 key={event.id}
                 className="bg-white dark:bg-slate-900

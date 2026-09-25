@@ -4,23 +4,35 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery } from "@apollo/client/react";
 import { ArrowLeft, Building2, MapPin } from "lucide-react";
-import { GET_EVENT_BY_ID, type EventRow } from "@/graphql/queries/event-queries";
+
+// TODO: replace with Hasura query → public.events
+const STUB_EVENTS = [
+  {
+    id: "1",
+    name: "Coldplay Live",
+    address: "Estadio Nacional, La Sabana, San José",
+    location_area: "San José Centro",
+    description: "Music of the Spheres world tour",
+  },
+  {
+    id: "2",
+    name: "Costa Rica vs Mexico",
+    address: "Estadio Nacional, La Sabana, San José",
+    location_area: "San José Centro",
+    description: "International football friendly",
+  },
+  {
+    id: "3",
+    name: "Hamilton",
+    address: "Teatro Popular Melico Salazar, San José",
+    location_area: "San José Centro",
+    description: "Broadway musical, touring production",
+  },
+];
 
 export default function EventDetailPage() {
-  const params = useParams<{ id: string }>();
-  const { data, loading } = useQuery<{ events_by_pk: EventRow | null }>(
-    GET_EVENT_BY_ID,
-    { variables: { id: params.id } },
-  );
-  const event = data?.events_by_pk;
-
-  if (loading && !event) {
-    return (
-      <p className="py-20 text-center text-sm text-muted-foreground">
-        Loading event...
-      </p>
-    );
-  }
+  const params = useParams();
+  const event = STUB_EVENTS.find((e) => e.id === params.id);
 
   if (!event) {
     return (

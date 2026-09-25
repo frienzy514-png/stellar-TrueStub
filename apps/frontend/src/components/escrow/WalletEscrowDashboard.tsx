@@ -63,8 +63,8 @@ export interface WalletEscrowDashboardProps {
  * Escrow Status Monitoring Dashboard
  *
  * Displays escrows grouped by user role:
- * - As Guest (Approver): Escrows where user is the approver
- * - As Hotel (Marker): Escrows where user is the marker
+ * - As Buyer (Approver): Escrows where user is the approver
+ * - As Seller (Marker): Escrows where user is the marker
  * - Platform Managed (Releaser): Escrows where user is the releaser
  */
 export function WalletEscrowDashboard({
@@ -213,7 +213,7 @@ export function WalletEscrowDashboard({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Approver Escrows" />}>
           <EscrowCard
-            title="As Guest (Approver)"
+            title="As Buyer (Approver)"
             escrows={escrowsByRole.approver}
             role="approver"
             signer={address}
@@ -225,7 +225,7 @@ export function WalletEscrowDashboard({
 
         <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Marker Escrows" />}>
           <EscrowCard
-            title="As Hotel (Marker)"
+            title="As Seller (Marker)"
             escrows={escrowsByRole.marker}
             role="marker"
             signer={address}

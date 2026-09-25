@@ -45,8 +45,10 @@ would matter most:
   LOBSTR via `@creit.tech/stellar-wallets-kit`). Private keys should never
   pass through or be logged by the app. Report immediately if you find a
   path where they do.
-- **Escrow webhook verification** — `src/app/webhooks/escrow-status/route.ts`
-  verifies Trustless Work webhook payloads via HMAC
+- **Escrow webhook verification** — `apps/backend/src/routes/webhooks.ts`
+  (reached directly, or via the frontend's pass-through
+  `src/app/webhooks/escrow-status/route.ts`) verifies Trustless Work webhook
+  payloads via HMAC over the raw request body
   (`TRUSTLESS_WORK_WEBHOOK_SECRET`, `crypto.timingSafeEqual`). A bypass here
   would let an attacker forge escrow status updates.
 - **Hasura admin secret** — `HASURA_GRAPHQL_ADMIN_SECRET` must never be

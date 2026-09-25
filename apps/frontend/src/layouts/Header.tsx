@@ -118,10 +118,10 @@ const Header: React.FC = () => {
                 <ul className="py-2 text-sm text-gray-700 dark:text-gray-400">
                   <li>
                     <a
-                      href="/profile/my-ticket_listings"
+                      href="/dashboard/listings"
                       className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white transition-colors duration-300 ease-in-out"
                     >
-                      {t("header.myApartments")}
+                      {t("header.myListings")}
                     </a>
                   </li>
                   <li>
@@ -182,10 +182,10 @@ const Header: React.FC = () => {
                     <ul className="space-y-2">
                       <li>
                         <Link
-                          href="/profile/my-ticket_listings"
+                          href="/dashboard/listings"
                           className="block px-4 py-2 text-gray-800 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-300 ease-in-out"
                         >
-                          {t("header.myApartments")}
+                          {t("header.myListings")}
                         </Link>
                       </li>
                       <li>

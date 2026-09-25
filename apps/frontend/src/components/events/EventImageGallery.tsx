@@ -26,7 +26,7 @@ function thumbIndices(activeIndex: number, length: number): number[] {
 export default function EventImageGallery({
   images,
   promoted = false,
-  altText = "Apartment",
+  altText = "Event",
 }: EventImageGalleryProps) {
   const [activeIndex, setActiveIndex] = useState(0);
 

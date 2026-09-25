@@ -1,11 +1,7 @@
 /**
- * Tests for RefundService idempotency guard — issue #153
- *
- * Uses node:test (same pattern as existing fraud-detection.test.ts).
+ * Jest tests for RefundService idempotency guard — issue #153
  */
 
-import { describe, it, beforeEach } from "node:test";
-import assert from "node:assert/strict";
 import {
   RefundService,
   InMemoryRefundStore,
@@ -15,8 +11,7 @@ import { AppError } from "../middleware/errorHandler";
 
 function makeService() {
   const store = new InMemoryRefundStore();
-  const service = new RefundService(store);
-  return { service, store };
+  return { service: new RefundService(store), store };
 }
 
 const basePayload = {
@@ -34,12 +29,12 @@ describe("RefundService — idempotency guard (#153)", () => {
 
       const record = await service.claimRefund(basePayload);
 
-      assert.equal(record.refundId, basePayload.refundId);
-      assert.equal(record.escrowId, basePayload.escrowId);
-      assert.equal(record.amount, basePayload.amount);
-      assert.equal(record.currency, basePayload.currency);
-      assert.equal(record.claimedBy, basePayload.claimedBy);
-      assert.ok(record.claimedAt, "claimedAt should be set");
+      expect(record.refundId).toBe(basePayload.refundId);
+      expect(record.escrowId).toBe(basePayload.escrowId);
+      expect(record.amount).toBe(basePayload.amount);
+      expect(record.currency).toBe(basePayload.currency);
+      expect(record.claimedBy).toBe(basePayload.claimedBy);
+      expect(record.claimedAt).toBeTruthy();
     });
 
     it("throws RefundAlreadyClaimed on second call with the same refundId", async () => {
@@ -47,19 +42,25 @@ describe("RefundService — idempotency guard (#153)", () => {
 
       await service.claimRefund(basePayload);
 
-      await assert.rejects(
-        () => service.claimRefund(basePayload),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError, "should be AppError");
-          assert.equal((err as AppError).statusCode, 409);
-          assert.equal((err as AppError).code, REFUND_ERROR_CODES.ALREADY_CLAIMED);
-          assert.ok(
-            (err as AppError).message.includes(basePayload.refundId),
-            "error message should include the refundId"
-          );
-          return true;
-        }
-      );
+      await expect(service.claimRefund(basePayload)).rejects.toMatchObject({
+        statusCode: 409,
+        code: REFUND_ERROR_CODES.ALREADY_CLAIMED,
+      });
+    });
+
+    it("error message includes the refundId", async () => {
+      const { service } = makeService();
+      await service.claimRefund(basePayload);
+
+      let caught: AppError | null = null;
+      try {
+        await service.claimRefund(basePayload);
+      } catch (err) {
+        caught = err as AppError;
+      }
+
+      expect(caught).not.toBeNull();
+      expect(caught!.message).toContain(basePayload.refundId);
     });
 
     it("allows independent claims for different refundIds", async () => {
@@ -68,43 +69,33 @@ describe("RefundService — idempotency guard (#153)", () => {
       await service.claimRefund({ ...basePayload, refundId: "refund-1" });
       const second = await service.claimRefund({ ...basePayload, refundId: "refund-2" });
 
-      assert.equal(second.refundId, "refund-2");
+      expect(second.refundId).toBe("refund-2");
     });
 
     it("throws 400 when refundId is missing", async () => {
       const { service } = makeService();
 
-      await assert.rejects(
-        () => service.claimRefund({ refundId: "", escrowId: "escrow-1" }),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).statusCode, 400);
-          assert.equal((err as AppError).code, REFUND_ERROR_CODES.INVALID_PAYLOAD);
-          return true;
-        }
-      );
+      await expect(
+        service.claimRefund({ refundId: "", escrowId: "escrow-1" })
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        code: REFUND_ERROR_CODES.INVALID_PAYLOAD,
+      });
     });
 
     it("throws 400 when escrowId is missing", async () => {
       const { service } = makeService();
 
-      await assert.rejects(
-        () => service.claimRefund({ refundId: "refund-1", escrowId: "" }),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).statusCode, 400);
-          return true;
-        }
-      );
+      await expect(
+        service.claimRefund({ refundId: "refund-1", escrowId: "" })
+      ).rejects.toMatchObject({ statusCode: 400 });
     });
   });
 
   describe("getClaimStatus", () => {
     it("returns undefined for an unclaimed refundId", async () => {
       const { service } = makeService();
-
-      const result = await service.getClaimStatus("non-existent");
-      assert.equal(result, undefined);
+      expect(await service.getClaimStatus("non-existent")).toBeUndefined();
     });
 
     it("returns the claim record after it has been claimed", async () => {
@@ -113,8 +104,8 @@ describe("RefundService — idempotency guard (#153)", () => {
       await service.claimRefund(basePayload);
       const result = await service.getClaimStatus(basePayload.refundId);
 
-      assert.ok(result);
-      assert.equal(result!.refundId, basePayload.refundId);
+      expect(result).not.toBeUndefined();
+      expect(result!.refundId).toBe(basePayload.refundId);
     });
   });
 
@@ -122,19 +113,18 @@ describe("RefundService — idempotency guard (#153)", () => {
     it("removes records older than the retention window", async () => {
       const { service, store } = makeService();
 
-      // Claim a refund and then manually backdate its claimedAt
       await service.claimRefund(basePayload);
       const existing = await store.get(basePayload.refundId);
-      assert.ok(existing);
+      expect(existing).not.toBeUndefined();
 
       // Backdate to 100 days ago
       const old = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString();
-      await store.set(basePayload.refundId, { ...existing, claimedAt: old });
+      await store.set(basePayload.refundId, { ...existing!, claimedAt: old });
 
-      const removed = await service.cleanup(90); // 90-day retention
+      const removed = await service.cleanup(90);
 
-      assert.equal(removed, 1);
-      assert.equal(store.size, 0);
+      expect(removed).toBe(1);
+      expect(store.size).toBe(0);
     });
 
     it("retains records within the retention window", async () => {
@@ -143,15 +133,13 @@ describe("RefundService — idempotency guard (#153)", () => {
       await service.claimRefund(basePayload);
       const removed = await service.cleanup(90);
 
-      assert.equal(removed, 0);
-      assert.equal(store.size, 1);
+      expect(removed).toBe(0);
+      expect(store.size).toBe(1);
     });
 
-    it("documents: cleanup removes nothing when the store is empty", async () => {
+    it("removes nothing when the store is empty", async () => {
       const { service } = makeService();
-
-      const removed = await service.cleanup(90);
-      assert.equal(removed, 0);
+      expect(await service.cleanup(90)).toBe(0);
     });
   });
 });

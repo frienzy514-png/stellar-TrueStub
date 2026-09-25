@@ -6,7 +6,7 @@ const resources = {
         search: "Search",
         searchPlaceholder: "Search anything...",
         profile: "Profile",
-        myApartments: "My Listings",
+        myListings: "My Listings",
         settings: "Settings",
         signOut: "Sign Out",
         signIn: "Sign In",
@@ -223,8 +223,8 @@ const resources = {
         addPropertyDesc: "List a new ticket for resale",
         manageBookings: "Manage Purchases",
         manageBookingsDesc: "View and manage purchases",
-        hotelSettings: "Event Settings",
-        hotelSettingsDesc: "Update event details",
+        eventSettings: "Event Settings",
+        eventSettingsDesc: "Update event details",
         manageEscrows: "Manage Escrows",
         manageEscrowsDesc: "View all escrow transactions",
         userManagement: "User Management",
@@ -311,116 +311,6 @@ const resources = {
           title: "Network mismatch",
           description:
             "Your wallet is on '{{actual}}' but the app expects '{{expected}}'. Please switch networks in your wallet before creating or funding an escrow.",
-        },
-      },
-
-      propertyList: {
-        title: "Available for rent in ",
-        subtitle: "Costa Rica, San José",
-        unitsAvailable: "204 units available",
-        filterOne: "All ticket_listings",
-        filterTwo: "1 bedroom",
-        filterThree: "2 bedrooms",
-        filterFour: "3 bedrooms",
-
-        sortBy: {
-          title: "Sort by:",
-          orderOne: "Relevance",
-          orderTwo: "Price (Low to High)",
-          orderThree: "Price (High to Low)",
-          orderFour: "Newest",
-        },
-
-        propertyCard: {
-          promo: "Promoted",
-          perMonth: "Per month",
-          title: "The southern Sabana",
-          address: "329 Curridabat Street, station yard, San José",
-        },
-      },
-
-      propertyDetails: {
-        promo: "Promoted",
-        propertyTitle: "The southern Sabana",
-        address: "329 Calle Santos, Paseo Colón, San José",
-        detailsTitle: "Apartment details",
-        detailsText:
-          "La Sabana Sur is one of the most central and convenient areas of San José, close to the iconic La Sabana Park. This apartment features 2 bedrooms and 1 bathroom, making it ideal for couples or small families. Additionally, it's pet-friendly, perfect for those with pets. Its location on Paseo Colón provides easy access to public transportation, restaurants, and services.",
-        bookButton: "Book",
-      },
-
-      sideSuggestions: {
-        title: "Suggestions",
-        unitAvailable: "More than 200 units available",
-
-        cards: {
-          title: "The Yoses",
-          address: "329 Santos Street, Colon Walk, San José",
-        },
-      },
-
-      profile: {
-        title: "Edit profile",
-        sideTitle: "General",
-        account: "Account",
-        sideSecondTitle: "Other",
-        ticket_listings: "Apartments",
-        offers: "Offers",
-        summaryHolder: "Summary",
-        nameHolder: "First Name",
-        SurnameHolder: "Surnames",
-        phoneHolder: "Phone",
-        LocationHolder: "Location",
-
-        overView: {
-          title: "Account overview",
-          date: "Creation date",
-          walletAddress: "Wallet address",
-          email: "Email",
-          action: "Action",
-          saveBtn: "Save changes",
-        },
-      },
-
-      myApartments: {
-        title: "My ticket_listings",
-        newApartmentBtn: "New apartment",
-        searchHolder: "Search anything...",
-        promo: "Promoted",
-        priceRange: "Price Range",
-
-        status: {
-          default: "Status",
-          optionOne: "Inhabited",
-          optionTwo: "Not Inhabited",
-        },
-
-        table: {
-          title: "Showing {{current}} of {{total}}",
-          items: "Items per page",
-          columnOne: "ID No",
-          columnTwo: "Apartment Name",
-          columnThree: "Location",
-          columnFour: "Offers",
-          columnFive: "Status",
-          columnSix: "Promoted",
-          columnSeven: "Price",
-          columnEight: "Actions",
-        },
-
-        apartmentNames: {
-          apartmentOne: "The Sabana House",
-          apartmentTwo: "Escazú Apartment",
-          apartmentThree: "Santa Ana Condo",
-          apartmentFour: "Beachside Villa",
-          apartmentFive: "Downtown Loft",
-          apartmentSix: "Mountain Retreat",
-          apartmentSeven: "Penthouse",
-          apartmentEight: "The Sabana Luxury",
-          apartmentNine: "Eco-friendly Apartment",
-          apartmentTen: "Colonial Home",
-          apartmentEleven: "City Center Studio",
-          apartmentTwelve: "Lakeview Apartment",
         },
       },
 
@@ -514,7 +404,7 @@ const resources = {
         search: "Buscar",
         searchPlaceholder: "Buscar cualquier cosa...",
         profile: "Perfil",
-        myApartments: "Mis Publicaciones",
+        myListings: "Mis Publicaciones",
         settings: "Configuración",
         signOut: "Cerrar Sesión",
         signIn: "Iniciar Sesión",
@@ -732,8 +622,8 @@ const resources = {
         addPropertyDesc: "Publicar un nuevo boleto para reventa",
         manageBookings: "Administrar Compras",
         manageBookingsDesc: "Ver y administrar compras",
-        hotelSettings: "Ajustes del Evento",
-        hotelSettingsDesc: "Actualizar datos del evento",
+        eventSettings: "Ajustes del Evento",
+        eventSettingsDesc: "Actualizar datos del evento",
         manageEscrows: "Administrar Fideicomisos",
         manageEscrowsDesc: "Ver todas las transacciones de fideicomiso",
         userManagement: "Gestión de Usuarios",
@@ -820,116 +710,6 @@ const resources = {
           title: "Red incorrecta",
           description:
             "Tu billetera está en '{{actual}}' pero la aplicación espera '{{expected}}'. Por favor cambia de red en tu billetera antes de crear o financiar un fideicomiso.",
-        },
-      },
-
-      propertyList: {
-        title: "Disponible para rentar en",
-        subtitle: "Costa Rica, San José",
-        unitsAvailable: "204 unidades disponibles",
-        filterOne: "Todos los apartamentos",
-        filterTwo: "1 baño",
-        filterThree: "2 dormitorios",
-        filterFour: "+3 dormitorios",
-
-        sortBy: {
-          title: "Ordenar por:",
-          orderOne: "Relevancia",
-          orderTwo: "Precio (de menor a mayor)",
-          orderThree: "Precio (de mayor a menor)",
-          orderFour: "Más reciente",
-        },
-
-        propertyCard: {
-          promo: "Promocionado",
-          perMonth: "Por mes",
-          title: "La Sabana del sur",
-          address: "329 Calle Curridabat, patio de estación, San José",
-        },
-      },
-
-      propertyDetails: {
-        promo: "Promocionado",
-        propertyTitle: "La Sabana sur",
-        address: "329 Calle Santos, Paseo Colón, San José",
-        detailsTitle: "Detalles del apartamento",
-        detailsText:
-          "La Sabana Sur es una de las zonas más céntricas y convenientes de San José, cerca del icónico Parque La Sabana. Este apartamento cuenta con 2 dormitorios y 1 baño, por lo que es ideal para parejas o familias pequeñas. Además, es apto para mascotas.. Su ubicación en Paseo Colón brinda fácil acceso a transporte público, restaurantes y servicios.",
-        bookButton: "Reservar",
-      },
-
-      sideSuggestions: {
-        title: "Sugerencias",
-        unitAvailable: "Más de 200 unidades disponibles",
-
-        cards: {
-          title: "Los Yoses",
-          address: "329 Calle Santos, Paseo Colón, San José",
-        },
-      },
-
-      profile: {
-        title: "Editar perfil",
-        sideTitle: "General",
-        account: "Cuenta",
-        sideSecondTitle: "Otros",
-        ticket_listings: "Apartamentos",
-        offers: "Ofertas",
-        summaryHolder: "Resumen",
-        nameHolder: "Nombre",
-        SurnameHolder: "Apellidos",
-        phoneHolder: "Teléfono",
-        LocationHolder: "Ubicación",
-
-        overView: {
-          title: "Resumen de cuenta",
-          date: "Fecha de creación",
-          walletAddress: "Dirección de billetera",
-          email: "Correo electrónico",
-          action: "Acción",
-          saveBtn: "Guardar cambios",
-        },
-      },
-
-      myApartments: {
-        title: "Mis apartamentos",
-        newApartmentBtn: "Nuevo apartamento",
-        searchHolder: "Buscar...",
-        promo: "Promocionado",
-        priceRange: "Rango de precios",
-
-        status: {
-          default: "Estado",
-          optionOne: "Habitado",
-          optionTwo: "No habitado",
-        },
-
-        table: {
-          title: "Mostrando {{current}} de {{total}}",
-          items: "Elementos por página",
-          rowOne: "ID No",
-          columnTwo: "Nombre del apartamento",
-          columnThree: "Ubicación",
-          columnFour: "Ofertas",
-          columnFive: "Estado",
-          columnSix: "Promocionado",
-          columnSeven: "Precio",
-          columnEight: "Acciones",
-        },
-
-        apartmentNames: {
-          apartmentOne: "Casa La Sabana",
-          apartmentTwo: "Apartamento Escazú",
-          apartmentThree: "Condominio Santa Ana",
-          apartmentFour: "Villa frente al mar",
-          apartmentFive: "Loft en el centro",
-          apartmentSix: "Retiro en la montaña",
-          apartmentSeven: "Apartamento de lujo",
-          apartmentEight: "Lujo en La Sabana",
-          apartmentNine: "Apartamento ecológico",
-          apartmentTen: "Casa colonial",
-          apartmentEleven: "Estudio en el centro",
-          apartmentTwelve: "Apartamento con vista al lago",
         },
       },
 

@@ -71,7 +71,7 @@ export default function EventSuggestionCard({
         >
           <div className="relative h-[60px] w-[60px] shrink-0 overflow-hidden rounded-[10px] bg-muted">
             <Image
-              src={image ?? "/img/hotel/hotel1.jpg"}
+              src={image ?? "/img/event/event1.jpg"}
               alt={name}
               fill
               sizes="60px"

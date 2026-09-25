@@ -43,8 +43,19 @@ export default function NewEventPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const latitude = parseFloat(form.latitude);
-    const longitude = parseFloat(form.longitude);
+    // TODO: wire to Hasura mutation → INSERT INTO public.events
+    // Mutation payload shape:
+    // {
+    //   name: form.name,                           // VARCHAR(20)
+    //   description: form.description,             // VARCHAR(50)
+    //   address: form.address,                     // VARCHAR(50)
+    //   location_area: form.location_area,         // VARCHAR(20)
+    //   coordinates: `POINT(${form.longitude} ${form.latitude})`
+    //                                              // geometry(Point, 4326)
+    // }
+    //
+    // Note: PostGIS WKT format for coordinates is POINT(lng lat)
+    // Example: POINT(-84.0907 9.9281)
 
     try {
       await insertEvent({
@@ -100,7 +111,7 @@ export default function NewEventPage() {
           New Event
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Register a new event property on TrueStub
+          Register a new event on TrueStub
         </p>
       </div>
 
@@ -123,7 +134,7 @@ export default function NewEventPage() {
                   type="text"
                   required
                   maxLength={20}
-                  placeholder="e.g. Metropolitan Tower"
+                  placeholder="e.g. Coldplay Live"
                   value={form.name}
                   onChange={(e) => set("name", e.target.value)}
                   className={cn(inputClass, "pl-9")}
@@ -147,7 +158,7 @@ export default function NewEventPage() {
                   type="text"
                   required
                   maxLength={50}
-                  placeholder="e.g. Avenida Central 100, San José"
+                  placeholder="e.g. Estadio Nacional, San José"
                   value={form.address}
                   onChange={(e) => set("address", e.target.value)}
                   className={cn(inputClass, "pl-9")}
@@ -217,7 +228,7 @@ export default function NewEventPage() {
                   id="event-description"
                   maxLength={50}
                   rows={5}
-                  placeholder="Describe the event — features, nearby amenities, special conditions..."
+                  placeholder="Describe the event — performers, venue details, special conditions..."
                   value={form.description}
                   onChange={(e) => set("description", e.target.value)}
                   className={cn(inputClass, "pl-9 resize-none")}

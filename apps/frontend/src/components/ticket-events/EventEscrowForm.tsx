@@ -49,21 +49,6 @@ export interface EventTicketEscrowProps {
 }
 
 /**
- * Custom validation function for event booking escrows
- */
-function validateHotelBooking(data: Record<string, unknown>): { 
-  error?: string; 
-  success?: boolean 
-} {
-  if (!data?.amount || Number(data.amount) <= 0) {
-    return { error: "Amount must be greater than 0" };
-  }
-
-  // Additional event-specific validations can be added here
-  return { success: true };
-}
-
-/**
  * Wallet Not Connected State
  */
 function WalletNotConnected({ onConnect }: { onConnect: () => void }) {
