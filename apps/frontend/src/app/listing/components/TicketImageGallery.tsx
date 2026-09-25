@@ -16,10 +16,10 @@ interface TicketImageGalleryProps {
 const defaultImages = [
   "/img/room1.png",
   "/img/room2.png",
-  "/img/hotel/hotel1.jpg",
+  "/img/event/event1.jpg",
   "/img/room2.png",
   "/img/room1.png",
-  "/img/hotel/hotel1.jpg"
+  "/img/event/event1.jpg"
 ]
 
 const TicketImageGallery = ({

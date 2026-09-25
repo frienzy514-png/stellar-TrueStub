@@ -28,7 +28,7 @@ import { ArrowLeft, Share, Heart } from "lucide-react";
 const additionalImages = [
   "/img/room1.png",
   "/img/room2.png",
-  "/img/hotel/hotel1.jpg",
+  "/img/event/event1.jpg",
 ];
 
 const breadcrumbs = [

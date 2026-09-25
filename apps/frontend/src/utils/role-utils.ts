@@ -23,7 +23,7 @@ export function getUserRole(): UserRole {
 
     if (address.startsWith('0xadmin') || address.includes('admin')) {
       return 'admin';
-    } else if (address.startsWith('0xhotel') || address.includes('event')) {
+    } else if (address.startsWith('0xevent') || address.includes('event')) {
       return 'event';
     } else {
       return 'guest';

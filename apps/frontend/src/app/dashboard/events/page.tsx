@@ -1,28 +1,28 @@
 import Link from "next/link";
 import { PlusCircle } from "lucide-react";
 
-// TODO: replace with Hasura query → public.hotels
-const STUB_HOTELS = [
+// TODO: replace with Hasura query → public.events
+const STUB_EVENTS = [
   {
     id: "1",
-    name: "Metropolitan Tower",
-    address: "Avenida Central 100, San José",
+    name: "Coldplay Live",
+    address: "Estadio Nacional, La Sabana, San José",
     location_area: "San José Centro",
-    description: "Luxury event in downtown San José",
+    description: "Music of the Spheres world tour",
   },
   {
     id: "2",
-    name: "Mountain Peak Lodge",
-    address: "Calle 5, Escazú, San José",
-    location_area: "Escazú",
-    description: "Boutique lodge with mountain views",
+    name: "Costa Rica vs Mexico",
+    address: "Estadio Nacional, La Sabana, San José",
+    location_area: "San José Centro",
+    description: "International football friendly",
   },
   {
     id: "3",
-    name: "Oceanview Resort & Spa",
-    address: "Playa Jacó, Puntarenas",
-    location_area: "Jacó",
-    description: "Beachfront resort with full spa",
+    name: "Hamilton",
+    address: "Teatro Popular Melico Salazar, San José",
+    location_area: "San José Centro",
+    description: "Broadway musical, touring production",
   },
 ];
 
@@ -35,7 +35,7 @@ export default function EventsPage() {
             Events
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage your event properties
+            Manage your events
           </p>
         </div>
         <Link
@@ -45,7 +45,7 @@ export default function EventsPage() {
                      px-4 py-2 transition-colors"
         >
           <PlusCircle className="h-4 w-4" />
-          New Hotel
+          New Event
         </Link>
       </div>
 
@@ -69,7 +69,7 @@ export default function EventsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-            {STUB_HOTELS.map((event) => (
+            {STUB_EVENTS.map((event) => (
               <tr
                 key={event.id}
                 className="bg-white dark:bg-slate-900

@@ -5,18 +5,18 @@ const randomDate = (start: Date, end: Date) => {
   return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
 };
 
-// Sample hotels for mock data
-const HOTELS = [
-  'Grand Plaza Hotel',
-  'Oceanview Resort & Spa',
-  'Mountain Peak Lodge',
-  'Sunset Beach Resort',
-  'Downtown Suites',
-  'Royal Garden Hotel',
-  'Alpine Chalet',
-  'Metropolitan Tower',
-  'Palm Oasis Resort',
-  'Harborview Inn'
+// Sample events for mock data
+const EVENTS = [
+  'Coldplay: Music of the Spheres',
+  'Costa Rica vs. Mexico',
+  'Hamilton',
+  'Karol G: Mañana Será Bonito',
+  'Monster Jam',
+  'Swan Lake',
+  'Bad Bunny: Most Wanted Tour',
+  'Saprissa vs. Alajuela',
+  'Cirque du Soleil: Kooza',
+  'Imagine Dragons Live'
 ];
 
 // Generate mock escrow data
@@ -39,7 +39,7 @@ export const generateMockEscrows = (count: number = 10): EscrowData[] => {
     const eventDate = new Date(transferDate.getTime() + (Math.floor(Math.random() * 14) + 1) * 24 * 60 * 60 * 1000);
     const createdAt = randomDate(new Date(Date.now() - 60 * 24 * 60 * 60 * 1000), new Date());
     const updatedAt = randomDate(createdAt, new Date());
-    const eventName = HOTELS[Math.floor(Math.random() * HOTELS.length)];
+    const eventName = EVENTS[Math.floor(Math.random() * EVENTS.length)];
     
     // Determine milestone statuses based on escrow status
     const milestoneStatuses = milestones.map(milestone => {

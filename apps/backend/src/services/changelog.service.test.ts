@@ -1,9 +1,7 @@
 /**
- * Tests for ChangelogService write-once immutability — issue #155
+ * Jest tests for ChangelogService write-once immutability — issue #155
  */
 
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
 import {
   ChangelogService,
   InMemoryChangelogStore,
@@ -33,39 +31,31 @@ describe("ChangelogService — write-once immutability (#155)", () => {
       const entry = await service.appendEntry(baseEntry);
       const after = Date.now();
 
-      assert.equal(entry.entryId, baseEntry.entryId);
-      assert.equal(entry.action, baseEntry.action);
-      assert.ok(entry.timestamp, "timestamp must be set");
+      expect(entry.entryId).toBe(baseEntry.entryId);
+      expect(entry.action).toBe(baseEntry.action);
+      expect(entry.timestamp).toBeTruthy();
+
       const ts = new Date(entry.timestamp).getTime();
-      assert.ok(ts >= before && ts <= after, "timestamp should be in the current range");
+      expect(ts).toBeGreaterThanOrEqual(before);
+      expect(ts).toBeLessThanOrEqual(after);
     });
 
     it("throws CHANGELOG_DUPLICATE_ENTRY on a second append with the same entryId", async () => {
       const { service } = makeService();
       await service.appendEntry(baseEntry);
 
-      await assert.rejects(
-        () => service.appendEntry(baseEntry),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).statusCode, 409);
-          assert.equal((err as AppError).code, CHANGELOG_ERROR_CODES.DUPLICATE_ENTRY);
-          return true;
-        }
-      );
+      await expect(service.appendEntry(baseEntry)).rejects.toMatchObject({
+        statusCode: 409,
+        code: CHANGELOG_ERROR_CODES.DUPLICATE_ENTRY,
+      });
     });
 
     it("throws 400 when required fields are missing", async () => {
       const { service } = makeService();
 
-      await assert.rejects(
-        () => service.appendEntry({ ...baseEntry, action: "" }),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).statusCode, 400);
-          return true;
-        }
-      );
+      await expect(
+        service.appendEntry({ ...baseEntry, action: "" })
+      ).rejects.toMatchObject({ statusCode: 400 });
     });
 
     it("deep-copies metadata so the stored entry is not affected by later mutations", async () => {
@@ -73,11 +63,11 @@ describe("ChangelogService — write-once immutability (#155)", () => {
       const meta = { key: "value" };
       await service.appendEntry({ ...baseEntry, metadata: meta });
 
-      // Mutate original object after append
+      // Mutate original after append
       meta.key = "mutated";
 
       const stored = await service.getEntry(baseEntry.entryId);
-      assert.equal(stored!.metadata!.key, "value", "stored metadata should be immutable");
+      expect(stored!.metadata!.key).toBe("value");
     });
 
     it("emits ENTRY_APPENDED event", async () => {
@@ -87,9 +77,9 @@ describe("ChangelogService — write-once immutability (#155)", () => {
 
       await service.appendEntry(baseEntry);
 
-      assert.equal(events.length, 1);
-      assert.equal(events[0].type, "ENTRY_APPENDED");
-      assert.equal(events[0].entry.entryId, baseEntry.entryId);
+      expect(events).toHaveLength(1);
+      expect(events[0].type).toBe("ENTRY_APPENDED");
+      expect(events[0].entry.entryId).toBe(baseEntry.entryId);
     });
   });
 
@@ -98,28 +88,20 @@ describe("ChangelogService — write-once immutability (#155)", () => {
       const { service } = makeService();
       await service.appendEntry(baseEntry);
 
-      await assert.rejects(
-        () => service.updateEntry(baseEntry.entryId, { action: "tampered" }),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).statusCode, 409);
-          assert.equal((err as AppError).code, CHANGELOG_ERROR_CODES.UPDATE_FORBIDDEN);
-          return true;
-        }
-      );
+      await expect(
+        service.updateEntry(baseEntry.entryId, { action: "tampered" })
+      ).rejects.toMatchObject({
+        statusCode: 409,
+        code: CHANGELOG_ERROR_CODES.UPDATE_FORBIDDEN,
+      });
     });
 
     it("throws CHANGELOG_UPDATE_FORBIDDEN even for non-existent entries", async () => {
       const { service } = makeService();
 
-      await assert.rejects(
-        () => service.updateEntry("ghost-id", { action: "anything" }),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).code, CHANGELOG_ERROR_CODES.UPDATE_FORBIDDEN);
-          return true;
-        }
-      );
+      await expect(
+        service.updateEntry("ghost-id", { action: "anything" })
+      ).rejects.toMatchObject({ code: CHANGELOG_ERROR_CODES.UPDATE_FORBIDDEN });
     });
   });
 
@@ -130,22 +112,17 @@ describe("ChangelogService — write-once immutability (#155)", () => {
 
       const removed = await service.removeEntry(baseEntry.entryId);
 
-      assert.equal(removed.entryId, baseEntry.entryId);
-      assert.equal(store.size, 0);
+      expect(removed.entryId).toBe(baseEntry.entryId);
+      expect(store.size).toBe(0);
     });
 
     it("throws CHANGELOG_ENTRY_NOT_FOUND for unknown entryId", async () => {
       const { service } = makeService();
 
-      await assert.rejects(
-        () => service.removeEntry("does-not-exist"),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).statusCode, 404);
-          assert.equal((err as AppError).code, CHANGELOG_ERROR_CODES.NOT_FOUND);
-          return true;
-        }
-      );
+      await expect(service.removeEntry("does-not-exist")).rejects.toMatchObject({
+        statusCode: 404,
+        code: CHANGELOG_ERROR_CODES.NOT_FOUND,
+      });
     });
 
     it("emits ENTRY_REMOVED event on removal", async () => {
@@ -157,23 +134,18 @@ describe("ChangelogService — write-once immutability (#155)", () => {
       await service.removeEntry(baseEntry.entryId);
 
       const removeEvent = events.find((e) => e.type === "ENTRY_REMOVED");
-      assert.ok(removeEvent, "ENTRY_REMOVED event should be emitted");
-      assert.equal(removeEvent!.entry.entryId, baseEntry.entryId);
+      expect(removeEvent).not.toBeUndefined();
+      expect(removeEvent!.entry.entryId).toBe(baseEntry.entryId);
     });
 
     it("documents: remove + recreate is the documented correction workflow", async () => {
       const { service } = makeService();
 
-      // Step 1: append with a wrong action
       await service.appendEntry({ ...baseEntry, action: "wrong_action" });
-
-      // Step 2: remove the incorrect entry
       await service.removeEntry(baseEntry.entryId);
-
-      // Step 3: append the corrected entry
       const corrected = await service.appendEntry({ ...baseEntry, action: "correct_action" });
 
-      assert.equal(corrected.action, "correct_action");
+      expect(corrected.action).toBe("correct_action");
     });
   });
 
@@ -186,15 +158,14 @@ describe("ChangelogService — write-once immutability (#155)", () => {
 
       const entries = await service.listEntries(baseEntry.resourceId);
 
-      assert.equal(entries.length, 2);
-      assert.equal(entries[0].action, "step_1");
-      assert.equal(entries[1].action, "step_2");
+      expect(entries).toHaveLength(2);
+      expect(entries[0].action).toBe("step_1");
+      expect(entries[1].action).toBe("step_2");
     });
 
     it("returns empty array when no entries exist for a resource", async () => {
       const { service } = makeService();
-      const entries = await service.listEntries("no-such-resource");
-      assert.deepEqual(entries, []);
+      expect(await service.listEntries("no-such-resource")).toEqual([]);
     });
   });
 });

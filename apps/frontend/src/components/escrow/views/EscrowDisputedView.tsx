@@ -4,10 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { formatEscrowAmount } from "@/lib/formatEscrowAmount";
 import { EscrowPartyInfo } from "./EscrowPartyInfo";
 import { DisputeArbitrationCard } from "@/components/dispute/DisputeArbitrationCard";
-import type { StubEscrowDetail } from "./types";
+import type { EscrowDetail } from "./types";
 import { ShieldAlert } from "lucide-react";
 
-export function EscrowDisputedView({ data }: { data: StubEscrowDetail }) {
+export function EscrowDisputedView({ data }: { data: EscrowDetail }) {
   return (
     <div className="space-y-8">
       <header className="space-y-2">

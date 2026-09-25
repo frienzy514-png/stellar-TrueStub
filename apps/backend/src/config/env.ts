@@ -35,7 +35,6 @@ export const envSchema = z.object({
   CORS_ORIGINS: z.string().default("http://localhost:3000"),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
-  INTERNAL_API_SECRET: z.string().min(1).optional(),
   EMAIL_PROVIDER: z.string().optional(),
   SENDGRID_API_KEY: z.string().min(1).optional(),
   NOTIFICATION_FROM_EMAIL: z.string().email().default("noreply@truestub.local"),

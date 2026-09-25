@@ -127,7 +127,7 @@ async function getEvent(eventId: string): Promise<EventData> {
         walletAddress: "GBCXK3ZQWFWMQJXLSIMVCAHUKTJVWRJPB5XYGZGQCVBWKWVEPTSYLUHI",
         rating: 4.8,
         location: "Downtown, New York City",
-        imageUrl: "/img/hotels.png",
+        imageUrl: "/img/event-venue.png",
       });
     }, 500);
   });

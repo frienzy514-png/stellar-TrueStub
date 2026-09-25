@@ -147,7 +147,7 @@ export default function GuestDashboard() {
         <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Ticket Listings" />}>
           <TicketListingGrid
             listings={filteredListings}
-            onApartmentClick={handleListingClick}
+            onListingClick={handleListingClick}
           />
         </ErrorBoundaryWithCache>
 

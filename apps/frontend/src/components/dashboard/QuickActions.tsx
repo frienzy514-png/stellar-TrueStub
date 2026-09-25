@@ -35,7 +35,7 @@ export function QuickActions({ userRole }: QuickActionsProps) {
     },
   ];
 
-  const hotelActions = [
+  const eventActions = [
     {
       title: t('dashboard.addProperty'),
       icon: Plus,
@@ -49,10 +49,10 @@ export function QuickActions({ userRole }: QuickActionsProps) {
       description: t('dashboard.manageBookingsDesc'),
     },
     {
-      title: t('dashboard.hotelSettings'),
+      title: t('dashboard.eventSettings'),
       icon: Settings,
       onClick: () => router.push('/event/settings'),
-      description: t('dashboard.hotelSettingsDesc'),
+      description: t('dashboard.eventSettingsDesc'),
     },
   ];
 
@@ -81,7 +81,7 @@ export function QuickActions({ userRole }: QuickActionsProps) {
     userRole === 'guest'
       ? guestActions
       : userRole === 'event'
-        ? hotelActions
+        ? eventActions
         : adminActions;
 
   const helpAction = {

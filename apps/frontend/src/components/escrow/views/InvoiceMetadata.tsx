@@ -1,9 +1,9 @@
 "use client";
 
-import type { StubEscrowDetail } from "./types";
+import type { EscrowDetail } from "./types";
 
 type Props = Pick<
-  StubEscrowDetail,
+  EscrowDetail,
   "invoiceNumber" | "subject" | "currency" | "issued" | "dueDate" | "notes"
 >;
 

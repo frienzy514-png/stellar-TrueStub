@@ -24,7 +24,7 @@ const EMPTY_FORM: EventFormData = {
   longitude: "-84.0907",
 };
 
-export default function NewHotelPage() {
+export default function NewEventPage() {
   const router = useRouter();
   const [form, setForm] = useState<EventFormData>(EMPTY_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,7 +36,7 @@ export default function NewHotelPage() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // TODO: wire to Hasura mutation → INSERT INTO public.hotels
+    // TODO: wire to Hasura mutation → INSERT INTO public.events
     // Mutation payload shape:
     // {
     //   name: form.name,                           // VARCHAR(20)
@@ -82,10 +82,10 @@ export default function NewHotelPage() {
 
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          New Hotel
+          New Event
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Register a new event property on TrueStub
+          Register a new event on TrueStub
         </p>
       </div>
 
@@ -98,7 +98,7 @@ export default function NewHotelPage() {
             {/* Name */}
             <div>
               <label htmlFor="event-name" className={labelClass}>
-                Hotel Name <span className="text-red-500">*</span>
+                Event Name <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2
@@ -108,7 +108,7 @@ export default function NewHotelPage() {
                   type="text"
                   required
                   maxLength={20}
-                  placeholder="e.g. Metropolitan Tower"
+                  placeholder="e.g. Coldplay Live"
                   value={form.name}
                   onChange={(e) => set("name", e.target.value)}
                   className={cn(inputClass, "pl-9")}
@@ -132,7 +132,7 @@ export default function NewHotelPage() {
                   type="text"
                   required
                   maxLength={50}
-                  placeholder="e.g. Avenida Central 100, San José"
+                  placeholder="e.g. Estadio Nacional, San José"
                   value={form.address}
                   onChange={(e) => set("address", e.target.value)}
                   className={cn(inputClass, "pl-9")}
@@ -202,7 +202,7 @@ export default function NewHotelPage() {
                   id="event-description"
                   maxLength={50}
                   rows={5}
-                  placeholder="Describe the event — features, nearby amenities, special conditions..."
+                  placeholder="Describe the event — performers, venue details, special conditions..."
                   value={form.description}
                   onChange={(e) => set("description", e.target.value)}
                   className={cn(inputClass, "pl-9 resize-none")}
@@ -219,7 +219,7 @@ export default function NewHotelPage() {
                             dark:bg-blue-900/10 p-4 space-y-1">
               <p className="text-xs font-semibold text-blue-600
                              dark:text-blue-400">
-                Schema constraints (public.hotels)
+                Schema constraints (public.events)
               </p>
               <ul className="text-xs text-blue-500 dark:text-blue-400
                               space-y-0.5 list-disc list-inside">
@@ -256,7 +256,7 @@ export default function NewHotelPage() {
                        transition-colors disabled:opacity-60
                        disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "Creating..." : "Create Hotel"}
+            {isSubmitting ? "Creating..." : "Create Event"}
           </button>
         </div>
       </form>

@@ -4,34 +4,34 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Building2, MapPin } from "lucide-react";
 
-// TODO: replace with Hasura query → public.hotels
-const STUB_HOTELS = [
+// TODO: replace with Hasura query → public.events
+const STUB_EVENTS = [
   {
     id: "1",
-    name: "Metropolitan Tower",
-    address: "Avenida Central 100, San José",
+    name: "Coldplay Live",
+    address: "Estadio Nacional, La Sabana, San José",
     location_area: "San José Centro",
-    description: "Luxury event in downtown San José",
+    description: "Music of the Spheres world tour",
   },
   {
     id: "2",
-    name: "Mountain Peak Lodge",
-    address: "Calle 5, Escazú, San José",
-    location_area: "Escazú",
-    description: "Boutique lodge with mountain views",
+    name: "Costa Rica vs Mexico",
+    address: "Estadio Nacional, La Sabana, San José",
+    location_area: "San José Centro",
+    description: "International football friendly",
   },
   {
     id: "3",
-    name: "Oceanview Resort & Spa",
-    address: "Playa Jacó, Puntarenas",
-    location_area: "Jacó",
-    description: "Beachfront resort with full spa",
+    name: "Hamilton",
+    address: "Teatro Popular Melico Salazar, San José",
+    location_area: "San José Centro",
+    description: "Broadway musical, touring production",
   },
 ];
 
 export default function EventDetailPage() {
   const params = useParams();
-  const event = STUB_HOTELS.find((h) => h.id === params.id);
+  const event = STUB_EVENTS.find((e) => e.id === params.id);
 
   if (!event) {
     return (
@@ -47,7 +47,7 @@ export default function EventDetailPage() {
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Building2 className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Hotel not found
+            Event not found
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             The event you&apos;re looking for doesn&apos;t exist.
@@ -57,7 +57,7 @@ export default function EventDetailPage() {
             className="mt-6 rounded-lg bg-orange-500 hover:bg-orange-600
                        text-white text-sm font-semibold px-4 py-2 transition-colors"
           >
-            View all hotels
+            View all events
           </Link>
         </div>
       </div>
@@ -80,7 +80,7 @@ export default function EventDetailPage() {
           {event.name}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Hotel details and information
+          Event details and information
         </p>
       </div>
 

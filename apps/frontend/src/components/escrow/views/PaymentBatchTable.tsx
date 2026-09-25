@@ -1,9 +1,9 @@
 "use client";
 
-import type { StubEscrowProductRow } from "./types";
+import type { EscrowProductRow } from "./types";
 
 type Props = {
-  products: StubEscrowProductRow[];
+  products: EscrowProductRow[];
   subtotal: string;
   discount: string;
   total: string;

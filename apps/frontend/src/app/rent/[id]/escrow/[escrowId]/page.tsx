@@ -8,9 +8,9 @@ import {
   EscrowNotesPanel,
   EscrowPaidView,
   EscrowReleasedView,
-  getStubEscrow,
   getViewForStatus,
 } from "@/components/escrow/views";
+import { getMockEscrowDetail } from "@/components/escrow/mocks/escrowDetail.mock";
 
 export default function EventEscrowDetailPage() {
   const params = useParams<{ id: string; escrowId: string }>();
@@ -18,16 +18,16 @@ export default function EventEscrowDetailPage() {
   const eventId = params.id;
   const escrowId = params.escrowId;
 
-  const stub = useMemo(() => getStubEscrow(escrowId), [escrowId]);
+  const mockDetail = useMemo(() => getMockEscrowDetail(escrowId), [escrowId]);
   const subscription = useEscrowSubscription(escrowId);
 
   const isAwaitingSubscription = subscription.loading && !subscription.escrow;
 
-  const effectiveStatus = subscription.escrow?.status ?? stub.status;
+  const effectiveStatus = subscription.escrow?.status ?? mockDetail.status;
   const view = getViewForStatus(effectiveStatus);
   const data = useMemo(
-    () => ({ ...stub, status: effectiveStatus }),
-    [stub, effectiveStatus],
+    () => ({ ...mockDetail, status: effectiveStatus }),
+    [mockDetail, effectiveStatus],
   );
 
   useEffect(() => {

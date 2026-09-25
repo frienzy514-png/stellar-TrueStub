@@ -135,7 +135,7 @@ export function EscrowStatusCard({
 
           {escrow.metadata?.eventName && (
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Hotel:</span>
+              <span className="text-muted-foreground">Event:</span>
               <span className="font-medium dark:text-white">
                 {escrow.metadata.eventName}
               </span>
