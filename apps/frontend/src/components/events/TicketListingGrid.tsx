@@ -5,12 +5,12 @@ import ListingCard from './ListingCard';
 
 interface TicketListingGridProps {
   listings: EventListing[];
-  onApartmentClick: (listing: EventListing) => void;
+  onListingClick: (listing: EventListing) => void;
 }
 
 export default function TicketListingGrid({
   listings,
-  onApartmentClick,
+  onListingClick,
 }: TicketListingGridProps) {
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -18,7 +18,7 @@ export default function TicketListingGrid({
         <ListingCard
           key={listing.id}
           listing={listing}
-          onClick={() => onApartmentClick(listing)}
+          onClick={() => onListingClick(listing)}
         />
       ))}
     </div>

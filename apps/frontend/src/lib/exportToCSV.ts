@@ -34,10 +34,10 @@ export function exportTransactionsToCSV(
   filename = "truestub-transactions.csv",
 ): void {
   const headers = [
-    "Booking ID",
-    "Hotel",
-    "Check-in",
-    "Check-out",
+    "Purchase ID",
+    "Event",
+    "Transfer Initiated",
+    "Transfer Completed",
     "Amount (USD)",
     "Status",
   ];

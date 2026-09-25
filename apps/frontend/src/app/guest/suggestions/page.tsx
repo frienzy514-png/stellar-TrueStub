@@ -9,11 +9,11 @@ import  EventHeader from "@/components/events/EventHeader";
 
 // TODO: replace with Apollo query → public.ticket_listings (Hasura)
 // Reference: dApp/apps/frontend/src/app/dashboard/guest/page.tsx
-const STUB_APARTMENTS = [
+const STUB_LISTINGS = [
   {
     id: "1",
-    name: "Moderno Apartamento en San José Centro",
-    address: "Avenida Central, Centro, San José",
+    name: "Coldplay: Music of the Spheres",
+    address: "Estadio Nacional, La Sabana, San José",
     price: 1200,
     deposit: 2400,
     beds: 2,
@@ -21,7 +21,7 @@ const STUB_APARTMENTS = [
     petFriendly: true,
     isPromoted: true,
     description:
-      "Apartamento renovado con acabados de lujo, 2 habitaciones, 2 baños",
+      "West Floor, Row 12 — two seats together, verified transfer via escrow",
     images: [
       "/img/room1.png",
       "/img/room2.png",
@@ -31,8 +31,8 @@ const STUB_APARTMENTS = [
   },
   {
     id: "2",
-    name: "Suite Ejecutiva Sabana Norte",
-    address: "Calle 42, Sabana Norte, San José",
+    name: "Costa Rica vs. Mexico",
+    address: "Estadio Nacional, La Sabana, San José",
     price: 950,
     deposit: 1900,
     beds: 2,
@@ -40,7 +40,7 @@ const STUB_APARTMENTS = [
     petFriendly: true,
     isPromoted: false,
     description:
-      "Suite ejecutiva completamente amueblada con vista panorámica de la ciudad.",
+      "East Stand, Row 18 — great sightline to midfield, verified transfer via escrow",
     images: [
       "/img/room2.png",
       "/img/room1.png",
@@ -51,10 +51,10 @@ const STUB_APARTMENTS = [
 ];
 
 export default function GuestSuggestionsPage() {
-  const [selectedId, setSelectedId] = useState(STUB_APARTMENTS[0].id);
+  const [selectedId, setSelectedId] = useState(STUB_LISTINGS[0].id);
   const [favorites, setFavorites] = useState<string[]>([]);
 
-  const selected = STUB_APARTMENTS.find((a) => a.id === selectedId)!;
+  const selected = STUB_LISTINGS.find((l) => l.id === selectedId)!;
 
   const toggleFavorite = (id: string) => {
     setFavorites((curr) =>
@@ -78,7 +78,7 @@ export default function GuestSuggestionsPage() {
                 Suggestions
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {STUB_APARTMENTS.length} units available
+                {STUB_LISTINGS.length} listings available
               </p>
               <Link
                 href="/rent"
@@ -90,15 +90,15 @@ export default function GuestSuggestionsPage() {
             </div>
 
             <div className="space-y-3">
-              {STUB_APARTMENTS.map((apt) => (
+              {STUB_LISTINGS.map((listing) => (
                 <button
-                  key={apt.id}
+                  key={listing.id}
                   type="button"
-                  onClick={() => setSelectedId(apt.id)}
+                  onClick={() => setSelectedId(listing.id)}
                   className={cn(
                     "w-full text-left rounded-xl border p-3",
                     "flex items-start gap-3 transition-colors",
-                    selectedId === apt.id
+                    selectedId === listing.id
                       ? "border-orange-400 bg-orange-50 dark:bg-orange-900/10"
                       : "border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800",
                   )}
@@ -108,8 +108,8 @@ export default function GuestSuggestionsPage() {
                                   overflow-hidden shrink-0 bg-gray-200
                                   dark:bg-slate-700">
                     <Image
-                      src={apt.images[0]}
-                      alt={apt.name}
+                      src={listing.images[0]}
+                      alt={listing.name}
                       fill
                       className="object-cover"
                       sizes="64px"
@@ -125,19 +125,19 @@ export default function GuestSuggestionsPage() {
                       <p className="text-sm font-semibold
                                     text-gray-900 dark:text-white
                                     line-clamp-2 leading-tight">
-                        {apt.name}
+                        {listing.name}
                       </p>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          toggleFavorite(apt.id);
+                          toggleFavorite(listing.id);
                         }}
                         className="shrink-0 mt-0.5"
                       >
                         <Heart
                           className={cn(
                             "h-4 w-4 transition-colors",
-                            favorites.includes(apt.id)
+                            favorites.includes(listing.id)
                               ? "fill-red-500 text-red-500"
                               : "text-gray-300 hover:text-red-400",
                           )}
@@ -146,24 +146,24 @@ export default function GuestSuggestionsPage() {
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400
                                   truncate">
-                      {apt.address}
+                      {listing.address}
                     </p>
                     <div className="flex items-center gap-2
                                     text-xs text-gray-400 dark:text-gray-500">
-                      <span>{apt.beds}bd</span>
+                      <span>{listing.beds}bd</span>
                       <span>·</span>
-                      {apt.petFriendly && (
+                      {listing.petFriendly && (
                         <>
                           <span>pet friendly</span>
                           <span>·</span>
                         </>
                       )}
-                      <span>{apt.baths} ba</span>
+                      <span>{listing.baths} ba</span>
                       <span
                         className="ml-auto font-bold text-green-600
                                    dark:text-green-400"
                       >
-                        ${apt.price.toLocaleString()}
+                        ${listing.price.toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -199,7 +199,7 @@ export default function GuestSuggestionsPage() {
               )}
             </div>
 
-            {/* Apartment details */}
+            {/* Listing details */}
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-4">
                 <h1 className="text-2xl font-bold text-gray-900
@@ -247,7 +247,7 @@ export default function GuestSuggestionsPage() {
               <div className="space-y-1">
                 <p className="text-sm font-semibold
                                text-gray-900 dark:text-white">
-                  Apartment details
+                  Listing details
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400
                                leading-relaxed">

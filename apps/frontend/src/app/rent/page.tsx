@@ -369,7 +369,7 @@ export default function EventListingPage() {
             ) : (
               <TicketListingGrid
                 listings={filteredListings}
-                onApartmentClick={handleListingClick}
+                onListingClick={handleListingClick}
               />
             )}
           </div>

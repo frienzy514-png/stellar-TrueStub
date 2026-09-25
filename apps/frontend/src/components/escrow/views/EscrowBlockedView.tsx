@@ -5,9 +5,9 @@ import { formatEscrowAmount } from "@/lib/formatEscrowAmount";
 import { EscrowPartyInfo } from "./EscrowPartyInfo";
 import { EscrowProcessStepper } from "./EscrowProcessStepper";
 import { RaiseDisputeModal } from "@/components/dispute/RaiseDisputeModal";
-import type { StubEscrowDetail } from "./types";
+import type { EscrowDetail } from "./types";
 
-export function EscrowBlockedView({ data }: { data: StubEscrowDetail }) {
+export function EscrowBlockedView({ data }: { data: EscrowDetail }) {
   return (
     <div className="space-y-8">
       <EscrowProcessStepper view="blocked" />

@@ -210,18 +210,18 @@ export function SideBar({
           <span>Moderation</span>
         </Link>
         <Link
-          href="/dashboard/ticket_listings"
+          href="/dashboard/listings"
           onClick={onClose}
           className={cn(
             "flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full group relative dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white",
-            pathname?.startsWith("/dashboard/ticket_listings") &&
+            pathname?.startsWith("/dashboard/listings") &&
               "bg-accent font-medium dark:bg-gray-800 dark:text-white",
           )}
         >
           <Home className="w-6 h-6 shrink-0 dark:text-gray-400" />
-          <span className="md:hidden lg:block">My ticket_listings</span>
+          <span className="md:hidden lg:block">My Listings</span>
           <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
-            My ticket_listings
+            My Listings
           </span>
         </Link>
       </div>

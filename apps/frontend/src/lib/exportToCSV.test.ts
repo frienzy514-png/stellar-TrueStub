@@ -40,16 +40,16 @@ describe("exportTransactionsToCSV", () => {
   it("should generate CSV and trigger download for transaction rows", () => {
     const mockTransactions: TransactionRow[] = [
       {
-        purchaseId: "BOOK-101",
-        event: "Grand Hotel",
+        purchaseId: "PUR-101",
+        event: "Coldplay Live",
         transferInitiated: "2026-08-01",
         transferCompleted: "2026-08-05",
         amount: 250,
         status: "completed",
       },
       {
-        purchaseId: 'BOOK-"102"',
-        event: 'Hotel "Lux"',
+        purchaseId: 'PUR-"102"',
+        event: 'Hamilton "Encore"',
         transferInitiated: "2026-08-10",
         transferCompleted: "2026-08-15",
         amount: 500.5,

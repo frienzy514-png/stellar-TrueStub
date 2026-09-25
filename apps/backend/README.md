@@ -30,7 +30,19 @@ this workspace is where their actual implementation lands.
     silently failing — fix the constraint name in
     `src/routes/sync-user.ts` once someone with real schema access confirms
     it.
+- `POST /webhooks/escrow-status` → the **single authoritative write path**
+  for escrow status (`escrow_transactions.status`). Requires a valid
+  HMAC-SHA256 signature of the raw body keyed with
+  `TRUSTLESS_WORK_WEBHOOK_SECRET` (`x-trustless-work-signature`,
+  `x-webhook-signature` or `x-signature`), maps the Trustless Work status via
+  `STATUS_MAP` (unknown statuses → 400), updates the row by `contractId`
+  through `HasuraService.updateEscrowStatus`, then sends notifications via
+  `NotificationService`. A failed write answers 500 so Trustless Work retries.
+  `apps/frontend`'s `src/app/webhooks/escrow-status/route.ts` is a pass-through
+  that forwards the signed payload here unchanged.
 - Express + TypeScript, `tsx` for the dev watcher, plain `tsc` build.
+- Tests are Jest, named `*.test.ts` next to the code they cover
+  (`yarn workspace @truestub/backend test`).
 - `src/config/env.ts` — the one place environment variables get read.
 
 ## Running it
@@ -79,7 +91,7 @@ end" of the URL it's calling:
 | `src/app/api/auth/sync-user/route.ts` | `BACKEND_URL` | ✅ Done — see "Current scope" above |
 | `src/app/api/auth/reset-password/route.ts` | `BACKEND_URL` | Complete a password reset |
 | `src/app/api/auth/forgot-password/route.ts` | `NEXT_PUBLIC_WEBHOOK_URL` | Kick off the forgot-password flow |
-| `src/app/webhooks/escrow-status/route.ts` | `TRUSTLESS_WORK_WEBHOOK_SECRET`-verified webhook | Verify the Trustless Work HMAC signature and call `updateEscrowStatus` (currently a stub in `src/lib/server/hasura.ts`, throws "not implemented") |
+| `src/app/webhooks/escrow-status/route.ts` | `BACKEND_URL` | ✅ Done — see "Current scope" above |
 
 The rest of that logic hasn't moved here yet. When it does, update the
 frontend's `BACKEND_URL` / `NEXT_PUBLIC_WEBHOOK_URL` env vars to point at

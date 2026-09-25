@@ -9,9 +9,9 @@ import { EscrowPartyInfo } from "./EscrowPartyInfo";
 import { EscrowProcessStepper } from "./EscrowProcessStepper";
 import { RatingReviewModal } from "@/components/ratings/RatingReviewModal";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
-import type { StubEscrowDetail } from "./types";
+import type { EscrowDetail } from "./types";
 
-export function EscrowReleasedView({ data }: { data: StubEscrowDetail }) {
+export function EscrowReleasedView({ data }: { data: EscrowDetail }) {
   const receiptsEnabled = useFeatureFlag("ESCROW_RECEIPTS");
   return (
     <div className="space-y-8">

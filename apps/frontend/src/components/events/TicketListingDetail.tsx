@@ -89,7 +89,7 @@ export default function TicketListingDetail({
 
       <div className="mt-10 max-w-[760px]">
         <h2 className="text-[22px] font-semibold text-[#1b1b1b]">
-          Apartment details
+          Listing details
         </h2>
         <p className="mt-4 text-sm leading-6 text-[#6d6d6d]">
           {listing.description}

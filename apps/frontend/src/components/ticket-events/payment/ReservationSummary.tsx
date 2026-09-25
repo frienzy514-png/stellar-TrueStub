@@ -63,7 +63,7 @@ const ReservationSummary: React.FC<ReservationSummaryProps> = ({
 
       <div className="space-y-1">
         <h3 className="text-xl font-bold text-gray-800">{eventName}</h3>
-        <p className="text-gray-600">King bed stylish Apartment</p>
+        <p className="text-gray-600">{description}</p>
       </div>
 
       <div className="h-px bg-gray-200 w-full my-4" />

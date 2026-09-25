@@ -17,21 +17,21 @@ import { useState } from "react";
 const STUB_ESCROWS = [
   {
     id: "abc-123",
-    property: "La sabana apartment",
+    event: "Coldplay Live — West Floor",
     amount: 4000,
     status: "PENDING" as const,
     createdAt: "2025-01-20",
   },
   {
     id: "def-456",
-    property: "Casa verde downtown",
+    event: "Costa Rica vs Mexico — East Stand",
     amount: 2500,
     status: "ACTIVE" as const,
     createdAt: "2025-01-15",
   },
   {
     id: "ghi-789",
-    property: "Playa escazú suite",
+    event: "Hamilton — Orchestra",
     amount: 6000,
     status: "COMPLETED" as const,
     createdAt: "2025-01-10",
@@ -117,7 +117,7 @@ export default function EscrowPage() {
             <TableHeader>
               <TableRow className="bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-700">
                 <TableHead className="w-[100px] min-w-[100px] text-gray-600 dark:text-gray-300 font-semibold">ID</TableHead>
-                <TableHead className="min-w-[200px] text-gray-600 dark:text-gray-300 font-semibold">Property</TableHead>
+                <TableHead className="min-w-[200px] text-gray-600 dark:text-gray-300 font-semibold">Event</TableHead>
                 <TableHead className="w-[120px] min-w-[120px] text-gray-600 dark:text-gray-300 font-semibold">
                   Amount
                 </TableHead>
@@ -146,8 +146,8 @@ export default function EscrowPage() {
                       {escrow.id.slice(0, 8)}...
                     </TableCell>
                     <TableCell className="font-medium min-w-[200px] text-gray-900 dark:text-white">
-                      <div className="truncate" title={escrow.property}>
-                        {escrow.property}
+                      <div className="truncate" title={escrow.event}>
+                        {escrow.event}
                       </div>
                     </TableCell>
                     <TableCell className="font-medium min-w-[120px] text-gray-900 dark:text-white">

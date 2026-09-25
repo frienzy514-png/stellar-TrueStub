@@ -6,7 +6,7 @@ import { InvoiceHeader } from "@/components/escrow/InvoiceHeader";
 import { ProcessStepper } from "@/components/escrow/ProcessStepper";
 import { EscrowPartyInfo } from "@/components/escrow/views/EscrowPartyInfo";
 import { MilestoneProgress } from "@/components/dashboard/milestone-progress";
-import { getStubEscrow } from "@/components/escrow/views/stubEscrow";
+import { getMockEscrowDetail } from "@/components/escrow/mocks/escrowDetail.mock";
 import { formatEscrowAmount } from "@/lib/formatEscrowAmount";
 import { RatingReviewModal } from "@/components/ratings/RatingReviewModal";
 import { RaiseDisputeModal } from "@/components/dispute/RaiseDisputeModal";
@@ -43,12 +43,12 @@ export default async function EscrowDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const stub = getStubEscrow(id);
+  const mockDetail = getMockEscrowDetail(id);
   const amount = 4000;
   const currency = "USDC";
   const formattedAmount = formatEscrowAmount(amount, currency);
   const escrow = {
-    ...stub,
+    ...mockDetail,
     status: "FUNDED" as const,
     amount,
     currency,

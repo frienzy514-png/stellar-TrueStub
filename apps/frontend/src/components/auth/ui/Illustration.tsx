@@ -5,7 +5,7 @@ export default function Illustration({ className }: { className?: string }) {
      <div className={`relative hidden md:block md:w-1/2 dark:bg-gray-900 ${className || ""}`}>
        <div className="absolute mt-[15rem] inset-0 flex items-center justify-center">
          <Image
-           src="/img/hotels.png"
+           src="/img/event-venue.png"
            alt="Events"
            width={1500}
            height={1200}

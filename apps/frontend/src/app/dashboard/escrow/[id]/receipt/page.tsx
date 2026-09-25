@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
-import { getStubEscrow } from "@/components/escrow/views/stubEscrow";
+import { getMockEscrowDetail } from "@/components/escrow/mocks/escrowDetail.mock";
 import { PrintReceiptButton } from "@/components/escrow/PrintReceiptButton";
 import { formatEscrowAmount } from "@/lib/formatEscrowAmount";
 import { isFeatureEnabled } from "@/lib/featureFlags";
@@ -20,7 +20,7 @@ export default async function EscrowReceiptPage({
 
   const { id } = await params;
   // TODO: replace with GET_ESCROW_BY_ID once GraphQL wiring lands.
-  const escrow = getStubEscrow(id);
+  const escrow = getMockEscrowDetail(id);
   const amount = formatEscrowAmount(escrow.amount, escrow.currency);
   const explorerUrl = `https://stellar.expert/explorer/${explorerNetwork}/contract/${encodeURIComponent(escrow.id)}`;
 

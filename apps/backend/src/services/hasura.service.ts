@@ -9,14 +9,23 @@ interface NotificationMutationData {
 }
 
 export class HasuraService {
+  /**
+   * The single authoritative write path for `escrow_transactions.status`
+   * (called only from the HMAC-verified `/webhooks/escrow-status` route).
+   *
+   * Failures are surfaced, not swallowed: the webhook must answer non-2xx so
+   * Trustless Work retries the delivery instead of the update being lost. The
+   * thrown error is generic so admin credentials and remote error payloads
+   * stay out of logs and responses.
+   */
   static async updateEscrowStatus(
-    engagementId: string,
+    contractId: string,
     status: string
   ): Promise<{ affected_rows: number }> {
     const query = `
-      mutation UpdateEscrowStatus($engagementId: String!, $status: String!) {
+      mutation UpdateEscrowStatus($contractId: String!, $status: String!) {
         update_escrow_transactions(
-          where: { contract_id: { _eq: $engagementId } }
+          where: { contract_id: { _eq: $contractId } }
           _set: { status: $status, updated_at: "now()" }
         ) {
           affected_rows
@@ -24,17 +33,16 @@ export class HasuraService {
       }
     `;
 
+    let data: EscrowMutationData;
     try {
-      const data = await hasuraClient.request<EscrowMutationData>(query, {
-        engagementId,
+      data = await hasuraClient.request<EscrowMutationData>(query, {
+        contractId,
         status,
       });
-      return { affected_rows: data.update_escrow_transactions?.affected_rows ?? 0 };
     } catch {
-      // Preserve the existing offline fallback while keeping admin credentials
-      // and remote error payloads out of logs.
-      return { affected_rows: 1 };
+      throw new Error("Failed to update escrow status in Hasura");
     }
+    return { affected_rows: data.update_escrow_transactions?.affected_rows ?? 0 };
   }
 
   static async insertNotification(notification: {

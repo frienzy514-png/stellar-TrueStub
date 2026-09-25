@@ -1,15 +1,15 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { StubEscrowBeneficiary, StubEscrowParty, StubEscrowTenant } from "./types";
+import type { EscrowBeneficiary, EscrowParty, EscrowTenant } from "./types";
 
 type Variant = "tenant" | "owner" | "beneficiary";
 
 type Props = {
   variant: Variant;
-  tenant?: StubEscrowTenant;
-  owner?: StubEscrowParty;
-  beneficiary?: StubEscrowBeneficiary;
+  tenant?: EscrowTenant;
+  owner?: EscrowParty;
+  beneficiary?: EscrowBeneficiary;
 };
 
 function Row({ label, value }: { label: string; value: string }) {

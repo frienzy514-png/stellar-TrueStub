@@ -6,13 +6,13 @@ import ReservationSummary from "@/components/ticket-events/payment/ReservationSu
 
 const EventPage = () => {
   const eventData = {
-    eventName: "Shikara Hotel",
-    description: "King bed stylish Apartment",
+    eventName: "Coldplay Live",
+    description: "West Floor · Row 12 · 2 tickets",
     details:
       "Lorem ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book.",
     goodToKnow:
       "Lorem ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book.",
-    location: "329 Calle santos, paseo colón, San José",
+    location: "Estadio Nacional, La Sabana, San José",
     coordinates: [9.9281, -84.0907] as [number, number],
     rating: 5.0,
     beds: 2,

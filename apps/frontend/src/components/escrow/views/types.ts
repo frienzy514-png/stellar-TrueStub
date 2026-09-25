@@ -1,28 +1,28 @@
-export type StubEscrowParty = {
+export type EscrowParty = {
   name: string;
   wallet: string;
   email: string;
 };
 
-export type StubEscrowTenant = StubEscrowParty & {
+export type EscrowTenant = EscrowParty & {
   rentalDate: string;
   depositAmount: string;
 };
 
-export type StubEscrowBeneficiary = StubEscrowParty & {
+export type EscrowBeneficiary = EscrowParty & {
   releasedDate: string;
   depositAmount: string;
   phone: string;
 };
 
-export type StubEscrowProductRow = {
+export type EscrowProductRow = {
   product: string;
   pricePerMonth: string;
   deposit: string;
 };
 
-/** Stub shape until GET_ESCROW_BY_ID is wired */
-export type StubEscrowDetail = {
+/** Escrow detail shape rendered by the escrow views (see mocks/escrowDetail.mock.ts until GET_ESCROW_BY_ID is wired) */
+export type EscrowDetail = {
   id: string;
   invoiceNumber: string;
   status: string;
@@ -36,15 +36,15 @@ export type StubEscrowDetail = {
   notes: string;
   billedTo: string;
   billingDetails: string;
-  products: StubEscrowProductRow[];
+  products: EscrowProductRow[];
   subtotal: string;
   discount: string;
   total: string;
   terms: string;
-  tenant: StubEscrowTenant;
-  owner: StubEscrowParty;
-  beneficiary: StubEscrowBeneficiary;
+  tenant: EscrowTenant;
+  owner: EscrowParty;
+  beneficiary: EscrowBeneficiary;
   escrowJustification: string;
   claimsPlaceholder: string;
-  apartment: { name: string; image: string };
+  listing: { name: string; image: string };
 };
