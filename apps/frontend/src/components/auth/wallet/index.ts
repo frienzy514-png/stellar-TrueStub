@@ -1,11 +1,18 @@
 // Hooks
 export { useWallet } from './hooks/wallet.hook';
 export { useMultiWallet } from './hooks/useMultiWallet';
+export { useNetworkCheck } from './hooks/useNetworkCheck';
+export type { NetworkCheckResult } from './hooks/useNetworkCheck';
 export {
   useWalletDetection,
   getAvailableWallets,
   isWalletAvailable,
 } from './hooks/useWalletDetection';
+export {
+  useWalletPersistence,
+  getPersistedWalletType,
+  persistWalletType,
+} from './hooks/useWalletPersistence';
 
 // Components
 export { WalletSelectionModal } from './components/WalletSelectionModal';
@@ -13,6 +20,7 @@ export { default as WalletConnectionModal } from './WalletConnectionModal';
 export { default as WalletOption } from './WalletOption';
 export { default as WalletDetection } from './WalletDetection';
 export { default as ConnectionStatus } from './ConnectionStatus';
+export { NetworkMismatchBanner } from './NetworkMismatchBanner';
 
 // Types
 export type * from './types/wallet.types';

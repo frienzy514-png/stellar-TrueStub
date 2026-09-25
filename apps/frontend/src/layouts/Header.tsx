@@ -4,7 +4,7 @@ import { FaUserCircle, FaBell, FaSearch } from "react-icons/fa";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { useTheme } from "next-themes";
-// import LanguageSwitcher from '@/components/language/LanguageSwitcher';
+import LanguageSwitcher from '@/components/language/LanguageSwitcher';
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 
@@ -66,7 +66,7 @@ const Header: React.FC = () => {
             </svg>
           </button>
 
-          <div className="hidden lg:block">{/* <LanguageSwitcher /> */}</div>
+          <div className="hidden lg:block"><LanguageSwitcher /></div>
 
           <div className="relative hidden lg:block">
             <FaBell
@@ -118,10 +118,10 @@ const Header: React.FC = () => {
                 <ul className="py-2 text-sm text-gray-700 dark:text-gray-400">
                   <li>
                     <a
-                      href="/profile/my-apartments"
+                      href="/dashboard/listings"
                       className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white transition-colors duration-300 ease-in-out"
                     >
-                      {t("header.myApartments")}
+                      {t("header.myListings")}
                     </a>
                   </li>
                   <li>
@@ -182,10 +182,10 @@ const Header: React.FC = () => {
                     <ul className="space-y-2">
                       <li>
                         <Link
-                          href="/profile/my-apartments"
+                          href="/dashboard/listings"
                           className="block px-4 py-2 text-gray-800 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-300 ease-in-out"
                         >
-                          {t("header.myApartments")}
+                          {t("header.myListings")}
                         </Link>
                       </li>
                       <li>
@@ -215,7 +215,7 @@ const Header: React.FC = () => {
                 </button>
 
                 <div className="flex justify-between items-center mt-4">
-                  {/* <LanguageSwitcher /> */}
+                  <LanguageSwitcher />
                   <ThemeToggle />
                 </div>
               </div>

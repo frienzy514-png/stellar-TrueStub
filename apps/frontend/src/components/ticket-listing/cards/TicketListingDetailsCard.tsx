@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator"
 import { MapPin, Star, Users, Calendar } from "lucide-react"
 
 interface TicketListingDetailsCardProps {
-  hotelName?: string
+  eventName?: string
   price?: number
   currency?: string
   rating?: number
@@ -14,14 +14,14 @@ interface TicketListingDetailsCardProps {
   location?: string
   description?: string
   maxGuests?: number
-  checkIn?: string
-  checkOut?: string
+  transferInitiated?: string
+  transferCompleted?: string
   isLoading?: boolean
   onBookNow?: () => void
 }
 
 const TicketListingDetailsCard = ({
-  hotelName = "Shikara Event",
+  eventName = "Shikara Event",
   price = 40.18,
   currency = "$",
   rating = 4.8,
@@ -29,8 +29,8 @@ const TicketListingDetailsCard = ({
   location = "124 Colte Street, Downtown Center, San José",
   description = "Lorem ipsum is simply random text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book.",
   maxGuests = 4,
-  checkIn = "3:00 PM",
-  checkOut = "11:00 AM",
+  transferInitiated = "3:00 PM",
+  transferCompleted = "11:00 AM",
   isLoading = false,
   onBookNow
 }: TicketListingDetailsCardProps) => {
@@ -57,7 +57,7 @@ const TicketListingDetailsCard = ({
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="space-y-2">
-            <CardTitle className="text-2xl font-semibold">{hotelName}</CardTitle>
+            <CardTitle className="text-2xl font-semibold">{eventName}</CardTitle>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-1">
                 <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
@@ -106,11 +106,11 @@ const TicketListingDetailsCard = ({
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">Check-in: </span>
-                <span className="font-medium">{checkIn}</span>
+                <span className="font-medium">{transferInitiated}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Check-out: </span>
-                <span className="font-medium">{checkOut}</span>
+                <span className="font-medium">{transferCompleted}</span>
               </div>
             </div>
           </div>

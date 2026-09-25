@@ -1,34 +1,19 @@
 export interface TransactionRow {
-  bookingId: string;
+  purchaseId: string;
   event: string;
-  checkIn: string;
-  checkOut: string;
+  transferInitiated: string;
+  transferCompleted: string;
   amount: number;
   status: string;
 }
 
-export function exportTransactionsToCSV(
-  transactions: TransactionRow[],
-  filename = "truestub-transactions.csv",
-): void {
-  const headers = [
-    "Booking ID",
-    "Hotel",
-    "Check-in",
-    "Check-out",
-    "Amount (USD)",
-    "Status",
-  ];
+export interface WalletRow {
+  address: string;
+  network: string;
+  isPrimary: boolean;
+}
 
-  const rows = transactions.map((t) => [
-    t.bookingId,
-    t.event,
-    t.checkIn,
-    t.checkOut,
-    t.amount.toFixed(2),
-    t.status,
-  ]);
-
+function downloadCSV(headers: string[], rows: (string | number)[][], filename: string): void {
   const csvContent = [headers, ...rows]
     .map((row) =>
       row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
@@ -42,4 +27,44 @@ export function exportTransactionsToCSV(
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+export function exportTransactionsToCSV(
+  transactions: TransactionRow[],
+  filename = "truestub-transactions.csv",
+): void {
+  const headers = [
+    "Purchase ID",
+    "Event",
+    "Transfer Initiated",
+    "Transfer Completed",
+    "Amount (USD)",
+    "Status",
+  ];
+
+  const rows = transactions.map((t) => [
+    t.purchaseId,
+    t.event,
+    t.transferInitiated,
+    t.transferCompleted,
+    t.amount.toFixed(2),
+    t.status,
+  ]);
+
+  downloadCSV(headers, rows, filename);
+}
+
+export function exportWalletsToCSV(
+  wallets: WalletRow[],
+  filename = "truestub-wallets.csv",
+): void {
+  const headers = ["Address", "Network", "Primary"];
+
+  const rows = wallets.map((w) => [
+    w.address,
+    w.network,
+    w.isPrimary ? "Yes" : "No",
+  ]);
+
+  downloadCSV(headers, rows, filename);
 }

@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
+import {
+  forgotPasswordSchema,
+  parseOr400,
+  readJson,
+} from "@/lib/server/validation";
 
 export async function POST(request: Request) {
   try {
-    const { email } = await request.json();
-
-    if (!email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
-    }
+    const parsed = parseOr400(forgotPasswordSchema, await readJson(request));
+    if (parsed.error) return parsed.error;
+    const { email } = parsed.data;
 
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_WEBHOOK_URL}/webhooks/forgot-password`,

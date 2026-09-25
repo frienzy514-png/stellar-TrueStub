@@ -9,12 +9,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, KeyRound, ArrowLeft } from "lucide-react";
 import Buildings from "@/components/auth/ui/Buildings";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-
-// Firebase imports per Issue #313
+import LanguageSwitcher from "@/components/language/LanguageSwitcher";
+import { useTranslation } from "react-i18next";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
 export default function ForgotPasswordForm() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<
@@ -22,18 +23,22 @@ export default function ForgotPasswordForm() {
   >("idle");
   const [message, setMessage] = useState("");
 
-  // Error mapping per Issue #313 description
-  const ERROR_MESSAGES: Record<string, string> = {
-    "auth/user-not-found": "No account found with this email",
-    "auth/invalid-email": "Invalid email address",
-    "auth/too-many-requests": "Too many requests. Please try again later",
-    "auth/internal-error": "Authentication server error",
+  const getErrorMessage = (code: string) => {
+    switch (code) {
+      case "auth/user-not-found":
+        return t("auth.userNotFound");
+      case "auth/invalid-email":
+        return t("auth.invalidEmail");
+      case "auth/too-many-requests":
+        return t("auth.tooManyRequests");
+      default:
+        return t("auth.unexpectedError");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Safety guard: Ensure auth is initialized (Prevents crash if API key is missing)
     if (!auth) {
       setStatus("error");
       setMessage("Configuration error: Authentication service not found.");
@@ -44,26 +49,21 @@ export default function ForgotPasswordForm() {
     setMessage("");
 
     try {
-      // Execute Firebase password reset
       await sendPasswordResetEmail(auth, email);
-
       setStatus("success");
-      setMessage("Check your email for reset instructions");
-      setEmail(""); // Clear email input on success
+      setMessage(t("auth.resetEmailSent"));
+      setEmail("");
     } catch (error: any) {
       console.error("Firebase Reset Error:", error.code);
       setStatus("error");
-
-      // Map specific Firebase error codes or use generic fallback
-      setMessage(
-        ERROR_MESSAGES[error.code] ?? "Something went wrong — please try again",
-      );
+      setMessage(getErrorMessage(error.code));
     }
   };
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-white px-4 transition-colors duration-300 dark:bg-gray-900">
-      <div className="absolute right-4 top-4 z-10">
+      <div className="absolute right-4 top-4 z-10 flex items-center space-x-2">
+        <LanguageSwitcher />
         <ThemeToggle />
       </div>
 
@@ -77,10 +77,10 @@ export default function ForgotPasswordForm() {
         </div>
 
         <h1 className="text-2xl font-bold transition-colors duration-300 dark:text-gray-100">
-          Forgot password?
+          {t("auth.forgotPasswordTitle")}
         </h1>
         <p className="text-sm text-gray-500 transition-colors duration-300 dark:text-gray-400">
-          No worries, we'll send you a temporary password
+          {t("auth.forgotPasswordSubtitle")}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -89,12 +89,12 @@ export default function ForgotPasswordForm() {
               htmlFor="email"
               className="transition-colors duration-300 dark:text-gray-200"
             >
-              Email
+              {t("auth.emailOrUsername")}
             </Label>
             <Input
               id="email"
               type="email"
-              placeholder="Enter your email"
+              placeholder={t("auth.emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -125,10 +125,10 @@ export default function ForgotPasswordForm() {
             {status === "loading" ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Sending...
+                {t("auth.sending")}
               </>
             ) : (
-              "Send password"
+              t("auth.sendResetLink")
             )}
           </Button>
 
@@ -138,7 +138,7 @@ export default function ForgotPasswordForm() {
             className="flex w-full items-center justify-center text-sm text-[#2857B8] transition-colors duration-300 hover:underline dark:text-blue-400"
           >
             <ArrowLeft className="mr-1 h-4 w-4" />
-            Back to log in
+            {t("auth.backToLogin")}
           </button>
         </form>
       </div>

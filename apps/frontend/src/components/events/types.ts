@@ -1,38 +1,38 @@
-export interface Booking {
+export interface TicketPurchase {
   id: string;
   guestName: string;
   guestEmail: string;
-  checkInDate: string;
-  checkOutDate: string;
-  roomNumber?: string;
-  status: 'pending' | 'checked_in' | 'checked_out' | 'completed' | 'cancelled';
+  transferDate: string;
+  eventDate: string;
+  seatNumber?: string;
+  status: 'pending' | 'transfer_confirmed' | 'transfer_finalized' | 'completed' | 'cancelled';
 }
 
-export interface CheckInData {
-  roomNumber: string;
-  checkInTime: string;
+export interface TransferInitiationData {
+  seatNumber: string;
+  transferInitiatedAt: string;
   wifiPassword?: string;
   signature?: string;
   staffMember?: string;
 }
 
-export interface CheckOutData {
-  checkOutTime: string;
+export interface TransferCompletionData {
+  transferCompletedAt: string;
   staffMember?: string;
-  roomCondition?: 'excellent' | 'good' | 'fair' | 'poor';
+  ticketCondition?: 'excellent' | 'good' | 'fair' | 'poor';
 }
 
-export interface DamageAssessment {
-  hasDamage: boolean;
+export interface TicketConditionAssessment {
+  hasIssue: boolean;
   condition: 'excellent' | 'good' | 'fair' | 'poor';
   description?: string;
-  damagePhotos?: string[];
+  issuePhotos?: string[];
 }
 
 export interface MilestoneApprovalData {
   contractId: string;
   milestoneId: string;
-  bookingId: string;
+  purchaseId: string;
   timestamp: string;
 }
 
@@ -40,27 +40,27 @@ export interface MilestoneStatusData {
   contractId: string;
   milestoneId: string;
   newStatus: string;
-  bookingId: string;
+  purchaseId: string;
   timestamp: string;
 }
 
 export interface EscrowMetadata {
-  bookingId: string;
-  hotelName: string;
-  checkInDate: string;
-  checkOutDate: string;
+  purchaseId: string;
+  eventName: string;
+  transferDate: string;
+  eventDate: string;
   guestName?: string;
   guestEmail?: string;
-  roomNumber?: string;
-  checkInTime?: string;
-  checkOutTime?: string;
+  seatNumber?: string;
+  transferInitiatedAt?: string;
+  transferCompletedAt?: string;
   staffApprover?: string;
-  hasDamage?: boolean;
-  damageDescription?: string;
+  hasIssue?: boolean;
+  issueDescription?: string;
 }
 
 export interface TicketTransferApprovalProps {
-  booking: Booking;
+  purchase: TicketPurchase;
   escrow: {
     contractId: string;
     milestoneId?: string;
@@ -71,7 +71,7 @@ export interface TicketTransferApprovalProps {
 }
 
 export interface TicketTransferCompletionProps {
-  booking: Booking;
+  purchase: TicketPurchase;
   escrow: {
     contractId: string;
     milestoneId?: string;

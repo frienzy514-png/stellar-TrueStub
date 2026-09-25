@@ -4,9 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { formatEscrowAmount } from "@/lib/formatEscrowAmount";
 import { EscrowPartyInfo } from "./EscrowPartyInfo";
 import { EscrowProcessStepper } from "./EscrowProcessStepper";
-import type { StubEscrowDetail } from "./types";
+import { RaiseDisputeModal } from "@/components/dispute/RaiseDisputeModal";
+import type { EscrowDetail } from "./types";
 
-export function EscrowBlockedView({ data }: { data: StubEscrowDetail }) {
+export function EscrowBlockedView({ data }: { data: EscrowDetail }) {
   return (
     <div className="space-y-8">
       <EscrowProcessStepper view="blocked" />
@@ -21,6 +22,12 @@ export function EscrowBlockedView({ data }: { data: StubEscrowDetail }) {
             <Badge className="border-transparent bg-blue-600 text-white hover:bg-blue-600">
               Deposit blocked
             </Badge>
+            <RaiseDisputeModal
+              contractId={data.id}
+              engagementId={data.invoiceNumber}
+              userWallet={data.tenant?.wallet}
+              userRole="buyer"
+            />
           </div>
         </div>
       </header>
@@ -52,3 +59,4 @@ export function EscrowBlockedView({ data }: { data: StubEscrowDetail }) {
     </div>
   );
 }
+

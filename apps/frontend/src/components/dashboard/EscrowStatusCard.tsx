@@ -13,27 +13,34 @@ interface EscrowStatusCardProps {
   onActionComplete?: () => void;
 }
 
-const statusColors = {
+const statusColors: Record<string, string> = {
   pending:
     "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
   funded: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  check_in_approved:
+  transfer_confirmed:
     "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  check_out_approved:
+  transfer_finalized:
     "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
   completed:
     "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  disputed: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  indispute: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  resolved: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
   cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-} as const;
+};
 
-const statusLabels = {
+const statusLabels: Record<string, string> = {
   pending: "Pending",
   funded: "Funded",
-  check_in_approved: "Check-in Approved",
-  check_out_approved: "Check-out Approved",
+  transfer_confirmed: "Check-in Approved",
+  transfer_finalized: "Check-out Approved",
   completed: "Completed",
+  disputed: "Disputed ⚠️",
+  indispute: "In Dispute ⚠️",
+  resolved: "Resolved ⚖️",
   cancelled: "Cancelled",
-} as const;
+};
+
 
 export function EscrowStatusCard({
   escrow,
@@ -55,12 +62,12 @@ export function EscrowStatusCard({
     if (
       userRole === "event" &&
       escrow.status === "funded" &&
-      escrow.nextMilestone === "check_in"
+      escrow.nextMilestone === "transfer_initiated"
     ) {
       return (
         <ApproveMilestone
           contractId={escrow.contractId}
-          milestoneId="check_in"
+          milestoneId="transfer_initiated"
           approverWallet={escrow.marker || walletAddress || ""}
           variant="default"
           size="sm"
@@ -69,11 +76,11 @@ export function EscrowStatusCard({
       );
     }
 
-    if (userRole === "admin" && escrow.status === "check_in_approved") {
+    if (userRole === "admin" && escrow.status === "transfer_confirmed") {
       return (
         <ChangeMilestoneStatus
           contractId={escrow.contractId}
-          milestoneId="check_out"
+          milestoneId="transfer_completed"
           newStatus="completed"
           walletAddress={
             process.env.NEXT_PUBLIC_PLATFORM_WALLET || walletAddress || ""
@@ -92,7 +99,7 @@ export function EscrowStatusCard({
     <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium dark:text-white">
-          Booking #{escrow.metadata?.bookingId || "N/A"}
+          Booking #{escrow.metadata?.purchaseId || "N/A"}
         </CardTitle>
         <Badge
           variant="outline"
@@ -126,11 +133,11 @@ export function EscrowStatusCard({
              </span>
            </div>
 
-          {escrow.metadata?.hotelName && (
+          {escrow.metadata?.eventName && (
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Hotel:</span>
+              <span className="text-muted-foreground">Event:</span>
               <span className="font-medium dark:text-white">
-                {escrow.metadata.hotelName}
+                {escrow.metadata.eventName}
               </span>
             </div>
           )}
@@ -138,14 +145,14 @@ export function EscrowStatusCard({
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Check-in:</span>
             <span className="font-medium dark:text-white">
-              {formatDate(escrow.metadata?.checkInDate)}
+              {formatDate(escrow.metadata?.transferDate)}
             </span>
           </div>
 
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Check-out:</span>
             <span className="font-medium dark:text-white">
-              {formatDate(escrow.metadata?.checkOutDate)}
+              {formatDate(escrow.metadata?.eventDate)}
             </span>
           </div>
 

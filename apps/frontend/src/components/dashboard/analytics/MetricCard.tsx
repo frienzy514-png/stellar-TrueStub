@@ -26,6 +26,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   isCurrency = false,
 }) => {
   const Icon = metric.icon;
+  const showCurrency = isCurrency || metric.isCurrency;
 
   const getTrendIcon = (trend: MetricData["trend"]) => {
     switch (trend) {
@@ -50,10 +51,11 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   };
 
   const formatValue = (value: number) => {
-    if (isCurrency) {
+    if (showCurrency) {
       return formatCurrency(value);
     }
-    return formatNumber(value);
+    const formatted = formatNumber(value);
+    return metric.suffix ? `${formatted}${metric.suffix}` : formatted;
   };
 
   return (

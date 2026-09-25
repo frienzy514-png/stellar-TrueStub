@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import Image from "@/components/ui/image";
 
@@ -30,6 +32,7 @@ export default function VerticalCarousel({
           onClick={scrollUp}
           className="absolute -top-6 left-1/2 transform -translate-x-1/2 p-2 bg-gray-200 rounded-full hover:bg-gray-300 text-sm disabled:opacity-50"
           disabled={startIndex === 0}
+          aria-label="Scroll thumbnails up"
         >
           ▲
         </button>
@@ -42,12 +45,17 @@ export default function VerticalCarousel({
             <button
               key={index}
               onClick={() => onSelect(img)}
-              className="w-full h-1/3 rounded-lg overflow-hidden transition"
+              // `relative` is required so that the fill-mode next/image inside
+              // the ui/image wrapper has a positioned ancestor to attach to.
+              className="relative w-full h-1/3 rounded-lg overflow-hidden transition"
+              aria-label={`Select thumbnail ${startIndex + index + 1}`}
             >
               <Image
                 src={img}
-                alt={`Thumbnail ${index}`}
-                className="w-full h-full object-cover"
+                alt={`Thumbnail ${startIndex + index + 1}`}
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 25vw, 15vw"
               />
             </button>
           ))}
@@ -58,6 +66,7 @@ export default function VerticalCarousel({
           onClick={scrollDown}
           className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 p-2 bg-gray-200 rounded-full hover:bg-gray-300 text-sm disabled:opacity-50"
           disabled={startIndex >= maxIndex}
+          aria-label="Scroll thumbnails down"
         >
           ▼
         </button>

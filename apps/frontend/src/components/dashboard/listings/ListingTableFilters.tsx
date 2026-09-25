@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 
 export type PriceRangeFilter = "all" | "under_3000" | "3000_5000" | "over_5000";
-export type StatusTableFilter = "all" | "inhabited" | "not_inhabited";
+export type StatusTableFilter = "all" | "available" | "unavailable";
 
 interface ListingTableFiltersProps {
   searchQuery: string;
@@ -46,7 +46,7 @@ export function ListingTableFilters({
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-9"
-          aria-label="Search apartments"
+          aria-label="Search listings"
         />
       </div>
 
@@ -87,8 +87,8 @@ export function ListingTableFilters({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="inhabited">Inhabited</SelectItem>
-              <SelectItem value="not_inhabited">Not inhabited</SelectItem>
+              <SelectItem value="available">Available</SelectItem>
+              <SelectItem value="unavailable">Unavailable</SelectItem>
             </SelectContent>
           </Select>
         </div>

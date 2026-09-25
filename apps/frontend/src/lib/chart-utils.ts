@@ -7,17 +7,25 @@ export interface AnalyticsData {
   users: number;
 }
 
+export interface EscrowAnalyticsData {
+  date: string;
+  volume: number;
+  escrowsCreated: number;
+  escrowsCompleted: number;
+  disputes: number;
+  disputeRate: number;
+  avgReleaseHours: number;
+}
+
 export interface MetricData {
   label: string;
   value: number;
   change: number;
   trend: "up" | "down" | "neutral";
-  /**
-   * Lucide React icon component used to illustrate the metric.
-   * (Replaces the emoji strings used in the original landing implementation.)
-   */
   icon: LucideIcon;
   color: "primary" | "success" | "warning" | "info";
+  suffix?: string;
+  isCurrency?: boolean;
 }
 
 export interface ChartConfig {
@@ -28,15 +36,12 @@ export interface ChartConfig {
   fillOpacity?: number;
 }
 
-// Generate mock analytics data for demonstration
+// Generate mock traffic analytics data
 export const generateMockData = (days: number = 30): AnalyticsData[] => {
   const data: AnalyticsData[] = [];
-
-  // Normalize to start-of-day so the returned window is stable.
   const endDate = new Date();
   endDate.setHours(0, 0, 0, 0);
 
-  // Include today in the returned window.
   const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - (days - 1));
 
@@ -44,9 +49,8 @@ export const generateMockData = (days: number = 30): AnalyticsData[] => {
     const date = new Date(startDate);
     date.setDate(date.getDate() + i);
 
-    // Deterministic variance based on index (stable across refreshes).
-    const wave = (Math.sin(i * 0.9) + 1) / 2; // 0..1
-    const noise = (Math.sin(i * 0.17 + 1.3) + 1) / 2; // 0..1
+    const wave = (Math.sin(i * 0.9) + 1) / 2;
+    const noise = (Math.sin(i * 0.17 + 1.3) + 1) / 2;
 
     const basePageViews = 100 + i * 5 + wave * 50;
     const baseClicks = 20 + i * 2 + noise * 10;
@@ -57,6 +61,43 @@ export const generateMockData = (days: number = 30): AnalyticsData[] => {
       pageViews: Math.floor(basePageViews),
       clicks: Math.floor(baseClicks),
       users: Math.floor(baseUsers),
+    });
+  }
+
+  return data;
+};
+
+// Generate platform-wide mock escrow & dispute analytics data
+export const generateMockEscrowAnalyticsData = (days: number = 30): EscrowAnalyticsData[] => {
+  const data: EscrowAnalyticsData[] = [];
+  const endDate = new Date();
+  endDate.setHours(0, 0, 0, 0);
+
+  const startDate = new Date(endDate);
+  startDate.setDate(startDate.getDate() - (days - 1));
+
+  for (let i = 0; i < days; i++) {
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + i);
+
+    const wave = (Math.sin(i * 0.6) + 1) / 2;
+    const noise = (Math.cos(i * 0.4) + 1) / 2;
+
+    const escrowsCreated = Math.floor(15 + i * 0.8 + wave * 10);
+    const escrowsCompleted = Math.floor(12 + i * 0.7 + wave * 9);
+    const disputes = Math.max(0, Math.floor(noise * 2.2));
+    const volume = Math.floor((escrowsCreated * 240) + wave * 1200 + noise * 800);
+    const disputeRate = parseFloat(((disputes / Math.max(1, escrowsCreated)) * 100).toFixed(2));
+    const avgReleaseHours = parseFloat((24 + wave * 8 - noise * 4).toFixed(1));
+
+    data.push({
+      date: date.toISOString().split("T")[0],
+      volume,
+      escrowsCreated,
+      escrowsCompleted,
+      disputes,
+      disputeRate,
+      avgReleaseHours,
     });
   }
 
@@ -77,7 +118,7 @@ export const formatNumber = (num: number): string => {
   if (num >= 1000) {
     return `${(num / 1000).toFixed(1)}K`;
   }
-  return num.toString();
+  return Number.isInteger(num) ? num.toString() : num.toFixed(1);
 };
 
 // Format currency values
@@ -90,65 +131,56 @@ export const formatCurrency = (num: number): string => {
   }).format(num);
 };
 
-// Default chart configurations
+// Default chart configurations for traffic
 export const chartConfigs: Record<string, ChartConfig[]> = {
   line: [
-    {
-      dataKey: "pageViews",
-      label: "Page Views",
-      color: "#3b82f6",
-      strokeWidth: 3,
-    },
+    { dataKey: "pageViews", label: "Page Views", color: "#3b82f6", strokeWidth: 3 },
     { dataKey: "clicks", label: "Clicks", color: "#22c55e", strokeWidth: 3 },
-    {
-      dataKey: "users",
-      label: "Unique Users",
-      color: "#f59e0b",
-      strokeWidth: 3,
-    },
+    { dataKey: "users", label: "Unique Users", color: "#f59e0b", strokeWidth: 3 },
   ],
   bar: [
-    {
-      dataKey: "pageViews",
-      label: "Page Views",
-      color: "#3b82f6",
-      fillOpacity: 0.8,
-    },
+    { dataKey: "pageViews", label: "Page Views", color: "#3b82f6", fillOpacity: 0.8 },
     { dataKey: "clicks", label: "Clicks", color: "#22c55e", fillOpacity: 0.8 },
-    {
-      dataKey: "users",
-      label: "Unique Users",
-      color: "#f59e0b",
-      fillOpacity: 0.8,
-    },
+    { dataKey: "users", label: "Unique Users", color: "#f59e0b", fillOpacity: 0.8 },
   ],
   area: [
-    {
-      dataKey: "pageViews",
-      label: "Page Views",
-      color: "#3b82f6",
-      fillOpacity: 0.3,
-    },
+    { dataKey: "pageViews", label: "Page Views", color: "#3b82f6", fillOpacity: 0.3 },
     { dataKey: "clicks", label: "Clicks", color: "#22c55e", fillOpacity: 0.3 },
-    {
-      dataKey: "users",
-      label: "Unique Users",
-      color: "#f59e0b",
-      fillOpacity: 0.3,
-    },
+    { dataKey: "users", label: "Unique Users", color: "#f59e0b", fillOpacity: 0.3 },
+  ],
+};
+
+// Escrow chart configurations
+export const escrowChartConfigs: Record<string, ChartConfig[]> = {
+  line: [
+    { dataKey: "volume", label: "Volume ($)", color: "#3b82f6", strokeWidth: 3 },
+    { dataKey: "escrowsCompleted", label: "Completed", color: "#22c55e", strokeWidth: 3 },
+    { dataKey: "disputes", label: "Disputes", color: "#ef4444", strokeWidth: 3 },
+    { dataKey: "avgReleaseHours", label: "Avg Release (hrs)", color: "#f59e0b", strokeWidth: 3 },
+  ],
+  bar: [
+    { dataKey: "volume", label: "Volume ($)", color: "#3b82f6", fillOpacity: 0.8 },
+    { dataKey: "escrowsCompleted", label: "Completed", color: "#22c55e", fillOpacity: 0.8 },
+    { dataKey: "disputes", label: "Disputes", color: "#ef4444", fillOpacity: 0.8 },
+  ],
+  area: [
+    { dataKey: "volume", label: "Volume ($)", color: "#3b82f6", fillOpacity: 0.3 },
+    { dataKey: "escrowsCompleted", label: "Completed", color: "#22c55e", fillOpacity: 0.3 },
+    { dataKey: "disputes", label: "Disputes", color: "#ef4444", fillOpacity: 0.3 },
   ],
 };
 
 // Export chart data as CSV
 export const exportToCSV = (
-  data: AnalyticsData[],
+  data: Array<Record<string, unknown>>,
   filename: string = "analytics-data",
 ) => {
-  const headers = ["Date", "Page Views", "Clicks", "Users"];
+  if (!data.length) return;
+  const headers = Object.keys(data[0]);
   const csvContent = [
     headers.join(","),
     ...data.map((row) =>
-      [row.date, row.pageViews, row.clicks, row.users].join(","),
+      headers.map((h) => JSON.stringify(row[h] ?? "")).join(","),
     ),
   ].join("\n");
 

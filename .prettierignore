@@ -1,0 +1,11 @@
+node_modules
+.next
+dist
+build
+target
+coverage
+.turbo
+*.lock
+yarn.lock
+Cargo.lock
+src/graphql/generated

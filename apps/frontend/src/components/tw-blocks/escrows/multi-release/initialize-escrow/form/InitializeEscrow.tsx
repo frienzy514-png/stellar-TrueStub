@@ -21,18 +21,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { useInitializeEscrow } from "./useInitializeEscrow";
 import { Trash2, DollarSign, Percent, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { trustlineOptions } from "@/components/tw-blocks/wallet-kit/trustlines";
+// trustlineAssets are now provided by useInitializeEscrow() — no direct import needed.
 
 export const InitializeEscrowForm = () => {
   const {
     form,
     isSubmitting,
+    isRetrying,
+    retryCount,
     milestones,
     isAnyMilestoneEmpty,
     handleSubmit,
     handleAddMilestone,
     handleRemoveMilestone,
     fillTemplateForm,
+    trustlineAssets,
   } = useInitializeEscrow();
 
   const handleMilestoneAmountChange = (
@@ -175,7 +178,7 @@ export const InitializeEscrowForm = () => {
                       <SelectValue placeholder="Select trustline" />
                     </SelectTrigger>
                     <SelectContent>
-                      {trustlineOptions
+                      {trustlineAssets
                         .filter((option) => option.value)
                         .map((option, index) => (
                           <SelectItem
@@ -484,11 +487,16 @@ export const InitializeEscrowForm = () => {
           ))}
         </div>
 
-        <div className="flex justify-start">
+        <div className="flex flex-col items-start gap-2">
+          {isRetrying && (
+            <p className="text-sm text-muted-foreground animate-pulse">
+              Retrying... (attempt {retryCount + 1} of 3)
+            </p>
+          )}
           <Button
             className="w-full md:w-1/4 cursor-pointer"
             type="submit"
-            disabled={isAnyMilestoneEmpty || isSubmitting}
+            disabled={isAnyMilestoneEmpty || isSubmitting || isRetrying}
           >
             {isSubmitting ? (
               <div className="flex items-center">

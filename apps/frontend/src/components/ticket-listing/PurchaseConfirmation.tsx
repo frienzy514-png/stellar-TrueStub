@@ -7,10 +7,10 @@ import { CheckCircle, Calendar, MapPin, Users, DollarSign, Copy } from "lucide-r
 import { useRouter } from "next/navigation"
 
 interface PurchaseConfirmationProps {
-  bookingId: string
-  hotelName: string
-  checkIn: Date
-  checkOut: Date
+  purchaseId: string
+  eventName: string
+  transferInitiated: Date
+  transferCompleted: Date
   guestCount: number
   totalPrice: number
   onViewBooking?: () => void
@@ -18,10 +18,10 @@ interface PurchaseConfirmationProps {
 }
 
 const PurchaseConfirmation: React.FC<PurchaseConfirmationProps> = ({
-  bookingId,
-  hotelName,
-  checkIn,
-  checkOut,
+  purchaseId,
+  eventName,
+  transferInitiated,
+  transferCompleted,
   guestCount,
   totalPrice,
   onViewBooking,
@@ -33,11 +33,11 @@ const PurchaseConfirmation: React.FC<PurchaseConfirmationProps> = ({
     if (onViewBooking) {
       onViewBooking()
     } else {
-      router.push(`/dashboard/event/payment?bookingId=${bookingId}`)
+      router.push(`/dashboard/event/payment?purchaseId=${purchaseId}`)
     }
   }
 
-  const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24))
+  const nights = Math.ceil((transferCompleted.getTime() - transferInitiated.getTime()) / (1000 * 60 * 60 * 24))
 
   return (
     <Card className={`!rounded-3xl !shadow-none border-black/10 w-full max-w-md ${className}`}>
@@ -60,9 +60,9 @@ const PurchaseConfirmation: React.FC<PurchaseConfirmationProps> = ({
               <Calendar className="h-4 w-4 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm font-medium">{hotelName}</p>
+              <p className="text-sm font-medium">{eventName}</p>
               <p className="text-xs text-muted-foreground">
-                {checkIn.toLocaleDateString()} - {checkOut.toLocaleDateString()}
+                {transferInitiated.toLocaleDateString()} - {transferCompleted.toLocaleDateString()}
               </p>
             </div>
           </div>
@@ -93,8 +93,8 @@ const PurchaseConfirmation: React.FC<PurchaseConfirmationProps> = ({
         </div>
 
         <div className="bg-gray-50 p-3 rounded-lg overflow-hidden">
-          <p className="text-xs text-muted-foreground flex items-center gap-2">Booking ID <Copy className="w-3 h-3" onClick={() => navigator.clipboard.writeText(bookingId)} /></p>
-          <p className="text-sm font-mono truncate">{bookingId}</p>
+          <p className="text-xs text-muted-foreground flex items-center gap-2">Booking ID <Copy className="w-3 h-3" onClick={() => navigator.clipboard.writeText(purchaseId)} /></p>
+          <p className="text-sm font-mono truncate">{purchaseId}</p>
         </div>
 
         <div className="space-y-2 pt-4">

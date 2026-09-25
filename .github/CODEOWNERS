@@ -1,0 +1,19 @@
+# CODEOWNERS
+#
+# Requests a review automatically when a PR touches a given path. Every
+# workspace maps to the repo maintainer today; split these out to
+# dedicated owners as the team grows.
+#
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for anything not matched below.
+*                       @frienzy514-png
+
+# Frontend (Next.js app)
+/apps/frontend/         @frienzy514-png
+
+# Backend (Express API)
+/apps/backend/          @frienzy514-png
+
+# Stellar/Soroban contracts (Rust)
+/contracts/             @frienzy514-png

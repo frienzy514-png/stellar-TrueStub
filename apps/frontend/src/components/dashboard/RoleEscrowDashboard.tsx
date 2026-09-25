@@ -1,8 +1,11 @@
 "use client";
 
+"use client";
+
 import Link from "next/link";
 import { ChevronRight, SlidersHorizontal, Download } from "lucide-react";
 import { useEffect, useRef, useState, useMemo } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Popover,
   PopoverContent,
@@ -17,6 +20,20 @@ import { RecentActivity } from "./RecentActivity";
 import { QuickActions } from "./QuickActions";
 import { EscrowTable } from "./EscrowTable";
 import { AnalyticsDashboard } from "./analytics";
+import { useTranslation } from "react-i18next";
+import { ErrorBoundaryWithCache } from "@/components/performance/ErrorBoundaryWithCache";
+import { usePerformanceTracking } from "@/hooks/usePerformanceTracking";
+
+/** Compact fallback shown when a single dashboard widget throws. */
+function SimpleErrorFallback({ label }: { label: string }) {
+  return (
+    <div className="flex items-center justify-center p-6 rounded-xl border border-red-500/20 bg-red-50 dark:bg-red-900/10 text-center">
+      <p className="text-sm text-red-600 dark:text-red-400">
+        Failed to load <span className="font-semibold">{label}</span>. Please refresh the page.
+      </p>
+    </div>
+  );
+}
 
 // Placeholder functions for notifications - in a real app, these would be API calls
 async function checkPendingNotifications(): Promise<NotificationData[]> {
@@ -36,8 +53,8 @@ async function checkMilestoneNotifications(): Promise<NotificationData[]> {
 type EscrowStatus =
   | "pending"
   | "funded"
-  | "check_in_approved"
-  | "check_out_approved"
+  | "transfer_confirmed"
+  | "transfer_finalized"
   | "completed"
   | "cancelled";
 
@@ -51,13 +68,13 @@ export interface EscrowData {
     issuer?: string;
   };
   metadata?: {
-    bookingId: string;
-    hotelName: string;
-    checkInDate: string;
-    checkOutDate: string;
+    purchaseId: string;
+    eventName: string;
+    transferDate: string;
+    eventDate: string;
     guestName?: string;
     guestEmail?: string;
-    roomNumber?: string;
+    seatNumber?: string;
   };
   nextMilestone?: string;
   milestones?: Milestone[];
@@ -106,6 +123,12 @@ export function RoleEscrowDashboard({
   error = null,
   onRefresh,
 }: RoleEscrowDashboardProps) {
+  const { t } = useTranslation();
+  // Reports real dashboard load timing to the dev-only Query Performance
+  // panel (components/dev/QueryPerformance.tsx) so it surfaces actual data
+  // instead of sitting empty. See performanceMonitor in
+  // utils/performance-monitor.ts.
+  usePerformanceTracking(`RoleEscrowDashboard:${userRole}`, isLoading);
   const [notifications, setNotifications] =
     useState<NotificationData[]>(initialNotifications);
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -118,42 +141,42 @@ export function RoleEscrowDashboard({
   const [minAmount, setMinAmount] = useState("");
   const [maxAmount, setMaxAmount] = useState("");
   const [sortBy, setSortBy] = useState("recent");
-  const [checkInFrom, setCheckInFrom] = useState("");
-  const [checkInTo, setCheckInTo] = useState("");
-  const [checkOutFrom, setCheckOutFrom] = useState("");
-  const [checkOutTo, setCheckOutTo] = useState("");
+  const [transferFrom, setCheckInFrom] = useState("");
+  const [transferTo, setCheckInTo] = useState("");
+  const [eventFrom, setCheckOutFrom] = useState("");
+  const [eventTo, setCheckOutTo] = useState("");
 
   const STATUS_OPTIONS = [
     "Completed",
-    "Check-In Approved",
-    "Check-out Approved",
+    "Transfer Confirmed",
+    "Transfer Finalized",
     "Cancelled",
     "Pending",
   ];
 
   const STATUS_MAP: Record<string, string> = {
     "Completed": "completed",
-    "Check-In Approved": "check_in_approved",
-    "Check-out Approved": "check_out_approved",
+    "Transfer Confirmed": "transfer_confirmed",
+    "Transfer Finalized": "transfer_finalized",
     "Cancelled": "cancelled",
     "Pending": "pending",
   };
 
   const SORT_OPTIONS = [
-    { label: "Most Recent", value: "recent" },
-    { label: "Amount: High to Low", value: "amount-high" },
-    { label: "Amount: Low to High", value: "amount-low" },
-    { label: "Check-in Date", value: "checkin" },
+    { label: t("dashboard.mostRecent"), value: "recent" },
+    { label: t("dashboard.amountHighToLow"), value: "amount-high" },
+    { label: t("dashboard.amountLowToHigh"), value: "amount-low" },
+    { label: t("dashboard.transferDate"), value: "checkin" },
   ];
 
   const activeFilterCount =
     statusFilter.length +
     (minAmount ? 1 : 0) +
     (maxAmount ? 1 : 0) +
-    (checkInFrom ? 1 : 0) +
-    (checkInTo ? 1 : 0) +
-    (checkOutFrom ? 1 : 0) +
-    (checkOutTo ? 1 : 0) +
+    (transferFrom ? 1 : 0) +
+    (transferTo ? 1 : 0) +
+    (eventFrom ? 1 : 0) +
+    (eventTo ? 1 : 0) +
     (sortBy !== "recent" ? 1 : 0);
 
   const filteredTransactions = useMemo(() => {
@@ -169,24 +192,24 @@ export function RoleEscrowDashboard({
     if (maxAmount) {
       result = result.filter((t) => t.amount <= Number(maxAmount));
     }
-    if (checkInFrom) {
+    if (transferFrom) {
       result = result.filter(
-        (t) => t.metadata?.checkInDate && new Date(t.metadata.checkInDate) >= new Date(checkInFrom)
+        (t) => t.metadata?.transferDate && new Date(t.metadata.transferDate) >= new Date(transferFrom)
       );
     }
-    if (checkInTo) {
+    if (transferTo) {
       result = result.filter(
-        (t) => t.metadata?.checkInDate && new Date(t.metadata.checkInDate) <= new Date(checkInTo)
+        (t) => t.metadata?.transferDate && new Date(t.metadata.transferDate) <= new Date(transferTo)
       );
     }
-    if (checkOutFrom) {
+    if (eventFrom) {
       result = result.filter(
-        (t) => t.metadata?.checkOutDate && new Date(t.metadata.checkOutDate) >= new Date(checkOutFrom)
+        (t) => t.metadata?.eventDate && new Date(t.metadata.eventDate) >= new Date(eventFrom)
       );
     }
-    if (checkOutTo) {
+    if (eventTo) {
       result = result.filter(
-        (t) => t.metadata?.checkOutDate && new Date(t.metadata.checkOutDate) <= new Date(checkOutTo)
+        (t) => t.metadata?.eventDate && new Date(t.metadata.eventDate) <= new Date(eventTo)
       );
     }
     if (sortBy === "amount-high") {
@@ -195,8 +218,8 @@ export function RoleEscrowDashboard({
       result.sort((a, b) => a.amount - b.amount);
     } else if (sortBy === "checkin") {
       result.sort((a, b) => {
-        const dateA = a.metadata?.checkInDate ? new Date(a.metadata.checkInDate).getTime() : 0;
-        const dateB = b.metadata?.checkInDate ? new Date(b.metadata.checkInDate).getTime() : 0;
+        const dateA = a.metadata?.transferDate ? new Date(a.metadata.transferDate).getTime() : 0;
+        const dateB = b.metadata?.transferDate ? new Date(b.metadata.transferDate).getTime() : 0;
         return dateA - dateB;
       });
     } else {
@@ -206,7 +229,19 @@ export function RoleEscrowDashboard({
     }
 
     return result;
-  }, [statusFilter, minAmount, maxAmount, sortBy, checkInFrom, checkInTo, checkOutFrom, checkOutTo, escrows]);
+  }, [statusFilter, minAmount, maxAmount, sortBy, transferFrom, transferTo, eventFrom, eventTo, escrows]);
+
+  const handleExportTransactions = () => {
+    const rows: TransactionRow[] = filteredTransactions.map((escrow) => ({
+      purchaseId: escrow.metadata?.purchaseId || escrow.id,
+      event: escrow.metadata?.eventName || "",
+      transferInitiated: escrow.metadata?.transferDate || "",
+      transferCompleted: escrow.metadata?.eventDate || "",
+      amount: escrow.amount,
+      status: escrow.status,
+    }));
+    exportTransactionsToCSV(rows);
+  };
 
   // Real-time updates using Trustless Work notifications
   useEffect(() => {
@@ -265,8 +300,99 @@ export function RoleEscrowDashboard({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary dark:border-white"></div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
+        <div className="max-w-8xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-6">
+          {/* Header skeleton */}
+          <div className="mb-6 sm:mb-8 flex items-center justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-7 w-48" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+            <Skeleton className="h-9 w-32" />
+          </div>
+
+          {/* Stat card skeletons (4-column grid) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-8 w-16" />
+                  </div>
+                  <Skeleton className="h-12 w-12 rounded-lg" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Main content grid skeleton */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            {/* Left column — escrow status + recent activity */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* EscrowsByStatus skeleton */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 space-y-3">
+                <Skeleton className="h-5 w-40" />
+                <div className="space-y-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* RecentActivity skeleton */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 space-y-4">
+                <Skeleton className="h-5 w-32" />
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-start space-x-3">
+                    <Skeleton className="mt-0.5 h-4 w-4 rounded-full flex-shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex justify-between gap-2">
+                        <Skeleton className="h-4 w-48" />
+                        <Skeleton className="h-5 w-20 rounded-full flex-shrink-0" />
+                      </div>
+                      <Skeleton className="h-3 w-32" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right column — quick actions */}
+            <div className="space-y-4">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 space-y-3">
+                <Skeleton className="h-5 w-28" />
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full rounded-md" />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Table skeleton */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 space-y-3">
+            <div className="flex items-center justify-between mb-4">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-9 w-28" />
+            </div>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="h-4 w-4" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+                <Skeleton className="h-8 w-8" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -306,7 +432,7 @@ export function RoleEscrowDashboard({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Total Escrows
+                  {t("dashboard.totalEscrows")}
                 </p>
                 <p className="text-2xl font-bold mt-1 dark:text-white">
                   {escrows.length}
@@ -335,15 +461,15 @@ export function RoleEscrowDashboard({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Active
+                  {t("dashboard.active")}
                 </p>
                 <p className="text-2xl font-bold mt-1 text-green-600 dark:text-green-400">
                   {
                     escrows.filter(
                       (e) =>
                         e.status === "pending" ||
-                        e.status === "check_in_approved" ||
-                        e.status === "check_out_approved",
+                        e.status === "transfer_confirmed" ||
+                        e.status === "transfer_finalized",
                     ).length
                   }
                 </p>
@@ -371,7 +497,7 @@ export function RoleEscrowDashboard({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Completed
+                  {t("dashboard.completed")}
                 </p>
                 <p className="text-2xl font-bold mt-1 text-purple-600 dark:text-purple-400">
                   {escrows.filter((e) => e.status === "completed").length}
@@ -400,7 +526,7 @@ export function RoleEscrowDashboard({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Total Value
+                  {t("dashboard.totalValue")}
                 </p>
                 <p className="text-2xl font-bold mt-1 dark:text-white">
                   $
@@ -432,7 +558,9 @@ export function RoleEscrowDashboard({
         {/* Analytics Panel (toggled from the header) */}
         {showAnalytics && (
           <div className="mb-6">
-            <AnalyticsDashboard />
+            <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Analytics Dashboard" />}>
+              <AnalyticsDashboard />
+            </ErrorBoundaryWithCache>
           </div>
         )}
 
@@ -457,11 +585,13 @@ export function RoleEscrowDashboard({
                       d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
                     />
                   </svg>
-                  Escrow Status Overview
+                  {t("dashboard.statusOverview")}
                 </h2>
               </div>
               <div className="p-4">
-                <EscrowsByStatus escrows={escrows} userRole={userRole} />
+                <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Escrows by Status" />}>
+                  <EscrowsByStatus escrows={escrows} userRole={userRole} />
+                </ErrorBoundaryWithCache>
               </div>
             </div>
 
@@ -482,11 +612,13 @@ export function RoleEscrowDashboard({
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  Recent Activity
+                  {t("dashboard.recentActivity")}
                 </h2>
               </div>
               <div className="p-4">
-                <RecentActivity escrows={escrows} />
+                <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Recent Activity" />}>
+                  <RecentActivity escrows={escrows} />
+                </ErrorBoundaryWithCache>
               </div>
             </div>
           </div>
@@ -510,11 +642,13 @@ export function RoleEscrowDashboard({
                       d="M13 10V3L4 14h7v7l9-11h-7z"
                     />
                   </svg>
-                  Quick Actions
+                  {t("dashboard.quickActions")}
                 </h2>
               </div>
               <div className="p-4">
-                <QuickActions userRole={userRole} />
+                <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Quick Actions" />}>
+                  <QuickActions userRole={userRole} />
+                </ErrorBoundaryWithCache>
               </div>
             </div>
 
@@ -535,7 +669,7 @@ export function RoleEscrowDashboard({
                       d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                     />
                   </svg>
-                  Notifications
+                  {t("dashboard.notifications")}
                   {notifications.length > 0 && (
                     <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-full">
                       {notifications.length}
@@ -613,7 +747,7 @@ export function RoleEscrowDashboard({
                     {notifications.length > 3 && (
                       <div className="text-center">
                         <button className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
-                          View all notifications
+                          {t("dashboard.viewAllNotifications")}
                         </button>
                       </div>
                     )}
@@ -621,7 +755,7 @@ export function RoleEscrowDashboard({
                 ) : (
                   <div className="text-center py-4">
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      No new notifications
+                      {t("dashboard.noNotifications")}
                     </p>
                   </div>
                 )}
@@ -648,7 +782,7 @@ export function RoleEscrowDashboard({
                   d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
                 />
               </svg>
-              Recent Transactions
+              {t("dashboard.recentTransactions")}
             </h2>
             <div className="flex items-center gap-3">
               <Popover>
@@ -659,7 +793,7 @@ export function RoleEscrowDashboard({
                                      transition-colors text-gray-700 dark:text-gray-300
                                      relative">
                     <SlidersHorizontal className="h-4 w-4" />
-                    <span>Filter</span>
+                    <span>{t("dashboard.filter")}</span>
                     {activeFilterCount > 0 && (
                       <span className="absolute -top-1.5 -right-1.5
                                        bg-orange-500 text-white text-[10px]
@@ -679,7 +813,7 @@ export function RoleEscrowDashboard({
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-wide
                                   text-gray-500 dark:text-gray-400">
-                      Sort by
+                      {t("dashboard.sortBy")}
                     </p>
                     <div className="grid grid-cols-2 gap-1">
                       {SORT_OPTIONS.map((opt) => (
@@ -705,7 +839,7 @@ export function RoleEscrowDashboard({
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-wide
                                   text-gray-500 dark:text-gray-400">
-                      Status
+                      {t("dashboard.status")}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {STATUS_OPTIONS.map((status) => (
@@ -737,12 +871,12 @@ export function RoleEscrowDashboard({
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-wide
                                   text-gray-500 dark:text-gray-400">
-                      Amount Range
+                      {t("dashboard.amountRange")}
                     </p>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
-                        placeholder="Min $"
+                        placeholder={t("dashboard.min")}
                         value={minAmount}
                         onChange={(e) => setMinAmount(e.target.value)}
                         className="w-full rounded-lg border border-gray-300 dark:border-slate-600
@@ -752,7 +886,7 @@ export function RoleEscrowDashboard({
                       <span className="text-gray-500 shrink-0">—</span>
                       <input
                         type="number"
-                        placeholder="Max $"
+                        placeholder={t("dashboard.max")}
                         value={maxAmount}
                         onChange={(e) => setMaxAmount(e.target.value)}
                         className="w-full rounded-lg border border-gray-300 dark:border-slate-600
@@ -768,20 +902,20 @@ export function RoleEscrowDashboard({
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-wide
                                   text-gray-500 dark:text-gray-400">
-                      Check-in Date Range
+                      {t("dashboard.transferDateRange")}
                     </p>
                     <div className="flex items-center gap-2">
                       <input
                         type="date"
-                        value={checkInFrom}
+                        value={transferFrom}
                         onChange={(e) => setCheckInFrom(e.target.value)}
                         className="w-full rounded-lg border border-gray-300 dark:border-slate-600
                                    bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-300"
                       />
-                      <span className="text-gray-500 shrink-0">to</span>
+                      <span className="text-gray-500 shrink-0">{t("dashboard.to")}</span>
                       <input
                         type="date"
-                        value={checkInTo}
+                        value={transferTo}
                         onChange={(e) => setCheckInTo(e.target.value)}
                         className="w-full rounded-lg border border-gray-300 dark:border-slate-600
                                    bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-300"
@@ -791,16 +925,16 @@ export function RoleEscrowDashboard({
 
                   <hr className="border-gray-200 dark:border-slate-700" />
 
-                  {/* Check-out date range */}
+                  {/* Event date range */}
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-wide
                                   text-gray-500 dark:text-gray-400">
-                      Check-out Date Range
+                      {t("dashboard.eventDateRange")}
                     </p>
                     <div className="flex items-center gap-2">
                       <input
                         type="date"
-                        value={checkOutFrom}
+                        value={eventFrom}
                         onChange={(e) => setCheckOutFrom(e.target.value)}
                         className="w-full rounded-lg border border-gray-300 dark:border-slate-600
                                    bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-300"
@@ -808,7 +942,7 @@ export function RoleEscrowDashboard({
                       <span className="text-gray-500 shrink-0">to</span>
                       <input
                         type="date"
-                        value={checkOutTo}
+                        value={eventTo}
                         onChange={(e) => setCheckOutTo(e.target.value)}
                         className="w-full rounded-lg border border-gray-300 dark:border-slate-600
                                    bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-300"
@@ -837,6 +971,18 @@ export function RoleEscrowDashboard({
                   </button>
                 </PopoverContent>
               </Popover>
+              <button
+                onClick={handleExportTransactions}
+                disabled={filteredTransactions.length === 0}
+                className="flex items-center gap-2 text-sm
+                           border border-slate-600 rounded-lg
+                           px-3 py-1.5 hover:bg-slate-700
+                           transition-colors text-gray-700 dark:text-gray-300
+                           disabled:opacity-50 disabled:pointer-events-none"
+              >
+                <Download className="h-4 w-4" />
+                <span>{t("dashboard.exportCsv")}</span>
+              </button>
               <Link
                 href="/dashboard/escrow"
                 className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
@@ -847,7 +993,9 @@ export function RoleEscrowDashboard({
             </div>
           </div>
           <div className="overflow-x-auto">
-            <EscrowTable escrows={filteredTransactions} userRole={userRole} />
+            <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Escrow Table" />}>
+              <EscrowTable escrows={filteredTransactions} userRole={userRole} />
+            </ErrorBoundaryWithCache>
           </div>
         </div>
       </div>

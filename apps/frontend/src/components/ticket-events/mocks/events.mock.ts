@@ -1,4 +1,4 @@
-export const hotelsMockData = [
+export const eventsMockData = [
   {
     id: 1,
     name: "Shikara Event",

@@ -21,18 +21,18 @@ import {
 } from "@/components/ui/select";
 import { BidStatusBadge, type BidStatus } from "./BidStatusBadge";
 
-export interface RentalOffer {
+export interface ListingOffer {
   id: number;
-  tenant_id: string | null;
-  tenant_name: string;
-  tenant_phone: string | null;
-  tenant_wallet_address: string | null;
+  buyer_id: string | null;
+  buyer_name: string;
+  buyer_phone: string | null;
+  buyer_wallet_address: string | null;
   offer_date: string;
   bid_status: BidStatus;
 }
 
 interface InterestedPeopleTableProps {
-  offers: RentalOffer[];
+  offers: ListingOffer[];
   totalCount: number;
   isLoading?: boolean;
   onAcceptOffer?: (offerId: number) => void;
@@ -60,9 +60,9 @@ export function InterestedPeopleTable({
     return offers.filter((offer) => {
       const matchesSearch =
         searchQuery === "" ||
-        offer.tenant_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        offer.tenant_phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        offer.tenant_wallet_address
+        offer.buyer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        offer.buyer_phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        offer.buyer_wallet_address
           ?.toLowerCase()
           .includes(searchQuery.toLowerCase());
 
@@ -221,12 +221,12 @@ export function InterestedPeopleTable({
                       {startIdx + idx + 1}
                     </TableCell>
                     <TableCell className="font-medium">{offer.id}</TableCell>
-                    <TableCell>{offer.tenant_name}</TableCell>
+                    <TableCell>{offer.buyer_name}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {offer.tenant_phone || "—"}
+                      {offer.buyer_phone || "—"}
                     </TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground">
-                      {formatWallet(offer.tenant_wallet_address)}
+                      {formatWallet(offer.buyer_wallet_address)}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDate(offer.offer_date)}
@@ -254,11 +254,11 @@ export function InterestedPeopleTable({
                         >
                           Reject
                         </Button>
-                        {offer.tenant_id && (
+                        {offer.buyer_id && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => onViewTenant?.(offer.tenant_id!)}
+                            onClick={() => onViewTenant?.(offer.buyer_id!)}
                           >
                             View profile
                           </Button>

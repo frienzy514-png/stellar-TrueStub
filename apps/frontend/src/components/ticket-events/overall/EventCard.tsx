@@ -3,7 +3,7 @@
 import { Heart, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Event } from "@/@types/event.entity";
+import { Event } from "@/types/event.entity";
 
 interface EventCardProps {
   event: Event;

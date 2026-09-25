@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "TrueStub — a trustless P2P escrow platform for secondary-market ticket transfers, built on Stellar via the TrustlessWork API. Monorepo root: apps/frontend, apps/backend, and contracts/.",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0",
+    "yarn": ">=4.0.0"
+  },
   "workspaces": [
     "apps/*"
   ],
@@ -13,15 +17,23 @@
     "build": "yarn build:frontend && yarn build:backend",
     "build:frontend": "yarn workspace @truestub/frontend build",
     "build:backend": "yarn workspace @truestub/backend build",
-    "lint": "yarn workspace @truestub/frontend lint",
-    "test": "yarn workspace @truestub/frontend test",
+    "lint": "yarn workspace @truestub/frontend lint && yarn workspace @truestub/backend lint",
+    "lint:frontend": "yarn workspace @truestub/frontend lint",
+    "lint:backend": "yarn workspace @truestub/backend lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "yarn workspace @truestub/frontend test && yarn workspace @truestub/backend test",
     "typecheck": "yarn workspace @truestub/frontend typecheck && yarn workspace @truestub/backend typecheck",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
+    "release": "semantic-release",
     "prepare": "husky"
   },
   "devDependencies": {
-    "husky": "^9.1.7"
+    "eslint": "^9.20.0",
+    "eslint-config-prettier": "^10.1.2",
+    "husky": "^9.1.7",
+    "prettier": "^3.5.3"
   },
   "packageManager": "yarn@4.9.4+sha512.7b1cb0b62abba6a537b3a2ce00811a843bea02bcf53138581a6ae5b1bf563f734872bd47de49ce32a9ca9dcaff995aa789577ffb16811da7c603dcf69e73750b"
 }

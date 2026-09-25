@@ -3,13 +3,13 @@
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@/components/auth/wallet/hooks/wallet.hook";
-import { useBookingEscrow } from "@/hooks/useBookingEscrow";
+import { useTicketPurchaseEscrow } from "@/hooks/useTicketPurchaseEscrow";
 import {
-  BookingData,
+  TicketPurchaseData,
   EventData,
   EscrowType,
   EscrowResponse,
-} from "@/interfaces/booking-escrow.interface";
+} from "@/interfaces/ticket-purchase-escrow.interface";
 
 // UI Components
 import {
@@ -43,32 +43,38 @@ import {
   Info,
 } from "lucide-react";
 
+import { useTrustlineAssets, TrustlineOption } from "@/components/tw-blocks/wallet-kit/trustlines";
+import { Coins } from "lucide-react";
+
 export interface EscrowCreationFormProps {
-  bookingData: BookingData;
+  purchaseData: TicketPurchaseData;
   eventData: EventData;
   escrowType: EscrowType;
+  selectedAsset?: string;
   onEscrowCreated: (data: EscrowResponse) => void;
   onCancel: () => void;
   className?: string;
 }
 
 /**
- * Booking Summary Card Component
- * Displays a beautiful summary of the booking details
+ * Purchase Summary Card Component
+ * Displays a beautiful summary of the purchase details
  */
-function BookingSummaryCard({
-  bookingData,
+function PurchaseSummaryCard({
+  purchaseData,
   eventData,
   escrowType,
+  currency = "USDC",
 }: {
-  bookingData: BookingData;
+  purchaseData: TicketPurchaseData;
   eventData: EventData;
   escrowType: EscrowType;
+  currency?: string;
 }) {
-  const checkInDate = new Date(bookingData.checkInDate);
-  const checkOutDate = new Date(bookingData.checkOutDate);
-  const nights = Math.ceil(
-    (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
+  const transferDate = new Date(purchaseData.transferDate);
+  const eventDate = new Date(purchaseData.eventDate);
+  const daysToEvent = Math.ceil(
+    (eventDate.getTime() - transferDate.getTime()) / (1000 * 60 * 60 * 24)
   );
 
   return (
@@ -91,26 +97,34 @@ function BookingSummaryCard({
               )}
             </div>
           </div>
-          <Badge
-            variant="outline"
-            className="border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
-          >
-            {escrowType === "multi_release" ? "Milestone" : "Single"} Payment
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge
+              variant="outline"
+              className="border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+            >
+              {currency}
+            </Badge>
+            <Badge
+              variant="outline"
+              className="border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+            >
+              {escrowType === "multi_release" ? "Milestone" : "Single"} Payment
+            </Badge>
+          </div>
         </div>
 
         <Separator className="my-4 bg-white/10" />
 
-        {/* Booking Details Grid */}
+        {/* Purchase Details Grid */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-wider text-slate-400">
-              Check-in
+              Transfer Date
             </p>
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-emerald-400" />
               <span className="font-medium">
-                {checkInDate.toLocaleDateString("en-US", {
+                {transferDate.toLocaleDateString("en-US", {
                   weekday: "short",
                   month: "short",
                   day: "numeric",
@@ -121,12 +135,12 @@ function BookingSummaryCard({
 
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-wider text-slate-400">
-              Check-out
+              Event Date
             </p>
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-emerald-400" />
               <span className="font-medium">
-                {checkOutDate.toLocaleDateString("en-US", {
+                {eventDate.toLocaleDateString("en-US", {
                   weekday: "short",
                   month: "short",
                   day: "numeric",
@@ -137,12 +151,12 @@ function BookingSummaryCard({
 
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-wider text-slate-400">
-              Duration
+              Days to Event
             </p>
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-emerald-400" />
               <span className="font-medium">
-                {nights} night{nights > 1 ? "s" : ""}
+                {daysToEvent} day{daysToEvent > 1 ? "s" : ""}
               </span>
             </div>
           </div>
@@ -154,17 +168,32 @@ function BookingSummaryCard({
             <div className="flex items-center gap-2">
               <CreditCard className="h-4 w-4 text-emerald-400" />
               <span className="text-lg font-bold text-emerald-400">
-                {bookingData.totalAmount.toFixed(2)} {bookingData.currency || "USDC"}
+                {purchaseData.totalAmount.toFixed(2)} {currency}
               </span>
             </div>
           </div>
+
+          {purchaseData.quantity > 1 && (
+            <div className="space-y-1">
+              <p className="text-xs uppercase tracking-wider text-slate-400">
+                Tickets
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">
+                  {purchaseData.quantity} x{" "}
+                  {(purchaseData.totalAmount / purchaseData.quantity).toFixed(2)}{" "}
+                  {currency}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Room Type Badge */}
-        {bookingData.roomType && (
+        {/* Seat Section Badge */}
+        {purchaseData.seatSection && (
           <div className="mt-4">
             <Badge variant="secondary" className="bg-white/10 text-white">
-              {bookingData.roomType}
+              {purchaseData.seatSection}
             </Badge>
           </div>
         )}
@@ -172,6 +201,7 @@ function BookingSummaryCard({
     </div>
   );
 }
+
 
 /**
  * Escrow Type Selector Component
@@ -201,8 +231,8 @@ function EscrowTypeInfo({ escrowType }: { escrowType: EscrowType }) {
           </h4>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             {isMultiRelease
-              ? "Payment released in stages: 70% at check-in verification, 30% after successful checkout."
-              : "Full payment held securely until your stay is successfully completed."}
+              ? "Payment released in stages: 70% once the ticket transfer is initiated, 30% after you confirm receipt."
+              : "Full payment held securely until the ticket transfer is successfully confirmed."}
           </p>
 
           {isMultiRelease && (
@@ -212,7 +242,7 @@ function EscrowTypeInfo({ escrowType }: { escrowType: EscrowType }) {
                   1
                 </div>
                 <span className="text-slate-600 dark:text-slate-400">
-                  Check-in: 70% released to event
+                  Transfer initiated: 70% released to seller
                 </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
@@ -220,7 +250,7 @@ function EscrowTypeInfo({ escrowType }: { escrowType: EscrowType }) {
                   2
                 </div>
                 <span className="text-slate-600 dark:text-slate-400">
-                  Check-out: Remaining 30% released
+                  Transfer confirmed: remaining 30% released
                 </span>
               </div>
             </div>
@@ -267,7 +297,7 @@ function WalletConnectionPrompt({ onConnect }: { onConnect: () => void }) {
           Connect Your Wallet
         </h3>
         <p className="mt-2 text-center text-sm text-slate-600 dark:text-slate-400 max-w-sm">
-          To create a secure escrow for your booking, please connect your Stellar
+          To create a secure escrow for your purchase, please connect your Stellar
           wallet first.
         </p>
         <Button onClick={onConnect} className="mt-6" size="lg">
@@ -309,12 +339,13 @@ function ValidationErrors({ errors }: { errors: string[] }) {
 
 /**
  * Main EscrowCreationForm Component
- * A beautiful, fully integrated escrow creation form for event bookings
+ * A beautiful, fully integrated escrow creation form for ticket purchases
  */
 export function EscrowCreationForm({
-  bookingData,
+  purchaseData,
   eventData,
   escrowType,
+  selectedAsset: initialAsset,
   onEscrowCreated,
   onCancel,
   className = "",
@@ -322,6 +353,13 @@ export function EscrowCreationForm({
   const router = useRouter();
   const { address: walletAddress, connectWallet } = useWallet();
   const [showForm, setShowForm] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>(
+    initialAsset || purchaseData.currency || "USDC"
+  );
+
+  // Network-aware trustline assets so the currency selector always shows the
+  // correct set for testnet or mainnet.
+  const trustlineAssets = useTrustlineAssets();
 
   const {
     escrowFormData,
@@ -329,10 +367,11 @@ export function EscrowCreationForm({
     totalAmount,
     isValid,
     validationErrors,
-  } = useBookingEscrow({
-    bookingData,
+  } = useTicketPurchaseEscrow({
+    purchaseData,
     eventData,
     escrowType,
+    selectedAsset: selectedCurrency,
   });
 
   // Determine if wallet is connected
@@ -354,10 +393,11 @@ export function EscrowCreationForm({
   if (!isWalletConnected) {
     return (
       <div className={`space-y-6 ${className}`}>
-        <BookingSummaryCard
-          bookingData={bookingData}
+        <PurchaseSummaryCard
+          purchaseData={purchaseData}
           eventData={eventData}
           escrowType={escrowType}
+          currency={selectedCurrency}
         />
         <WalletConnectionPrompt onConnect={connectWallet} />
       </div>
@@ -367,11 +407,12 @@ export function EscrowCreationForm({
   // Main form view
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Booking Summary */}
-      <BookingSummaryCard
-        bookingData={bookingData}
+      {/* Purchase Summary */}
+      <PurchaseSummaryCard
+        purchaseData={purchaseData}
         eventData={eventData}
         escrowType={escrowType}
+        currency={selectedCurrency}
       />
 
       {/* Main Card */}
@@ -382,9 +423,9 @@ export function EscrowCreationForm({
               <Shield className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
-              <CardTitle className="text-xl">Secure Your Booking</CardTitle>
+              <CardTitle className="text-xl">Secure Your Escrow Payment</CardTitle>
               <CardDescription>
-                Create a blockchain escrow to protect your payment
+                Create a blockchain escrow denominated in your chosen Stellar asset
               </CardDescription>
             </div>
           </div>
@@ -393,6 +434,54 @@ export function EscrowCreationForm({
         <CardContent className="space-y-6 pt-6">
           {/* Security Banner */}
           <SecurityBanner />
+
+          {/* Payment Asset Selector */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/40 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Coins className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                <h4 className="font-semibold text-sm text-slate-900 dark:text-white">
+                  Payment Asset / Currency
+                </h4>
+              </div>
+              <span className="text-xs text-muted-foreground">Multi-currency enabled</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {trustlineAssets.map((asset) => {
+                const isSelected = selectedCurrency.toUpperCase() === asset.symbol.toUpperCase();
+                return (
+                  <button
+                    key={asset.value}
+                    type="button"
+                    onClick={() => setSelectedCurrency(asset.symbol)}
+                    className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
+                      isSelected
+                        ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/30 ring-1 ring-emerald-500"
+                        : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 hover:border-slate-300"
+                    }`}
+                  >
+                    <span className="text-2xl">{asset.icon || "🪙"}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-sm text-slate-900 dark:text-white">
+                          {asset.symbol}
+                        </span>
+                        {isSelected && (
+                          <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                            ✓ Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {asset.description || asset.label}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Escrow Type Info */}
           <EscrowTypeInfo escrowType={escrowType} />
@@ -406,10 +495,10 @@ export function EscrowCreationForm({
             <div className="text-sm text-blue-700 dark:text-blue-300">
               <p className="font-medium">How it works:</p>
               <ol className="mt-2 space-y-1 list-decimal list-inside">
-                <li>Your payment is locked in a secure smart contract</li>
-                <li>The event cannot access funds until conditions are met</li>
-                <li>If there&apos;s a dispute, our resolution team will help</li>
-                <li>After successful checkout, funds are released to the event</li>
+                <li>Your payment is locked in a secure smart contract in {selectedCurrency}</li>
+                <li>The seller cannot access funds until conditions are met</li>
+                <li>If there&apos;s a dispute, our resolution team will arbitrate</li>
+                <li>After successful delivery confirmation, funds are released</li>
               </ol>
             </div>
           </div>
@@ -424,7 +513,7 @@ export function EscrowCreationForm({
                 disabled={!isValid}
               >
                 <Lock className="mr-2 h-4 w-4" />
-                Proceed to Create Escrow
+                Proceed to Create Escrow ({selectedCurrency})
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
               <p className="mt-3 text-xs text-slate-500">
@@ -433,6 +522,7 @@ export function EscrowCreationForm({
             </div>
           ) : (
             <div className="space-y-4">
+
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-slate-900 dark:text-white">
                   Escrow Configuration
@@ -463,7 +553,7 @@ export function EscrowCreationForm({
 
         <CardFooter className="flex flex-col sm:flex-row gap-3 justify-between border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 pt-6">
           <Button variant="outline" onClick={onCancel} className="w-full sm:w-auto">
-            Cancel Booking
+            Cancel Purchase
           </Button>
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <Lock className="h-3 w-3" />

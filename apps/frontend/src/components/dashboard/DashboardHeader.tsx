@@ -1,3 +1,5 @@
+"use client";
+
 import { Bell, BellRing, Menu, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,6 +10,8 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { NotificationData } from './RoleEscrowDashboard';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from '@/components/language/LanguageSwitcher';
 
 interface DashboardHeaderProps {
   userRole: 'guest' | 'event' | 'admin';
@@ -24,12 +28,15 @@ export function DashboardHeader({
   showAnalytics = false,
   onToggleAnalytics,
 }: DashboardHeaderProps) {
+  const { t } = useTranslation();
   const unreadCount = notifications.filter(n => !n.read).length;
   
-  const roleLabels = {
-    guest: 'Guest',
-    event: 'Hotel Manager',
-    admin: 'Administrator'
+  const getRoleLabel = (role: 'guest' | 'event' | 'admin') => {
+    switch (role) {
+      case 'guest': return t('dashboard.roleGuest');
+      case 'event': return t('dashboard.roleEvent');
+      case 'admin': return t('dashboard.roleAdmin');
+    }
   };
 
   return (
@@ -42,11 +49,11 @@ export function DashboardHeader({
           onClick={onMenuClick}
         >
           <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle menu</span>
+          <span className="sr-only">{t('header.toggleMenu')}</span>
         </Button>
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Escrow Dashboard</h1>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{t('dashboard.title')}</h1>
             {onToggleAnalytics && (
               <Button
                 variant={showAnalytics ? 'default' : 'outline'}
@@ -56,18 +63,19 @@ export function DashboardHeader({
                 aria-pressed={showAnalytics}
               >
                 <TrendingUp className="w-4 h-4" />
-                <span className="hidden sm:inline">Analytics</span>
+                <span className="hidden sm:inline">{t('dashboard.analyticsButton')}</span>
               </Button>
             )}
           </div>
           <p className="hidden sm:block text-sm text-muted-foreground">
-            Welcome back! You're logged in as {roleLabels[userRole]}
+            {t('dashboard.welcomeRole', { role: getRoleLabel(userRole) })}
           </p>
         </div>
-
       </div>
 
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-3 sm:space-x-4">
+        <LanguageSwitcher />
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
@@ -81,18 +89,18 @@ export function DashboardHeader({
               ) : (
                 <Bell className="h-5 w-5" />
               )}
-              <span className="sr-only">Notifications</span>
+              <span className="sr-only">{t('dashboard.notifications')}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80 max-h-[400px] overflow-y-auto">
             <div className="px-2 py-1.5 text-sm font-semibold">
-              Notifications
+              {t('dashboard.notifications')}
             </div>
             <DropdownMenuSeparator />
             
             {notifications.length === 0 ? (
               <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                No new notifications
+                {t('dashboard.noNotifications')}
               </div>
             ) : (
               notifications.map((notification) => (
@@ -119,7 +127,7 @@ export function DashboardHeader({
             
             {notifications.length > 0 && (
               <DropdownMenuItem className="text-sm font-medium text-center justify-center cursor-pointer hover:bg-muted/50">
-                View all notifications
+                {t('dashboard.viewAllNotifications')}
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
@@ -130,7 +138,7 @@ export function DashboardHeader({
             {userRole.charAt(0).toUpperCase()}
           </div>
           <div className="text-sm">
-            <div className="font-medium">{roleLabels[userRole]}</div>
+            <div className="font-medium">{getRoleLabel(userRole)}</div>
             <div className="text-xs text-muted-foreground">
               {userRole}@truestub.com
             </div>

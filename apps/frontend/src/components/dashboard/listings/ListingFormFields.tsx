@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
-interface ApartmentFormFieldProps {
+interface ListingFormFieldProps {
   label: string;
   children: ReactNode;
   className?: string;
@@ -30,11 +30,11 @@ interface IconSelectFieldProps {
   options: Array<{ label: string; value: string }>;
 }
 
-export function ApartmentFormField({
+export function ListingFormField({
   label,
   children,
   className,
-}: ApartmentFormFieldProps) {
+}: ListingFormFieldProps) {
   return (
     <div className={cn('space-y-2', className)}>
       <Label className="text-sm font-semibold text-gray-900 dark:text-gray-200">{label}</Label>
@@ -106,7 +106,7 @@ export function NumberSelectField({
   options,
 }: NumberSelectFieldProps) {
   return (
-    <ApartmentFormField label={label}>
+    <ListingFormField label={label}>
       <Select value={value} onValueChange={onValueChange}>
         <SelectTrigger className="h-11 bg-white shadow-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
           <SelectValue />
@@ -119,6 +119,6 @@ export function NumberSelectField({
           ))}
         </SelectContent>
       </Select>
-    </ApartmentFormField>
+    </ListingFormField>
   );
 }

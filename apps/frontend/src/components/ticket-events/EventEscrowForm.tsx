@@ -3,13 +3,13 @@
 import React, { useMemo } from "react";
 import { useWallet } from "@/components/auth/wallet/hooks/wallet.hook";
 import {
-  BookingData,
+  TicketPurchaseData,
   EventData,
-  RoomData,
+  TicketListingData,
   EscrowResponse,
   EscrowType,
-} from "@/interfaces/booking-escrow.interface";
-import { useBookingEscrow } from "@/hooks/useBookingEscrow";
+} from "@/interfaces/ticket-purchase-escrow.interface";
+import { useTicketPurchaseEscrow } from "@/hooks/useTicketPurchaseEscrow";
 
 // UI Components
 import {
@@ -40,27 +40,12 @@ import {
 } from "lucide-react";
 
 export interface EventTicketEscrowProps {
-  booking: BookingData;
-  room?: RoomData;
+  booking: TicketPurchaseData;
+  room?: TicketListingData;
   event: EventData;
   escrowType: EscrowType;
   onEscrowCreated: (escrow: EscrowResponse) => void;
   onCancel?: () => void;
-}
-
-/**
- * Custom validation function for event booking escrows
- */
-function validateHotelBooking(data: Record<string, unknown>): { 
-  error?: string; 
-  success?: boolean 
-} {
-  if (!data?.amount || Number(data.amount) <= 0) {
-    return { error: "Amount must be greater than 0" };
-  }
-
-  // Additional event-specific validations can be added here
-  return { success: true };
 }
 
 /**
@@ -96,14 +81,14 @@ function BookingSummary({
   event,
   room,
 }: {
-  booking: BookingData;
+  booking: TicketPurchaseData;
   event: EventData;
-  room?: RoomData;
+  room?: TicketListingData;
 }) {
-  const checkInDate = new Date(booking.checkInDate);
-  const checkOutDate = new Date(booking.checkOutDate);
+  const transferDate = new Date(booking.transferDate);
+  const eventDate = new Date(booking.eventDate);
   const nights = Math.ceil(
-    (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
+    (eventDate.getTime() - transferDate.getTime()) / (1000 * 60 * 60 * 24)
   );
 
   return (
@@ -118,11 +103,11 @@ function BookingSummary({
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
           <span className="text-slate-500">Check-in</span>
-          <p className="font-medium">{checkInDate.toLocaleDateString()}</p>
+          <p className="font-medium">{transferDate.toLocaleDateString()}</p>
         </div>
         <div>
           <span className="text-slate-500">Check-out</span>
-          <p className="font-medium">{checkOutDate.toLocaleDateString()}</p>
+          <p className="font-medium">{eventDate.toLocaleDateString()}</p>
         </div>
         <div>
           <span className="text-slate-500">Duration</span>
@@ -138,7 +123,7 @@ function BookingSummary({
 
       {room && (
         <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
-          <Badge variant="secondary">{room.type || room.name}</Badge>
+          <Badge variant="secondary">{room.name}</Badge>
         </div>
       )}
     </div>
@@ -165,8 +150,8 @@ export function EventEscrowForm({
     milestones,
     isValid,
     validationErrors,
-  } = useBookingEscrow({
-    bookingData: booking,
+  } = useTicketPurchaseEscrow({
+    purchaseData: booking,
     eventData: event,
     escrowType,
   });

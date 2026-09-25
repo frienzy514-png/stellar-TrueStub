@@ -1,0 +1,11 @@
+# Build output
+dist/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Env files (ignore actual env files, but keep .env.example)
+.env
+.env.local
+.env.*.local
+!.env.example

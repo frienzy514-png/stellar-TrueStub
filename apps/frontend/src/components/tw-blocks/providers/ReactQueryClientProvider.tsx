@@ -1,6 +1,11 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useContext } from "react";
+import {
+  QueryClient,
+  QueryClientContext,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 /**
@@ -25,6 +30,11 @@ const queryClient = new QueryClient({
 /**
  * React Query Client Provider
  *
+ * Reuses an existing QueryClient from an ancestor (e.g. the app-wide
+ * `QueryProvider` mounted in `ClientProviders`) so escrow blocks share one
+ * query cache with the rest of the app. Only creates its own client when
+ * rendered outside any QueryClientProvider (standalone tw-blocks usage).
+ *
  * @param children - The children
  * @returns The React Query Client Provider
  */
@@ -33,6 +43,12 @@ export function ReactQueryClientProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const parentClient = useContext(QueryClientContext);
+
+  if (parentClient) {
+    return <>{children}</>;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       {children}

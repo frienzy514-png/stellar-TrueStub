@@ -2,11 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import {
-  BookingData,
+  TicketPurchaseData,
   EventData,
   EscrowResponse,
   EscrowConfirmationProps,
-} from "@/interfaces/booking-escrow.interface";
+} from "@/interfaces/ticket-purchase-escrow.interface";
 
 // UI Components
 import {
@@ -152,19 +152,19 @@ function TimelineItem({
 }
 
 /**
- * Booking Details Summary
+ * Purchase Details Summary
  */
-function BookingDetailsSummary({
-  booking,
+function PurchaseDetailsSummary({
+  purchase,
   event,
 }: {
-  booking: BookingData;
+  purchase: TicketPurchaseData;
   event: EventData;
 }) {
-  const checkInDate = new Date(booking.checkInDate);
-  const checkOutDate = new Date(booking.checkOutDate);
-  const nights = Math.ceil(
-    (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
+  const transferDate = new Date(purchase.transferDate);
+  const eventDate = new Date(purchase.eventDate);
+  const daysToEvent = Math.ceil(
+    (eventDate.getTime() - transferDate.getTime()) / (1000 * 60 * 60 * 24)
   );
 
   return (
@@ -185,17 +185,17 @@ function BookingDetailsSummary({
           Total Amount
         </p>
         <p className="font-semibold text-emerald-600 dark:text-emerald-400">
-          {booking.totalAmount.toFixed(2)} {booking.currency || "USDC"}
+          {purchase.totalAmount.toFixed(2)} {purchase.currency || "USDC"}
         </p>
       </div>
 
       <div className="space-y-1">
         <p className="flex items-center gap-2 text-xs text-slate-500">
           <Calendar className="h-3 w-3" />
-          Check-in
+          Transfer Date
         </p>
         <p className="font-medium text-slate-900 dark:text-white">
-          {checkInDate.toLocaleDateString("en-US", {
+          {transferDate.toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
             year: "numeric",
@@ -206,10 +206,10 @@ function BookingDetailsSummary({
       <div className="space-y-1">
         <p className="flex items-center gap-2 text-xs text-slate-500">
           <Clock className="h-3 w-3" />
-          Duration
+          Days to Event
         </p>
         <p className="font-medium text-slate-900 dark:text-white">
-          {nights} night{nights > 1 ? "s" : ""}
+          {daysToEvent} day{daysToEvent > 1 ? "s" : ""}
         </p>
       </div>
     </div>
@@ -222,7 +222,7 @@ function BookingDetailsSummary({
  * Displays a beautiful confirmation screen after successful escrow creation
  */
 export function EscrowConfirmation({
-  booking,
+  purchase,
   event,
   escrowData,
   onComplete,
@@ -253,8 +253,8 @@ export function EscrowConfirmation({
             </h1>
 
             <p className="mt-2 max-w-md text-slate-600 dark:text-slate-400">
-              Your payment is now secured in a blockchain escrow. The event will
-              receive the funds after your stay is verified.
+              Your payment is now secured in a blockchain escrow. The seller will
+              receive the funds after the ticket transfer is confirmed.
             </p>
 
             <Badge className="mt-4 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
@@ -268,13 +268,13 @@ export function EscrowConfirmation({
       {/* Contract Details */}
       <ContractIdDisplay contractId={escrowData.contractId} />
 
-      {/* Booking Summary */}
+      {/* Purchase Summary */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Booking Summary</CardTitle>
+          <CardTitle className="text-base">Purchase Summary</CardTitle>
         </CardHeader>
         <CardContent>
-          <BookingDetailsSummary booking={booking} event={event} />
+          <PurchaseDetailsSummary purchase={purchase} event={event} />
         </CardContent>
       </Card>
 
@@ -283,7 +283,7 @@ export function EscrowConfirmation({
         <CardHeader>
           <CardTitle className="text-base">What Happens Next?</CardTitle>
           <CardDescription>
-            Here&apos;s what to expect with your escrow-protected booking
+            Here&apos;s what to expect with your escrow-protected purchase
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -291,22 +291,22 @@ export function EscrowConfirmation({
             <TimelineItem
               icon={FileText}
               title="Confirmation Email Sent"
-              description="You'll receive a confirmation email with your booking and escrow details."
+              description="You'll receive a confirmation email with your purchase and escrow details."
             />
             <TimelineItem
               icon={Calendar}
-              title="Check-in Day"
-              description="Present your booking confirmation at the event. First milestone payment may be released."
+              title="Ticket Transfer"
+              description="The seller transfers your ticket. First milestone payment may be released."
             />
             <TimelineItem
               icon={Building2}
-              title="Enjoy Your Stay"
-              description="Your payment remains protected throughout your stay."
+              title="Awaiting the Event"
+              description="Your payment remains protected until the event takes place."
             />
             <TimelineItem
               icon={CheckCircle2}
-              title="Check-out Complete"
-              description="Final payment released to event after successful checkout."
+              title="Transfer Confirmed"
+              description="Final payment released to the seller after you confirm the transfer."
               isLast
             />
           </div>

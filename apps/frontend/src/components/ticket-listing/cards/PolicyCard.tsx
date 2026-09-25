@@ -36,8 +36,8 @@ interface CancellationPolicy {
 }
 
 interface PolicyCardProps {
-  checkInTime?: string
-  checkOutTime?: string
+  transferInitiatedAt?: string
+  transferCompletedAt?: string
   quietHours?: string
   maxGuests?: number
   minimumStay?: number
@@ -96,8 +96,8 @@ const getPolicyColor = (type: CancellationPolicy["type"]) => {
 }
 
 const PolicyCard = ({
-  checkInTime = "3:00 PM",
-  checkOutTime = "11:00 AM",
+  transferInitiatedAt = "3:00 PM",
+  transferCompletedAt = "11:00 AM",
   quietHours = "10:00 PM - 8:00 AM",
   maxGuests = 4,
   minimumStay = 1,
@@ -170,11 +170,11 @@ const PolicyCard = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
                   <span className="text-muted-foreground">Check-in</span>
-                  <span className="font-medium">{checkInTime}</span>
+                  <span className="font-medium">{transferInitiatedAt}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
                   <span className="text-muted-foreground">Check-out</span>
-                  <span className="font-medium">{checkOutTime}</span>
+                  <span className="font-medium">{transferCompletedAt}</span>
                 </div>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg text-sm">

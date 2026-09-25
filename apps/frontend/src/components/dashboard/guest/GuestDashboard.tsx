@@ -1,6 +1,6 @@
 "use client";
 
-import type { EventListing } from "@/@types/event";
+import type { EventListing } from "@/types/event";
 import TicketListingGrid from "@/components/events/TicketListingGrid";
 import SectionTabs from "@/components/events/SectionTabs";
 import ListingFilterSidebar from "@/components/events/ListingFilterSidebar";
@@ -9,12 +9,29 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BsSortDownAlt } from "react-icons/bs";
 import GuestPurchasesSummary from "./GuestPurchasesSummary";
+import { ErrorBoundaryWithCache } from "@/components/performance/ErrorBoundaryWithCache";
 
+/** Compact fallback shown when a guest dashboard section throws. */
+function SimpleErrorFallback({ label }: { label: string }) {
+  return (
+    <div className="flex items-center justify-center p-6 rounded-xl border border-red-500/20 bg-red-50 text-center">
+      <p className="text-sm text-red-600">
+        Failed to load <span className="font-semibold">{label}</span>. Please refresh the page.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Buyer-facing dashboard: a "guest" is a user browsing the resale market to
+ * buy tickets (as opposed to a manager/seller listing them). Shows available
+ * ticket listings plus a summary of the buyer's escrow-backed purchases.
+ */
 export default function GuestDashboard() {
   const router = useRouter();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
-  const [selectedBedrooms, setSelectedBedrooms] = useState<string>("all");
+  const [selectedSection, setSelectedSection] = useState<string>("all");
   const PRICES = STUB_EVENTS.map((a) => a.price);
   const [minPrice, setMinPrice] = useState<number>(Math.min(...PRICES));
   const [maxPrice, setMaxPrice] = useState<number>(Math.max(...PRICES));
@@ -35,37 +52,37 @@ export default function GuestDashboard() {
     );
   };
 
-  const handleApartmentClick = (listing: EventListing) => {
+  const handleListingClick = (listing: EventListing) => {
     router.push(`/rent/${listing.id}`);
   };
 
   // Derived filtered state
-  const filteredListings = STUB_EVENTS.filter((apt) => {
+  const filteredListings = STUB_EVENTS.filter((listing) => {
     // Category filter
     if (
       selectedCategories.length > 0 &&
-      !selectedCategories.includes(apt.category)
+      !selectedCategories.includes(listing.category)
     ) {
       return false;
     }
     // Location filter
     if (
       selectedLocations.length > 0 &&
-      !selectedLocations.includes(apt.location)
+      !selectedLocations.includes(listing.location)
     ) {
       return false;
     }
-    // Bedroom filter (tabs: all | 1 | 2 | 3+)
-    if (selectedBedrooms !== "all") {
-      const target = Number(selectedBedrooms);
-      if (selectedBedrooms === "3") {
-        if (apt.seatCount < 3) return false;
-      } else if (apt.seatCount !== target) {
+    // Section filter (tabs: all | floor | lower bowl | upper bowl)
+    if (selectedSection !== "all") {
+      const target = Number(selectedSection);
+      if (selectedSection === "3") {
+        if (listing.seatCount < 3) return false;
+      } else if (listing.seatCount !== target) {
         return false;
       }
     }
     // Price filter
-    if (apt.price < minPrice || apt.price > maxPrice) {
+    if (listing.price < minPrice || listing.price > maxPrice) {
       return false;
     }
     return true;
@@ -89,12 +106,12 @@ export default function GuestDashboard() {
       <main className="flex-1 flex flex-col gap-8 p-6 md:p-10">
         <div>
           <h1 className="text-[28px]  text-[#1d1d1d] mb-1">
-            Available for rent in{" "}
-            <span className="font-bold">Costa Rica, San José</span>
+            Resale tickets in{" "}
+            <span className="font-bold">Costa Rica</span>
           </h1>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <p className="text-[#8a8a8a] text-sm">
-              {filteredListings.length} units available
+              {filteredListings.length} listings available
             </p>
             <div className="flex items-center text-sm font-medium">
               <span className="text-[#8a8a8a] mr-2 flex items-center gap-1">
@@ -123,17 +140,21 @@ export default function GuestDashboard() {
         </div>
 
         <SectionTabs
-          selected={selectedBedrooms}
-          onSelect={setSelectedBedrooms}
+          selected={selectedSection}
+          onSelect={setSelectedSection}
         />
 
-        <TicketListingGrid
-          listings={filteredListings}
-          onApartmentClick={handleApartmentClick}
-        />
+        <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="Ticket Listings" />}>
+          <TicketListingGrid
+            listings={filteredListings}
+            onListingClick={handleListingClick}
+          />
+        </ErrorBoundaryWithCache>
 
         <div className="mt-6">
-          <GuestPurchasesSummary />
+          <ErrorBoundaryWithCache fallback={<SimpleErrorFallback label="My Purchases" />}>
+            <GuestPurchasesSummary />
+          </ErrorBoundaryWithCache>
         </div>
       </main>
     </div>

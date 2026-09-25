@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
+import {
+  parseOr400,
+  readJson,
+  resetPasswordSchema,
+} from "@/lib/server/validation";
 
 export async function POST(request: Request) {
   try {
-    const { token, newPassword } = await request.json();
-
-    if (!token || !newPassword) {
-      return NextResponse.json(
-        { error: "Token and new password are required" },
-        { status: 400 },
-      );
-    }
+    const parsed = parseOr400(resetPasswordSchema, await readJson(request));
+    if (parsed.error) return parsed.error;
+    const { token, newPassword } = parsed.data;
 
     const response = await fetch(
       `${process.env.BACKEND_URL}/api/auth/reset-password`,

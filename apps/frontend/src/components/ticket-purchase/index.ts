@@ -17,12 +17,12 @@ export { EscrowConfirmation } from "./EscrowConfirmation";
 
 // Re-export types from interfaces
 export type {
-  BookingData,
+  TicketPurchaseData,
   EventData,
-  RoomData,
+  TicketListingData,
   EscrowType,
   EscrowResponse,
   EscrowMilestone,
   EscrowMetadata,
   EscrowConfirmationProps,
-} from "@/interfaces/booking-escrow.interface";
+} from "@/interfaces/ticket-purchase-escrow.interface";

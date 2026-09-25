@@ -6,21 +6,21 @@ import {
 } from "@/services/escrow.service";
 
 interface ReservationSummaryProps {
-  hotelName: string;
+  eventName: string;
   description: string;
   price: number;
   tax: number;
-  checkIn: Date;
-  checkOut: Date;
+  transferInitiated: Date;
+  transferCompleted: Date;
 }
 
 const ReservationSummary: React.FC<ReservationSummaryProps> = ({
-  hotelName,
+  eventName,
   description,
   price,
   tax,
-  // checkIn,
-  // checkOut,
+  // transferInitiated,
+  // transferCompleted,
 }) => {
   const totalAmount = price + tax;
 
@@ -33,7 +33,7 @@ const ReservationSummary: React.FC<ReservationSummaryProps> = ({
 
   const onPayReservation = async () => {
     const { data } = await initializedReservationEscrow({
-      hotelName,
+      eventName,
       description,
       price: totalAmount,
       tax,
@@ -62,8 +62,8 @@ const ReservationSummary: React.FC<ReservationSummaryProps> = ({
       </div>
 
       <div className="space-y-1">
-        <h3 className="text-xl font-bold text-gray-800">{hotelName}</h3>
-        <p className="text-gray-600">King bed stylish Apartment</p>
+        <h3 className="text-xl font-bold text-gray-800">{eventName}</h3>
+        <p className="text-gray-600">{description}</p>
       </div>
 
       <div className="h-px bg-gray-200 w-full my-4" />

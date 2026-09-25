@@ -1,0 +1,38 @@
+name: Backend Uptime Check
+
+on:
+  schedule:
+    # Every 15 minutes.
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  ping-health:
+    name: Ping /health
+    runs-on: ubuntu-latest
+    # Only runs once apps/backend is actually deployed somewhere and its URL
+    # is recorded in the BACKEND_HEALTH_URL repository variable (#111).
+    if: vars.BACKEND_HEALTH_URL != ''
+
+    steps:
+      - name: Check backend health endpoint
+        run: |
+          url="${{ vars.BACKEND_HEALTH_URL }}"
+          status=$(curl -s -o /tmp/health.json -w "%{http_code}" "$url")
+
+          if [ "$status" != "200" ]; then
+            echo "Health check failed with HTTP status $status"
+            cat /tmp/health.json || true
+            exit 1
+          fi
+
+          if ! grep -q '"status"[[:space:]]*:[[:space:]]*"ok"' /tmp/health.json; then
+            echo "Health check returned 200 but body did not report status: ok"
+            cat /tmp/health.json
+            exit 1
+          fi
+
+          echo "Backend healthy: $(cat /tmp/health.json)"

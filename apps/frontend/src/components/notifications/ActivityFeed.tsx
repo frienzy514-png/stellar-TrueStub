@@ -2,7 +2,7 @@
 
 import { useSubscription } from "@apollo/client/react";
 import { USER_ESCROW_ACTIVITY_SUBSCRIPTION } from "@/graphql/subscriptions/escrow-subscriptions";
-import type { UserEscrowActivitySubscription } from "@/graphql/types";
+import type { UserEscrowActivitySubscription } from "@/graphql/subscriptions/escrow-subscriptions";
 import { formatDistanceToNow } from "date-fns";
 
 interface ActivityFeedProps {

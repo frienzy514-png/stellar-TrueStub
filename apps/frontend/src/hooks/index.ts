@@ -5,8 +5,8 @@
  */
 
 // Booking Escrow Hooks
-export { useBookingEscrow, useEscrowValidation } from "./useBookingEscrow";
-export type { UseBookingEscrowOptions, UseBookingEscrowReturn } from "@/interfaces/booking-escrow.interface";
+export { useTicketPurchaseEscrow, useEscrowValidation } from "./useTicketPurchaseEscrow";
+export type { UseTicketPurchaseEscrowOptions, UseTicketPurchaseEscrowReturn } from "@/interfaces/ticket-purchase-escrow.interface";
 
 // Subscription Hooks
 export { useEscrowSubscription } from "./useEscrowSubscription";

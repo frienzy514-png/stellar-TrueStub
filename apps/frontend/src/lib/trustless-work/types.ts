@@ -61,15 +61,15 @@ import type { SingleReleaseEscrow, MultiReleaseEscrow, SingleReleaseMilestone, M
 
 /**
  * =============================================================================
- * DOMAIN-SPECIFIC TYPES FOR TRUESTUB APPLICATION (Hotel Booking)
+ * DOMAIN-SPECIFIC TYPES FOR TRUESTUB APPLICATION (Ticket Resale)
  * =============================================================================
  * These interfaces provide a simplified, application-specific view of escrow data
- * tailored for event booking scenarios. Use these for UI components and business logic.
+ * tailored for ticket purchase scenarios. Use these for UI components and business logic.
  */
 
 /**
  * Escrow Data Interface (Application Domain)
- * Simplified escrow structure for event booking use cases
+ * Simplified escrow structure for ticket purchase use cases
  */
 export interface EscrowData {
   /**
@@ -88,12 +88,12 @@ export interface EscrowData {
   currency: string;
 
   /**
-   * Hotel wallet address (service provider)
+   * Seller wallet address (service provider)
    */
   marker: string;
 
   /**
-   * Guest wallet address (approver)
+   * Buyer wallet address (approver)
    */
   approver: string;
 

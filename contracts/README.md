@@ -15,6 +15,14 @@ workspace exists for whenever that changes: a contract specific to
 TrueStub's ticket-resale flow that Trustless Work's generic escrow
 contracts don't cover.
 
+## Planning docs
+
+- [`DESIGN.md`](./DESIGN.md) — does TrueStub need a custom Soroban contract?
+  Current recommendation: no, stay on Trustless Work's hosted escrow (#27).
+- [`CI.md`](./CI.md) — planned GitHub Actions job for this workspace (#28).
+- [`DEPLOYMENT.md`](./DEPLOYMENT.md) — planned testnet deployment flow, once
+  a real contract exists (#29). Currently blocked on `DESIGN.md`'s outcome.
+
 ## Structure
 
 ```

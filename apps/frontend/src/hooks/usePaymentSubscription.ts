@@ -2,7 +2,7 @@ import { useSubscription } from "@apollo/client/react";
 import { useRef } from "react";
 import { toast } from "react-toastify";
 import { PAYMENT_STATUS_SUBSCRIPTION } from "@/graphql/subscriptions/payment-subscriptions";
-import type { PaymentStatusSubscription } from "@/graphql/types";
+import type { PaymentStatusSubscription } from "@/graphql/subscriptions/payment-subscriptions";
 
 const TOAST_DEBOUNCE_MS = 3000;
 

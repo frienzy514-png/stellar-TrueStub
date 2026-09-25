@@ -8,7 +8,7 @@ import {
   Memo,
   BASE_FEE,
 } from "stellar-sdk";
-import { ISupportedWallet } from "@creit.tech/stellar-wallets-kit";
+import { ISupportedWallet, WalletNetwork } from "@creit.tech/stellar-wallets-kit";
 import { kit } from "../constants/wallet-kit.constant";
 import {
   WalletInfo,
@@ -28,6 +28,14 @@ import {
 
 const Server = Horizon.Server;
 
+/** Resolves the NEXT_PUBLIC_TRUSTLESS_NETWORK env value to a full network passphrase. */
+function resolveExpectedNetwork(): string {
+  const env =
+    (process.env.NEXT_PUBLIC_TRUSTLESS_NETWORK as "testnet" | "mainnet") ||
+    "testnet";
+  return env === "mainnet" ? WalletNetwork.PUBLIC : WalletNetwork.TESTNET;
+}
+
 export const useMultiWallet = (
   horizonUrl: string = "https://horizon-testnet.stellar.org",
   network: string = Networks.TESTNET,
@@ -38,6 +46,11 @@ export const useMultiWallet = (
   const [error, setError] = useState<WalletError>();
   const [balances, setBalances] = useState<Balance[]>([]);
   const [server] = useState(() => new Server(horizonUrl));
+
+  // Network mismatch state
+  const [networkMismatch, setNetworkMismatch] = useState(false);
+  const [expectedNetwork] = useState<string>(resolveExpectedNetwork);
+  const [actualNetwork, setActualNetwork] = useState<string>("");
 
   const connectStellarWallet = useCallback(async () => {
     setIsConnecting(true);
@@ -79,6 +92,18 @@ export const useMultiWallet = (
 
           setSelectedWallet(walletInfo);
           refreshBalancesForKey(address); // Fire and forget
+
+          // Check network match after connection (fire and forget)
+          if (kit) {
+            kit.getNetwork().then(({ network: walletNetwork }) => {
+              setActualNetwork(walletNetwork);
+              setNetworkMismatch(walletNetwork !== expectedNetwork);
+            }).catch(() => {
+              // If we can't determine the network, clear mismatch state.
+              setActualNetwork("");
+              setNetworkMismatch(false);
+            });
+          }
         },
       });
     } catch (error: any) {
@@ -268,6 +293,8 @@ export const useMultiWallet = (
 
         if (connectedWallets.length <= 1) {
           setBalances([]);
+          setNetworkMismatch(false);
+          setActualNetwork("");
         }
       } catch (error: any) {
         const walletError: WalletError = {
@@ -301,6 +328,8 @@ export const useMultiWallet = (
     setError(undefined);
     setBalances([]);
     setIsConnecting(false);
+    setNetworkMismatch(false);
+    setActualNetwork("");
   }, []);
 
   const refreshBalancesForKey = useCallback(
@@ -325,6 +354,29 @@ export const useMultiWallet = (
     if (!selectedWallet || selectedWallet.chain !== "stellar") return;
     refreshBalancesForKey(selectedWallet.address);
   }, [selectedWallet, refreshBalancesForKey]);
+
+  /**
+   * Update an already-connected wallet's address after an account switch.
+   * The wallet type must already be in connectedWallets; only the address
+   * (and derived fields) are replaced — the wallet remains connected.
+   */
+  const updateWalletAddress = useCallback(
+    (updatedWallet: WalletInfo) => {
+      setConnectedWallets((prev) =>
+        prev.map((w) =>
+          w.walletType === updatedWallet.walletType ? updatedWallet : w,
+        ),
+      );
+      // If this is the selected wallet, update that too.
+      setSelectedWallet((prev) =>
+        prev?.walletType === updatedWallet.walletType ? updatedWallet : prev,
+      );
+      if (updatedWallet.chain === "stellar") {
+        refreshBalancesForKey(updatedWallet.address);
+      }
+    },
+    [refreshBalancesForKey],
+  );
 
   /**
    * Send payment using the selected Stellar wallet
@@ -392,6 +444,7 @@ export const useMultiWallet = (
     connectWallet,
     disconnectWallet,
     selectWallet,
+    updateWalletAddress,
     reset,
     balances,
     refreshBalances,
@@ -399,5 +452,9 @@ export const useMultiWallet = (
     connectStellarWallet,
     connectMetaMask,
     connectWalletConnect,
+    // Network mismatch state
+    networkMismatch,
+    expectedNetwork,
+    actualNetwork,
   };
 };

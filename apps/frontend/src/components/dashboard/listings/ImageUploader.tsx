@@ -10,10 +10,10 @@ interface ImageUploaderProps {
 }
 
 const SLOT_LABELS = [
-  'Main apartment image',
-  'Apartment image 2',
-  'Apartment image 3',
-  'Apartment image 4',
+  'Main listing image',
+  'Listing image 2',
+  'Listing image 3',
+  'Listing image 4',
 ] as const;
 
 function ImageSlot({

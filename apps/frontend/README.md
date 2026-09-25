@@ -17,7 +17,7 @@ sales. It's one piece of the `stellar-TrueStub` monorepo — see the
 - Trustless Work API access ([docs here](https://docs.trustlesswork.com/trustless-work)) 📖
 - A Firebase project with **Email/Password** authentication enabled ([Firebase Console](https://console.firebase.google.com)) 🔥
 
-> 🧩 **This workspace runs standalone.** It does **not** require the sibling `apps/backend` scaffold or the `contracts/` workspace to be running locally — those are unwired placeholders (see the [root README](../../README.md)). This app connects directly to a live Hasura GraphQL endpoint and to Firebase, both remote services reachable over the network. See [Architecture](#-architecture) below for the full explanation.
+> 🧩 **This workspace runs standalone.** It does **not** require the sibling `apps/backend` scaffold or the `contracts/` workspace to be running locally — those are unwired placeholders (see the [root README](../../README.md)). This app connects directly to a live Hasura GraphQL endpoint and to Firebase, both remote services reachable over the network. See [Architecture](#architecture) below for the full explanation.
 
 ---
 
@@ -91,8 +91,16 @@ NEXT_PUBLIC_FIREBASE_APP_ID=<your appId>
 ```
 
 > ℹ️ These are public, browser-safe values — Firebase ships them to the client by design, and the `NEXT_PUBLIC_` prefix is what makes Next.js expose them to the bundle. The real security boundary is **Firebase Security Rules**, not secrecy of these values. They are **not** the Firebase Admin SDK private key, which belongs only in a server-side backend (see `apps/backend`) and must never appear here.
+>
+> 🔒 The repo now includes version-controlled security rules files: `apps/frontend/firestore.rules` and `apps/frontend/storage.rules`. See [`docs/FIREBASE_SECURITY_RULES.md`](docs/FIREBASE_SECURITY_RULES.md) for the full rules documentation and deploy instructions.
 
 Make sure **Email/Password** sign-in is enabled in **Authentication → Sign-in method** for Register and Login to work. 📚 [Firebase Auth docs](https://firebase.google.com/docs/auth)
+
+To let users enable optional TOTP-based two-factor authentication
+(`/dashboard/profile/security`), turn on **Multi-factor authentication →
+TOTP** in **Authentication → Sign-in method** as well — the enroll/verify
+flow in `TwoFactorSettings.tsx` and the step-up prompt in `Login.tsx` both
+fail with a Firebase error until that's enabled on the project.
 
 ---
 
@@ -149,7 +157,7 @@ NEXT_PUBLIC_HASURA_GRAPHQL_URL=https://your-hasura-instance.example.com/v1/graph
 
 ---
 
-### **🧩 Architecture**
+### 🧩 Architecture
 
 This workspace (`apps/frontend`) runs **standalone**: `yarn dev` here connects to a remote/shared Hasura GraphQL endpoint and Firebase — no local backend, no Docker required for UI work.
 
@@ -160,7 +168,7 @@ The monorepo also has `apps/backend` and `contracts/`, but both are currently un
 ## 🛠️ **Tech Stack**
 
 - **Frontend**: TypeScript, Next.js 15, Tailwind CSS
-- **Auth**: Firebase Authentication (Email/Password, Google OAuth)
+- **Auth**: Firebase Authentication (Email/Password)
 - **GraphQL**: Apollo Client 4, Hasura GraphQL Engine
 - **Blockchain**: Stellar, TrustlessWork API
 - **Wallet**: Freighter, Albedo, LOBSTR
@@ -191,4 +199,4 @@ Run these from `apps/frontend/`, or scoped from the repo root via `yarn workspac
 
 ## 📚 More docs
 
-Frontend-specific docs live in `apps/frontend/docs/`: Apollo Client setup, the GraphQL codegen workflow, secrets/CI setup, and dependency-update notes. Repo-wide docs (contributing, git guidelines, pipeline, project history) live in the root [`docs/`](../../docs/).
+Frontend-specific docs live in `apps/frontend/docs/`: Apollo Client setup, the GraphQL codegen workflow, secrets/CI setup, dependency-update notes, and [Firebase Security Rules](docs/FIREBASE_SECURITY_RULES.md). Repo-wide docs (contributing, git guidelines, pipeline, project history) live in the root [`docs/`](../../docs/).

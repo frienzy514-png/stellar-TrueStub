@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ethers } from "ethers";
+
+// ethers is only needed when the user clicks "Connect MetaMask", so we
+// load it lazily to keep it out of the initial page bundle.
+async function getEthers() {
+  const { ethers } = await import("ethers");
+  return ethers;
+}
 import { Button } from "@/components/ui/button";
 import { 
   X, 
@@ -41,20 +47,31 @@ export const MetaMaskWalletModal: React.FC<MetaMaskWalletModalProps> = ({
     }
   }, [isOpen]);
 
+  // Handle ESC key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   const connectMetaMask = async () => {
     try {
       setIsConnecting(true);
       setError(null);
 
-      let signer = null;
-      let provider;
-
       if (window.ethereum == null) {
         throw new Error("MetaMask is not installed");
-      } else {
-        provider = new ethers.BrowserProvider(window.ethereum);
-        signer = await provider.getSigner();
       }
+
+      // Dynamic import — only fetched when the user clicks Connect
+      const ethers = await getEthers();
+
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
 
       // Get account details
       const address = await signer.getAddress();
@@ -80,22 +97,22 @@ export const MetaMaskWalletModal: React.FC<MetaMaskWalletModalProps> = ({
     window.open("https://metamask.io/download/", "_blank");
   };
 
-  const refreshConnection = () => {
-    setError(null);
-    setIsConnecting(false);
-  };
-
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden">
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="metamask-modal-title"
+    >
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+          <h2 id="metamask-modal-title" className="text-xl font-semibold text-gray-900 dark:text-white">
             {!isMetaMaskInstalled ? "Install MetaMask" : "Connect MetaMask"}
           </h2>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close MetaMask connection modal">
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -108,14 +125,15 @@ export const MetaMaskWalletModal: React.FC<MetaMaskWalletModalProps> = ({
               <div className="flex justify-center">
                 <img 
                   src="/img/wallet/metamask.png" 
-                  alt="MetaMask"
+                  alt=""
+                  aria-hidden="true"
                   className="w-16 h-16 rounded-lg"
                 />
               </div>
               
               <div>
-                <h3 className="text-xl font-semibold mb-2">MetaMask Not Found</h3>
-                <p className="text-gray-600">Install MetaMask to connect your wallet</p>
+                <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">MetaMask Not Found</h3>
+                <p className="text-gray-600 dark:text-gray-400">Install MetaMask to connect your wallet</p>
               </div>
 
               <div className="flex space-x-3">
@@ -124,7 +142,7 @@ export const MetaMaskWalletModal: React.FC<MetaMaskWalletModalProps> = ({
                   className="flex-1"
                   size="lg"
                 >
-                  <ExternalLink className="h-4 w-4 mr-2" />
+                  <ExternalLink className="h-4 w-4 mr-2" aria-hidden="true" />
                   Install MetaMask
                 </Button>
                 <Button 
@@ -142,21 +160,22 @@ export const MetaMaskWalletModal: React.FC<MetaMaskWalletModalProps> = ({
               <div className="flex justify-center">
                 <img 
                   src="/img/wallet/metamask.png" 
-                  alt="MetaMask"
+                  alt=""
+                  aria-hidden="true"
                   className="w-16 h-16 rounded-lg"
                 />
               </div>
               
               <div>
-                <h3 className="text-xl font-semibold mb-2">MetaMask Detected</h3>
-                <p className="text-gray-600">Try connecting again</p>
+                <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">MetaMask Detected</h3>
+                <p className="text-gray-600 dark:text-gray-400">Click below to connect your wallet</p>
               </div>
 
               {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg" role="alert">
                   <div className="flex items-center space-x-2">
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                    <p className="text-sm text-red-700">{error}</p>
+                    <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" aria-hidden="true" />
+                    <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
                   </div>
                 </div>
               )}
@@ -170,11 +189,11 @@ export const MetaMaskWalletModal: React.FC<MetaMaskWalletModalProps> = ({
                 >
                   {isConnecting ? (
                     <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
                       Connecting...
                     </>
                   ) : (
-                    "Try Again"
+                    "Connect MetaMask"
                   )}
                 </Button>
                 <Button 

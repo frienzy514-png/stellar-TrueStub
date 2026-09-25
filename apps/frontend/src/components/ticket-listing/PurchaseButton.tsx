@@ -16,7 +16,7 @@ interface PurchaseButtonProps {
   isAvailable: boolean;
   totalPrice: number;
   onBookingStart?: () => void;
-  onBookingComplete?: (bookingId: string) => void;
+  onBookingComplete?: (purchaseId: string) => void;
   onBookingError?: (error: string) => void;
   className?: string;
   disabled?: boolean;
@@ -105,7 +105,7 @@ const PurchaseButton: React.FC<PurchaseButtonProps> = ({
       }
 
       const escrowResult = await initializedReservationEscrow({
-        hotelName: "Shikara Event",
+        eventName: "Shikara Event",
         description: `Room reservation for ${nights} nights from ${dateRange.from.toLocaleDateString()} to ${dateRange.to.toLocaleDateString()}`,
         price: basePrice,
         tax: tax,
@@ -120,9 +120,9 @@ const PurchaseButton: React.FC<PurchaseButtonProps> = ({
         amount: totalPrice,
       });
 
-      const bookingId = escrowResult.data.contractId;
+      const purchaseId = escrowResult.data.contractId;
       setRetryCount(0);
-      onBookingComplete?.(bookingId);
+      onBookingComplete?.(purchaseId);
     } catch (error) {
       console.error("Booking error:", error);
       const errorMessage =

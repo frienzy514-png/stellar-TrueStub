@@ -2,6 +2,14 @@
 
 This guide covers everything you need to know about our testing, code quality, environment setup, and deployment processes to help you get started quickly.
 
+This repo is a Yarn workspaces monorepo (`apps/frontend`, `apps/backend`).
+The checks and commands below run per-workspace, e.g.
+`yarn workspace @truestub/frontend lint` /
+`yarn workspace @truestub/backend typecheck` (see `.github/workflows/frontend-ci.yml`
+and `.github/workflows/backend-ci.yml`). For where each workspace actually
+gets deployed — Vercel for `apps/frontend`, a separate host for
+`apps/backend` — see [`docs/DEPLOYMENT.md`](./DEPLOYMENT.md).
+
 ## Testing Setup
 
 Our project uses Jest and React Testing Library for unit and integration tests in a Next.js environment.

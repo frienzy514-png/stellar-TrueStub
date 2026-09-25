@@ -5,18 +5,9 @@
  *
  * Displays a card showing escrows filtered by role (guest/event/platform).
  * Shows a summary count and list of escrows for a specific role.
- *
- * @example
- * ```tsx
- * <EscrowCard
- *   title="As Guest (Approver)"
- *   escrows={escrows}
- *   role="approver"
- *   signer="WALLET_ADDRESS"
- * />
- * ```
  */
 
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EscrowStatusBadge } from './EscrowStatusBadge';
 import type { GetEscrowsFromIndexerResponse } from '@trustless-work/escrow/types';
@@ -70,19 +61,18 @@ export function EscrowCard({
   error = null,
   onEscrowClick,
 }: EscrowCardProps) {
-  // Get role icon
   const roleIcon = getRoleIcon(role);
   const roleColor = getRoleColor(role);
 
   return (
-    <Card className="h-full hover:shadow-lg transition-shadow duration-200 dark:bg-gray-800 dark:border-gray-700">
+    <Card className="h-full hover:shadow-lg transition-shadow duration-200 dark:bg-gray-800 dark:border-gray-700" role="region" aria-label={title}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between text-lg">
           <span className="flex items-center gap-2">
-            <span className={roleColor}>{roleIcon}</span>
+            <span className={roleColor} aria-hidden="true">{roleIcon}</span>
             {title}
           </span>
-          <span className={`text-2xl font-bold ${roleColor}`}>
+          <span className={`text-2xl font-bold ${roleColor}`} aria-label={`${escrows.length} escrows`}>
             {escrows.length}
           </span>
         </CardTitle>
@@ -91,15 +81,16 @@ export function EscrowCard({
       <CardContent>
         {/* Loading state */}
         {isLoading && (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-8" role="status" aria-label="Loading escrows">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary dark:border-white"></div>
+            <span className="sr-only">Loading escrows...</span>
           </div>
         )}
 
         {/* Error state */}
         {error && !isLoading && (
-          <div className="text-center py-8">
-            <div className="text-red-500 dark:text-red-400 text-sm mb-2">Failed to load escrows</div>
+          <div className="text-center py-8" role="alert">
+            <div className="text-red-600 dark:text-red-400 text-sm font-medium mb-2">Failed to load escrows</div>
             <p className="text-xs text-gray-500 dark:text-gray-400">{error.message}</p>
           </div>
         )}
@@ -107,12 +98,13 @@ export function EscrowCard({
         {/* Empty state */}
         {!isLoading && !error && escrows.length === 0 && (
           <div className="text-center py-8">
-            <div className="text-gray-400 dark:text-gray-400 mb-2">
+            <div className="text-gray-400 dark:text-gray-500 mb-2" aria-hidden="true">
               <svg
                 className="w-12 h-12 mx-auto"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -122,8 +114,8 @@ export function EscrowCard({
                 />
               </svg>
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">No escrows found</p>
-            <p className="text-xs text-gray-400 dark:text-gray-400 mt-1">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-300">No escrows found</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Escrows where you are the {role} will appear here
             </p>
           </div>
@@ -131,7 +123,7 @@ export function EscrowCard({
 
         {/* Escrows list */}
         {!isLoading && !error && escrows.length > 0 && (
-          <div className="space-y-3 max-h-96 overflow-y-auto">
+          <div className="space-y-3 max-h-96 overflow-y-auto" role="list" aria-label={`${title} escrows list`}>
             {escrows.slice(0, 10).map((escrow) => (
               <EscrowItem
                 key={escrow.contractId}
@@ -143,7 +135,11 @@ export function EscrowCard({
 
             {escrows.length > 10 && (
               <div className="text-center pt-2 border-t dark:border-gray-700">
-                <button className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                <button
+                  type="button"
+                  aria-label={`View all ${escrows.length} escrows`}
+                  className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 focus:outline-none focus:underline"
+                >
                   View all {escrows.length} escrows →
                 </button>
               </div>
@@ -167,7 +163,6 @@ function EscrowItem({
   signer: string;
   onClick?: () => void;
 }) {
-  // Extract escrow details
   const title = escrow.title || 'Untitled Escrow';
   const amount = escrow.amount || 0;
   const asset = (escrow as any).asset?.code || 'XLM';
@@ -176,16 +171,27 @@ function EscrowItem({
     ? new Date((escrow as any).createdAt as any).toLocaleDateString()
     : 'N/A';
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick?.();
+    }
+  };
+
   return (
     <div
-      className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+      role="button"
+      tabIndex={0}
+      aria-label={`Escrow ${title}, Amount: ${formatAmount(amount)} ${asset}`}
+      className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/80 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
       onClick={onClick}
+      onKeyDown={handleKeyDown}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-semibold truncate dark:text-white">{title}</h4>
+          <h4 className="text-sm font-semibold truncate text-gray-900 dark:text-white">{title}</h4>
           {contractId ? (
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+            <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
               {contractId.substring(0, 8)}...{contractId.substring(contractId.length - 6)}
             </p>
           ) : (
@@ -202,12 +208,13 @@ function EscrowItem({
       </div>
 
       <div className="flex items-center justify-between text-xs">
-        <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
+        <div className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
           <svg
             className="w-4 h-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <path
               strokeLinecap="round"
@@ -220,15 +227,12 @@ function EscrowItem({
             {formatAmount(amount)} {asset}
           </span>
         </div>
-        <span className="text-gray-500 dark:text-gray-400">{createdAt}</span>
+        <span className="text-gray-600 dark:text-gray-400">{createdAt}</span>
       </div>
     </div>
   );
 }
 
-/**
- * Get icon for role
- */
 function getRoleIcon(role: 'marker' | 'approver' | 'releaser') {
   switch (role) {
     case 'marker':
@@ -238,6 +242,7 @@ function getRoleIcon(role: 'marker' | 'approver' | 'releaser') {
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -254,6 +259,7 @@ function getRoleIcon(role: 'marker' | 'approver' | 'releaser') {
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -270,6 +276,7 @@ function getRoleIcon(role: 'marker' | 'approver' | 'releaser') {
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -282,9 +289,6 @@ function getRoleIcon(role: 'marker' | 'approver' | 'releaser') {
   }
 }
 
-/**
- * Get color for role
- */
 function getRoleColor(role: 'marker' | 'approver' | 'releaser') {
   switch (role) {
     case 'marker':
@@ -296,11 +300,7 @@ function getRoleColor(role: 'marker' | 'approver' | 'releaser') {
   }
 }
 
-/**
- * Format amount with proper decimals
- */
 function formatAmount(amount: number): string {
-  // Convert from stroops (7 decimal places) to standard units
   const formattedAmount = amount / 10000000;
   return formattedAmount.toLocaleString(undefined, {
     minimumFractionDigits: 2,

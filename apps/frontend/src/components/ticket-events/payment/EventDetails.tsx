@@ -4,7 +4,7 @@ import { Bed, Bath, MapPin } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 
 interface EventDetailsProps {
-  hotelName: string;
+  eventName: string;
   description: string;
   details: string;
   goodToKnow: string;
@@ -17,7 +17,8 @@ interface EventDetailsProps {
 }
 
 const EventDetails: React.FC<EventDetailsProps> = ({
-  hotelName,
+  eventName,
+  description,
   details,
   goodToKnow,
   location,
@@ -30,8 +31,8 @@ const EventDetails: React.FC<EventDetailsProps> = ({
       <div className="flex flex-col md:flex-row gap-8 mb-6">
         <div className="w-full md:w-1/3 flex-shrink-0">
           <Image
-            src={imageUrl || "/img/hotel/hotel1.jpg"}
-            alt={`${hotelName} view`}
+            src={imageUrl || "/img/event/event1.jpg"}
+            alt={`${eventName} view`}
             width={316}
             height={265}
             className="object-cover rounded-lg w-full h-auto"
@@ -39,9 +40,9 @@ const EventDetails: React.FC<EventDetailsProps> = ({
           />
         </div>
         <div className="flex flex-col justify-center">
-          <h2 className="text-3xl font-bold text-gray-800 mb-3">{hotelName}</h2>
+          <h2 className="text-3xl font-bold text-gray-800 mb-3">{eventName}</h2>
           <p className="text-xl text-gray-600 mb-6">
-            King bed stylish Apartment
+            {description}
           </p>
           <div className="flex items-center mb-6">
             {[...Array(5)].map((_, i) => (

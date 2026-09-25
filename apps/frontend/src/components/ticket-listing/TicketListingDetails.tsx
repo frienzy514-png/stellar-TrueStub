@@ -13,7 +13,7 @@ import {
 } from "./cards"
 
 export interface TicketListingDetailsInfo {
-  hotelName: string
+  eventName: string
   address: string
   beds: number
   baths: number
@@ -47,7 +47,7 @@ const TicketListingDetails = ({ info, isLoading = false }: TicketListingDetailsP
           <div className="space-y-4">
             {/* Event Name and Price */}
             <div className="relative">
-              <h2 className="text-2xl font-semibold">{info.hotelName}</h2>
+              <h2 className="text-2xl font-semibold">{info.eventName}</h2>
               <div className="absolute top-0 right-3">
                 <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                   {info.payment.priceLabel}

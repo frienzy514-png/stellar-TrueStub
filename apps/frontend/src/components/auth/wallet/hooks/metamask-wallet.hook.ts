@@ -1,13 +1,20 @@
 import { useState, useEffect } from "react";
-import { ethers } from "ethers";
+import type { BrowserProvider, JsonRpcSigner } from "ethers";
+
+// ethers is only needed when the user interacts with MetaMask, so we load
+// it lazily to keep it out of the initial page bundle (~800 KB saved).
+async function getEthers() {
+  const { ethers } = await import("ethers");
+  return ethers;
+}
 
 interface MetaMaskWalletState {
   isConnected: boolean;
   address: string | null;
   network: string | null;
   balance: string | null;
-  provider: ethers.BrowserProvider | null;
-  signer: ethers.JsonRpcSigner | null;
+  provider: BrowserProvider | null;
+  signer: JsonRpcSigner | null;
   error: string | null;
 }
 
@@ -51,16 +58,15 @@ export const useMetaMaskWallet = () => {
     try {
       setWalletState(prev => ({ ...prev, error: null }));
 
-      let signer = null;
-      let provider;
-
       if (window.ethereum == null) {
         throw new Error("MetaMask is not installed");
-      } else {
-        provider = new ethers.BrowserProvider(window.ethereum);
-        signer = await provider.getSigner();
       }
 
+      // Dynamic import — ethers is only fetched here, not at module load
+      const ethers = await getEthers();
+
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
       const address = await signer.getAddress();
       const network = await provider.getNetwork();
       const balance = await provider.getBalance(address);
@@ -113,6 +119,7 @@ export const useMetaMaskWallet = () => {
       });
 
       if (walletState.isConnected) {
+        const ethers = await getEthers();
         const provider = new ethers.BrowserProvider(window.ethereum);
         const network = await provider.getNetwork();
         setWalletState(prev => ({ ...prev, network: network.name }));
@@ -154,6 +161,7 @@ export const useMetaMaskWallet = () => {
       }
 
       const balance = await walletState.provider.getBalance(walletState.address);
+      const ethers = await getEthers();
       const formattedBalance = ethers.formatEther(balance);
       
       setWalletState(prev => ({ ...prev, balance: formattedBalance }));
@@ -200,6 +208,7 @@ export const useMetaMaskWallet = () => {
       window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
       window.ethereum?.removeListener('chainChanged', handleChainChanged);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletState.isConnected]);
 
   return {

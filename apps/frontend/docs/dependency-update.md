@@ -59,8 +59,7 @@ En Apollo Client v4, los hooks de React se movieron de `@apollo/client` a `@apol
 
 Archivos corregidos:
 
-- [src/app/test-page/page.tsx](../src/app/test-page/page.tsx)
-- [src/components/ApolloTestComponent.tsx](../src/components/ApolloTestComponent.tsx)
+- `src/app/test-page/page.tsx`
 - [src/components/EscrowList.tsx](../src/components/EscrowList.tsx)
 - [src/components/notifications/ActivityFeed.tsx](../src/components/notifications/ActivityFeed.tsx)
 - [src/hooks/useEscrowSubscription.ts](../src/hooks/useEscrowSubscription.ts)

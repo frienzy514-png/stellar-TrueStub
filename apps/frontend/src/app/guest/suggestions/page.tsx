@@ -33,6 +33,54 @@ export default function GuestSuggestionsPage() {
 
   const selected =
     listings.find((listing) => listing.id === selectedId) ?? listings[0];
+// TODO: replace with Apollo query → public.ticket_listings (Hasura)
+// Reference: dApp/apps/frontend/src/app/dashboard/guest/page.tsx
+const STUB_LISTINGS = [
+  {
+    id: "1",
+    name: "Coldplay: Music of the Spheres",
+    address: "Estadio Nacional, La Sabana, San José",
+    price: 1200,
+    deposit: 2400,
+    beds: 2,
+    baths: 1,
+    petFriendly: true,
+    isPromoted: true,
+    description:
+      "West Floor, Row 12 — two seats together, verified transfer via escrow",
+    images: [
+      "/img/room1.png",
+      "/img/room2.png",
+      "/img/room3.png",
+      "/img/room4.png",
+    ],
+  },
+  {
+    id: "2",
+    name: "Costa Rica vs. Mexico",
+    address: "Estadio Nacional, La Sabana, San José",
+    price: 950,
+    deposit: 1900,
+    beds: 2,
+    baths: 1,
+    petFriendly: true,
+    isPromoted: false,
+    description:
+      "East Stand, Row 18 — great sightline to midfield, verified transfer via escrow",
+    images: [
+      "/img/room2.png",
+      "/img/room1.png",
+      "/img/room3.png",
+      "/img/room4.png",
+    ],
+  },
+];
+
+export default function GuestSuggestionsPage() {
+  const [selectedId, setSelectedId] = useState(STUB_LISTINGS[0].id);
+  const [favorites, setFavorites] = useState<string[]>([]);
+
+  const selected = STUB_LISTINGS.find((l) => l.id === selectedId)!;
 
   if (loading || error || !selected) {
     return (
@@ -80,6 +128,7 @@ export default function GuestSuggestionsPage() {
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 {listings.length} listings available
+                {STUB_LISTINGS.length} listings available
               </p>
               <Link
                 href="/rent"
@@ -92,14 +141,16 @@ export default function GuestSuggestionsPage() {
 
             <div className="space-y-3">
               {listings.map((apt) => (
+              {STUB_LISTINGS.map((listing) => (
                 <button
-                  key={apt.id}
+                  key={listing.id}
                   type="button"
-                  onClick={() => setSelectedId(apt.id)}
+                  onClick={() => setSelectedId(listing.id)}
                   className={cn(
                     "w-full text-left rounded-xl border p-3",
                     "flex items-start gap-3 transition-colors",
                     selected.id === apt.id
+                    selectedId === listing.id
                       ? "border-orange-400 bg-orange-50 dark:bg-orange-900/10"
                       : "border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800",
                   )}
@@ -111,6 +162,8 @@ export default function GuestSuggestionsPage() {
                     <Image
                       src={listingImages(apt)[0]}
                       alt={apt.name}
+                      src={listing.images[0]}
+                      alt={listing.name}
                       fill
                       unoptimized
                       className="object-cover"
@@ -127,12 +180,12 @@ export default function GuestSuggestionsPage() {
                       <p className="text-sm font-semibold
                                     text-gray-900 dark:text-white
                                     line-clamp-2 leading-tight">
-                        {apt.name}
+                        {listing.name}
                       </p>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          toggleFavorite(apt.id);
+                          toggleFavorite(listing.id);
                         }}
                         className="shrink-0 mt-0.5"
                       >
@@ -140,6 +193,7 @@ export default function GuestSuggestionsPage() {
                           className={cn(
                             "h-4 w-4 transition-colors",
                             isFavorite(apt.id)
+                            favorites.includes(listing.id)
                               ? "fill-red-500 text-red-500"
                               : "text-gray-300 hover:text-red-400",
                           )}
@@ -152,11 +206,24 @@ export default function GuestSuggestionsPage() {
                     </p>
                     <div className="flex items-center gap-2
                                     text-xs text-gray-400 dark:text-gray-500">
+                      {listing.address}
+                    </p>
+                    <div className="flex items-center gap-2
+                                    text-xs text-gray-400 dark:text-gray-500">
+                      <span>{listing.beds}bd</span>
+                      <span>·</span>
+                      {listing.petFriendly && (
+                        <>
+                          <span>pet friendly</span>
+                          <span>·</span>
+                        </>
+                      )}
+                      <span>{listing.baths} ba</span>
                       <span
                         className="ml-auto font-bold text-green-600
                                    dark:text-green-400"
                       >
-                        ${apt.price.toLocaleString()}
+                        ${listing.price.toLocaleString()}
                       </span>
                     </div>
                   </div>

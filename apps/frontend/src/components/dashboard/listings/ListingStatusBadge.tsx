@@ -1,19 +1,19 @@
 import { cn } from "@/lib/utils";
 
-export type ApartmentOccupancyStatus = "inhabited" | "not_inhabited";
+export type ListingOccupancyStatus = "available" | "unavailable";
 
-export const STATUS_STYLES: Record<ApartmentOccupancyStatus, string> = {
-  inhabited: "bg-green-100 text-green-800",
-  not_inhabited: "bg-gray-800 text-white",
+export const STATUS_STYLES: Record<ListingOccupancyStatus, string> = {
+  available: "bg-green-100 text-green-800",
+  unavailable: "bg-gray-800 text-white",
 };
 
-const STATUS_LABEL: Record<ApartmentOccupancyStatus, string> = {
-  inhabited: "Inhabited",
-  not_inhabited: "Not inhabited",
+const STATUS_LABEL: Record<ListingOccupancyStatus, string> = {
+  available: "Available",
+  unavailable: "Unavailable",
 };
 
 interface ListingStatusBadgeProps {
-  status: ApartmentOccupancyStatus;
+  status: ListingOccupancyStatus;
   className?: string;
 }
 

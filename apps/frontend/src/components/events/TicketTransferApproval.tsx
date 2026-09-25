@@ -5,18 +5,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ApproveMilestone } from '@/components/tw-blocks/escrows/multi-release/approve-milestone/ApproveMilestone';
-import { TicketTransferApprovalProps, CheckInData, MilestoneApprovalData } from './types';
+import { TicketTransferApprovalProps, TransferInitiationData, MilestoneApprovalData } from './types';
 import { useGlobalAuthenticationStore } from '@/core/store/data';
 import { useWalletContext } from '@/components/tw-blocks/wallet-kit/WalletProvider';
-// import { updateBookingStatus, sendGuestNotification } from '@/services/event.service';
+// import { updatePurchaseStatus, sendBuyerNotification } from '@/services/event.service';
 // import { toast } from 'react-toastify';
 
-export function TicketTransferApproval({ booking, escrow, onSuccess, onError }: TicketTransferApprovalProps) {
+export function TicketTransferApproval({ purchase, escrow, onSuccess, onError }: TicketTransferApprovalProps) {
   const { address } = useGlobalAuthenticationStore();
   const { walletAddress } = useWalletContext();
-  const [checkInData, setCheckInData] = useState<CheckInData>({
-    roomNumber: '',
-    checkInTime: new Date().toISOString(),
+  const [transferData, setTransferData] = useState<TransferInitiationData>({
+    seatNumber: '',
+    transferInitiatedAt: new Date().toISOString(),
     wifiPassword: '',
     signature: '',
     staffMember: address || '',
@@ -24,94 +24,94 @@ export function TicketTransferApproval({ booking, escrow, onSuccess, onError }: 
 
   const handleMilestoneApproval = async (approvalData: MilestoneApprovalData) => {
     try {
-      // Update booking status - in a real app, this would be an API call
-      // await updateBookingStatus(booking.id, 'checked_in', {
-      //   checkInTime: new Date().toISOString(),
+      // Update purchase status - in a real app, this would be an API call
+      // await updatePurchaseStatus(purchase.id, 'transfer_confirmed', {
+      //   transferInitiatedAt: new Date().toISOString(),
       //   staffMember: address || '',
-      //   roomAssigned: checkInData.roomNumber,
-      //   roomNumber: checkInData.roomNumber,
-      //   guestSignature: checkInData.signature
+      //   seatAssigned: transferData.seatNumber,
+      //   seatNumber: transferData.seatNumber,
+      //   buyerSignature: transferData.signature
       // });
 
-      // Send notification to guest - in a real app, this would be an API call
-      // await sendGuestNotification(booking.guestEmail, 'check_in_confirmed', {
-      //   roomNumber: checkInData.roomNumber,
-      //   wifiPassword: checkInData.wifiPassword,
+      // Send notification to buyer - in a real app, this would be an API call
+      // await sendBuyerNotification(purchase.guestEmail, 'transfer_initiated_confirmed', {
+      //   seatNumber: transferData.seatNumber,
+      //   wifiPassword: transferData.wifiPassword,
       //   escrowStatus: 'milestone_approved'
       // });
 
-      // toast.success('Check-in completed and guest notified successfully');
+      // toast.success('Ticket transfer completed and buyer notified successfully');
 
       if (onSuccess) {
         onSuccess(approvalData);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to complete check-in process';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to complete the ticket transfer';
       // toast.error(errorMessage);
-      
+
       if (onError) {
         onError(error instanceof Error ? error : new Error(errorMessage));
       }
     }
   };
 
-  const isFormValid = checkInData.roomNumber.trim().length > 0;
+  const isFormValid = transferData.seatNumber.trim().length > 0;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Guest Check-in - {booking.guestName}</CardTitle>
+        <CardTitle>Confirm Ticket Transfer - {purchase.guestName}</CardTitle>
         <CardDescription>
-          Approve check-in milestone to release 70% of escrowed funds
+          Approve the transfer-initiated milestone to release 70% of escrowed funds
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="roomNumber">Room Number *</Label>
+            <Label htmlFor="seatNumber">Seat / Section *</Label>
             <Input
-              id="roomNumber"
-              placeholder="e.g., 101, 205"
-              value={checkInData.roomNumber}
-              onChange={(e) => setCheckInData({ ...checkInData, roomNumber: e.target.value })}
+              id="seatNumber"
+              placeholder="e.g., Section 204, Row 12"
+              value={transferData.seatNumber}
+              onChange={(e) => setTransferData({ ...transferData, seatNumber: e.target.value })}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="wifiPassword">WiFi Password (Optional)</Label>
+            <Label htmlFor="wifiPassword">Entry Code (Optional)</Label>
             <Input
               id="wifiPassword"
               type="password"
-              placeholder="Enter WiFi password"
-              value={checkInData.wifiPassword}
-              onChange={(e) => setCheckInData({ ...checkInData, wifiPassword: e.target.value })}
+              placeholder="Enter access code"
+              value={transferData.wifiPassword}
+              onChange={(e) => setTransferData({ ...transferData, wifiPassword: e.target.value })}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="signature">Guest Signature (Optional)</Label>
+            <Label htmlFor="signature">Buyer Signature (Optional)</Label>
             <Input
               id="signature"
-              placeholder="Guest signature or initials"
-              value={checkInData.signature}
-              onChange={(e) => setCheckInData({ ...checkInData, signature: e.target.value })}
+              placeholder="Buyer signature or initials"
+              value={transferData.signature}
+              onChange={(e) => setTransferData({ ...transferData, signature: e.target.value })}
             />
           </div>
         </div>
-        
+
         {isFormValid && (
           <ApproveMilestone
             contractId={escrow.contractId}
-            milestoneId={escrow.milestoneId || "check_in"}
+            milestoneId={escrow.milestoneId || "transfer_initiated"}
             approverWallet={walletAddress || address || ''}
             onSuccess={handleMilestoneApproval}
             customMetadata={{
-              bookingId: booking.id,
-              roomNumber: checkInData.roomNumber,
-              checkInTime: checkInData.checkInTime,
+              purchaseId: purchase.id,
+              seatNumber: transferData.seatNumber,
+              transferInitiatedAt: transferData.transferInitiatedAt,
               staffApprover: address || ''
             }}
-            confirmationMessage="This will release 70% of the guest's payment. Confirm check-in completion?"
+            confirmationMessage="This will release 70% of the buyer's payment. Confirm the ticket transfer?"
             className="w-full"
             size="lg"
           />

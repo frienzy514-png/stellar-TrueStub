@@ -10,7 +10,7 @@ import {
   X, 
   CheckCircle, 
   Download, 
-  ExternalLink,
+  ExternalLink, 
   RefreshCw,
   QrCode
 } from 'lucide-react';
@@ -58,6 +58,21 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
     }
   }, [isOpen]);
 
+  // Handle ESC key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        if (selectedWallet) {
+          setSelectedWallet(null);
+        } else {
+          onClose();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, selectedWallet, onClose]);
+
   const handleWalletClick = async (wallet: WalletInfo) => {
     if (wallet.isInstalled) {
       onWalletSelected(wallet);
@@ -78,7 +93,7 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
   };
 
   const getInstallationSteps = (wallet: WalletInfo) => {
-    const { isMobile, isChrome, isFirefox, isSafari, isEdge } = getBrowserInfo();
+    const { isMobile, isChrome, isFirefox, isSafari } = getBrowserInfo();
     
     const steps = {
       freighter: isMobile ? [
@@ -156,34 +171,32 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
     const { isMobile, isChrome, isFirefox, isSafari } = getBrowserInfo();
     
     const urls = {
-      freighter: isMobile ? 'https://albedo.link/' : // Redirect to Albedo for mobile
+      freighter: isMobile ? 'https://albedo.link/' :
         isChrome ? 'https://chromewebstore.google.com/detail/freighter/bcacfldlkkdogcmkkibnjlakofdplcbk' :
         isFirefox ? 'https://addons.mozilla.org/en-US/firefox/addon/freighter/' :
         isSafari ? 'https://apps.apple.com/app/freighter/id1576157386' :
         'https://freighter.app/',
       albedo: 'https://albedo.link/',
-      lobstr: isMobile ? 'https://lobstr.co/app' : // Mobile app page
+      lobstr: isMobile ? 'https://lobstr.co/app' :
         isChrome ? 'https://chromewebstore.google.com/detail/lobstr/ldiagbjmlmjiieclmdkagofdjcgodjle' :
         isFirefox ? 'https://addons.mozilla.org/en-US/firefox/addon/lobstr-vault/' :
         'https://lobstr.co',
-      rabet: isMobile ? 'https://albedo.link/' : // Redirect to Albedo for mobile
+      rabet: isMobile ? 'https://albedo.link/' :
         isChrome ? 'https://chromewebstore.google.com/detail/rabet/hgmoaheomcjnaheggkfafnjilfcefbmo' :
         isFirefox ? 'https://addons.mozilla.org/en-US/firefox/addon/rabet/' :
         'https://rabet.io/',
-      xbull: isMobile ? 'https://xbull.app' : 'https://xbull.app',
-      hana: isMobile ? 'https://www.hanawallet.io/' : 'https://www.hanawallet.io/'
+      xbull: 'https://xbull.app',
+      hana: 'https://www.hanawallet.io/'
     };
 
     return urls[wallet.id as keyof typeof urls] || wallet.url;
   };
 
-  // Generate QR code URL for mobile wallets
   const getQRCodeUrl = (wallet: WalletInfo) => {
     const url = getWalletUrl(wallet);
     return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(url)}`;
   };
 
-  // Check if wallet is mobile-only
   const isMobileWallet = (wallet: WalletInfo) => {
     return ['xbull', 'hana'].includes(wallet.id);
   };
@@ -191,20 +204,27 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold">Connect Wallet</h2>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="stellar-wallets-modal-title"
+    >
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+          <h2 id="stellar-wallets-modal-title" className="text-xl font-semibold text-gray-900 dark:text-white">
+            Connect Stellar Wallet
+          </h2>
+          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close Stellar wallet selection modal">
             <X className="h-4 w-4" />
           </Button>
         </div>
 
         <div className="p-6 space-y-4 max-h-[calc(90vh-120px)] overflow-y-auto">
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="h-6 w-6 animate-spin" />
-              <span className="ml-2">Loading wallets...</span>
+            <div className="flex items-center justify-center py-8" role="status" aria-label="Loading wallets">
+              <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Loading wallets...</span>
             </div>
           ) : (
             <>
@@ -213,30 +233,31 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
                   <div className="flex items-center space-x-3">
                     <img 
                       src={selectedWallet.icon} 
-                      alt={selectedWallet.name}
+                      alt=""
+                      aria-hidden="true"
                       className="w-12 h-12 rounded-lg"
                       onError={(e) => {
                         e.currentTarget.src = 'https://stellar.creit.tech/wallet-icons/default.png';
                       }}
                     />
                     <div>
-                      <h3 className="text-lg font-semibold">{selectedWallet.name}</h3>
-                      <p className="text-sm text-gray-600">Installation Guide</p>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedWallet.name}</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Installation Guide</p>
                     </div>
                   </div>
 
-                  <Card>
+                  <Card className="dark:border-gray-700">
                     <CardHeader>
-                      <CardTitle className="text-base">Installation Steps</CardTitle>
+                      <CardTitle className="text-base text-gray-900 dark:text-white">Installation Steps</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <ol className="space-y-2 text-sm">
                         {getInstallationSteps(selectedWallet).map((step, index) => (
                           <li key={index} className="flex items-start space-x-2">
-                            <span className="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">
+                            <span className="flex-shrink-0 w-5 h-5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full flex items-center justify-center text-xs font-semibold">
                               {index + 1}
                             </span>
-                            <span>{step}</span>
+                            <span className="text-gray-700 dark:text-gray-300">{step}</span>
                           </li>
                         ))}
                       </ol>
@@ -245,20 +266,20 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
 
                   {/* QR Code for mobile wallets */}
                   {isMobileWallet(selectedWallet) && (
-                    <Card className="mt-4">
+                    <Card className="mt-4 dark:border-gray-700">
                       <CardHeader>
-                        <CardTitle className="text-base flex items-center">
-                          <QrCode className="h-4 w-4 mr-2" />
+                        <CardTitle className="text-base flex items-center text-gray-900 dark:text-white">
+                          <QrCode className="h-4 w-4 mr-2" aria-hidden="true" />
                           Scan to Download
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="text-center">
                         <img 
                           src={getQRCodeUrl(selectedWallet)} 
-                          alt={`QR code for ${selectedWallet.name}`}
+                          alt={`QR code to download ${selectedWallet.name}`}
                           className="mx-auto mb-3 border rounded-lg"
                         />
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
                           Scan with your mobile device to download {selectedWallet.name}
                         </p>
                       </CardContent>
@@ -270,7 +291,7 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
                       onClick={() => window.open(getWalletUrl(selectedWallet), '_blank')}
                       className="flex-1"
                     >
-                      <ExternalLink className="h-4 w-4 mr-2" />
+                      <ExternalLink className="h-4 w-4 mr-2" aria-hidden="true" />
                       {isMobileWallet(selectedWallet) ? 'Download App' : 
                        getBrowserInfo().isMobile ? 'Visit Website' : 'Download Extension'}
                     </Button>
@@ -285,52 +306,61 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
               ) : (
                 /* Wallet List */
                 <div className="space-y-3">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
                     Choose a wallet to connect to TrueStub
                   </p>
                   
                   {wallets.map((wallet) => (
                     <Card 
                       key={wallet.id}
-                      className={`cursor-pointer bg-transparent transition-all duration-200 hover:shadow-md ${
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Select ${wallet.name} wallet, ${wallet.isInstalled ? 'installed' : 'not installed'}`}
+                      className={`cursor-pointer bg-transparent transition-all duration-200 hover:shadow-md dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                         wallet.isInstalled 
-                          ? 'hover:ring-2 hover:ring-green-200' 
-                          : 'hover:ring-2 hover:ring-blue-200'
+                          ? 'hover:ring-2 hover:ring-green-500' 
+                          : 'hover:ring-2 hover:ring-blue-500'
                       }`}
                       onClick={() => handleWalletClick(wallet)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleWalletClick(wallet);
+                        }
+                      }}
                     >
                       <CardContent className="!p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
                             <img 
                               src={wallet.icon} 
-                              alt={wallet.name}
+                              alt=""
+                              aria-hidden="true"
                               className="w-8 h-8 rounded-lg"
                               onError={(e) => {
                                 e.currentTarget.src = 'https://stellar.creit.tech/wallet-icons/default.png';
                               }}
                             />
                             <div>
-                              <h3 className="font-semibold">{wallet.name}</h3>
-                              {/* <p className="text-sm text-gray-600">{wallet.type}</p> */}
+                              <h3 className="font-semibold text-gray-900 dark:text-white">{wallet.name}</h3>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
                             <Badge 
                               variant={wallet.isInstalled ? "default" : "secondary"}
                               className={wallet.isInstalled 
-                                ? "bg-green-100 text-green-800 hover:bg-green-100" 
-                                : "bg-gray-100 text-gray-800"
+                                ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 hover:bg-green-100" 
+                                : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
                               }
                             >
                               {wallet.isInstalled ? (
                                 <>
-                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  <CheckCircle className="h-3 w-3 mr-1" aria-hidden="true" />
                                   Installed
                                 </>
                               ) : (
                                 <>
-                                  <Download className="h-3 w-3 mr-1" />
+                                  <Download className="h-3 w-3 mr-1" aria-hidden="true" />
                                   Install
                                 </>
                               )}

@@ -6,12 +6,16 @@ import { Bell, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchHeader } from "@/components/layouts/SearchHeader";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import LanguageSwitcher from "@/components/language/LanguageSwitcher";
+import { useTranslation } from "react-i18next";
+import { ConnectionStatus } from "@/components/notifications/ConnectionStatus";
 
 interface HeaderProps {
   onMenuClick?: () => void;
 }
 
 export const Header = ({ onMenuClick }: HeaderProps) => {
+  const { t } = useTranslation();
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm dark:border-b dark:border-gray-800 dark:bg-gray-900">
@@ -25,7 +29,7 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
                 onClick={onMenuClick}
               >
                 <Menu className="h-6 w-6" />
-                <span className="sr-only">Toggle menu</span>
+                <span className="sr-only">{t("header.toggleMenu")}</span>
               </Button>
 
               <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2">
@@ -47,14 +51,15 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
               <SearchHeader />
             </div>
 
-            {/* Right: bell | name | avatar — matching Figma order */}
-            <div className="flex items-center gap-3 shrink-0">
+            {/* Right: language | theme | bell | name | avatar */}
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              <LanguageSwitcher />
               <ThemeToggle />
 
               <button
                 type="button"
                 className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                aria-label="Notifications"
+                aria-label={t("header.notifications")}
               >
                 <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
               </button>
@@ -78,6 +83,8 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
       </header>
       {/* Spacer div to prevent content from being hidden under fixed header */}
       <div className="h-16" />
+      {/* WebSocket connection status pill — hidden when connected */}
+      <ConnectionStatus />
     </>
   );
 };

@@ -11,16 +11,16 @@ import { PurchaseButton } from "./PurchaseButton"
 import { Users, Calendar } from "lucide-react"
 
 interface TicketListingCardProps {
-  roomId?: string
+  listingId?: string
   basePrice: number
   onBookingStart?: () => void
-  onBookingComplete?: (bookingId: string) => void
+  onBookingComplete?: (purchaseId: string) => void
   onBookingError?: (error: string) => void
   className?: string
 }
 
 const TicketListingCard: React.FC<TicketListingCardProps> = ({
-  roomId,
+  listingId,
   basePrice,
   onBookingStart,
   onBookingComplete,
@@ -52,8 +52,8 @@ const TicketListingCard: React.FC<TicketListingCardProps> = ({
     onBookingStart?.()
   }
 
-  const handleBookingComplete = (bookingId: string) => {
-    onBookingComplete?.(bookingId)
+  const handleBookingComplete = (purchaseId: string) => {
+    onBookingComplete?.(purchaseId)
   }
 
   const handleBookingError = (error: string) => {
@@ -104,7 +104,7 @@ const TicketListingCard: React.FC<TicketListingCardProps> = ({
 
         <SeatAvailabilityChecker
           dateRange={dateRange}
-          roomId={roomId}
+          listingId={listingId}
           onAvailabilityChange={handleAvailabilityChange}
         />
 

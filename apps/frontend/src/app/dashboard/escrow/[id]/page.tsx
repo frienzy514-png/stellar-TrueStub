@@ -6,14 +6,19 @@ import { InvoiceHeader } from "@/components/escrow/InvoiceHeader";
 import { ProcessStepper } from "@/components/escrow/ProcessStepper";
 import { EscrowPartyInfo } from "@/components/escrow/views/EscrowPartyInfo";
 import { MilestoneProgress } from "@/components/dashboard/milestone-progress";
-import { getStubEscrow } from "@/components/escrow/views/stubEscrow";
+import { getMockEscrowDetail } from "@/components/escrow/mocks/escrowDetail.mock";
 import { formatEscrowAmount } from "@/lib/formatEscrowAmount";
+import { RatingReviewModal } from "@/components/ratings/RatingReviewModal";
+import { RaiseDisputeModal } from "@/components/dispute/RaiseDisputeModal";
+import { DisputeArbitrationCard } from "@/components/dispute/DisputeArbitrationCard";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 import type { Milestone } from "@/components/dashboard/RoleEscrowDashboard";
+
 
 const milestoneData: Milestone[] = [
   {
-    id: "check_in",
-    name: "check_in",
+    id: "transfer_initiated",
+    name: "transfer_initiated",
     status: "completed",
     dueDate: "2025-02-01",
     completedAt: "2025-01-28",
@@ -25,8 +30,8 @@ const milestoneData: Milestone[] = [
     dueDate: "2025-02-10",
   },
   {
-    id: "check_out",
-    name: "check_out",
+    id: "transfer_completed",
+    name: "transfer_completed",
     status: "pending",
     dueDate: "2025-02-15",
   },
@@ -38,12 +43,12 @@ export default async function EscrowDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const stub = getStubEscrow(id);
+  const mockDetail = getMockEscrowDetail(id);
   const amount = 4000;
   const currency = "USDC";
   const formattedAmount = formatEscrowAmount(amount, currency);
   const escrow = {
-    ...stub,
+    ...mockDetail,
     status: "FUNDED" as const,
     amount,
     currency,
@@ -65,6 +70,16 @@ export default async function EscrowDetailPage({
       </div>
 
       <InvoiceHeader invoiceNumber={escrow.invoiceNumber} status={escrow.status} />
+
+      {isFeatureEnabled("ESCROW_RECEIPTS") &&
+        (["RELEASED", "COMPLETED"] as string[]).includes(escrow.status) && (
+          <Link
+            href={`/dashboard/escrow/${encodeURIComponent(id)}/receipt`}
+            className="inline-block text-sm text-blue-600 underline"
+          >
+            View printable receipt
+          </Link>
+        )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-6">
         <div className="space-y-6">
@@ -89,18 +104,36 @@ export default async function EscrowDetailPage({
                 </div>
               </div>
 
-              <div className="flex flex-col justify-between rounded-3xl border border-gray-100 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-800">
-                <div>
-                  <p className="text-sm text-gray-400">Current Status</p>
-                  <EscrowStatusBadge status={escrow.status} />
+              <div className="flex flex-col justify-between rounded-3xl border border-gray-100 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-800 space-y-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm text-gray-400">Current Status</p>
+                    <EscrowStatusBadge status={escrow.status} />
+                  </div>
+                  <RaiseDisputeModal
+                    contractId={escrow.id}
+                    engagementId={escrow.invoiceNumber}
+                    userWallet={escrow.tenant?.wallet}
+                    userRole="buyer"
+                  />
                 </div>
-                <div className="mt-6">
+                <div>
                   <p className="text-sm text-gray-400">Booking subject</p>
                   <p className="text-sm text-gray-900 dark:text-white">{escrow.subject}</p>
                 </div>
               </div>
             </div>
           </div>
+
+          {/* If escrow is disputed or in arbitration */}
+          {escrow.status === "DISPUTED" && (
+            <DisputeArbitrationCard
+              contractId={escrow.id}
+              engagementId={escrow.invoiceNumber}
+              arbitratorAddress={escrow.owner?.wallet || "GDISPUTE...RESOLVER"}
+            />
+          )}
+
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm shadow-slate-100/50 dark:border-slate-700 dark:bg-slate-900">
@@ -125,7 +158,31 @@ export default async function EscrowDetailPage({
             <EscrowPartyInfo variant="owner" owner={escrow.owner} />
             <EscrowPartyInfo variant="beneficiary" beneficiary={escrow.beneficiary} />
           </div>
+
+          <div className="rounded-3xl border border-yellow-500/30 bg-yellow-50/40 dark:bg-yellow-950/20 p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <span>⭐</span> Post-Transaction Ratings & Reputation
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Leave a verified review for your counterparty once the ticket or service escrow completes.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <RatingReviewModal
+                  escrowId={escrow.id}
+                  reviewerId={escrow.tenant.wallet}
+                  reviewerName={escrow.tenant.name}
+                  revieweeId={escrow.beneficiary.wallet}
+                  revieweeName={escrow.beneficiary.name}
+                  role="buyer"
+                />
+              </div>
+            </div>
+          </div>
         </div>
+
 
         <div className="space-y-6">
           <EscrowOverviewCard />

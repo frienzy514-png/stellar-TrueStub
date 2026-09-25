@@ -1,6 +1,7 @@
 'use client';
 
-import { useTheme } from '@/hooks/useTheme';
+import { useEffect, useState } from 'react';
+import { useTheme } from 'next-themes';
 
 // Moon icon (dark mode)
 function MoonIcon({ active }: { active: boolean }) {
@@ -43,8 +44,13 @@ function SunIcon({ active }: { active: boolean }) {
 }
 
 export function ThemeToggle() {
-  const { theme, toggle } = useTheme();
-  const isDark = theme === 'dark';
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  const isDark = mounted && resolvedTheme === 'dark';
+  const toggle = () => setTheme(isDark ? 'light' : 'dark');
 
   return (
     <div className="inline-flex shrink-0 items-center gap-2 select-none">

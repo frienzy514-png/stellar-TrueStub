@@ -1,11 +1,13 @@
 'use client';
 
-import type { EventListing } from '@/@types/event';
+import type { EventListing } from '@/types/event';
 import Image from 'next/image';
 import { FaMapMarkerAlt } from 'react-icons/fa';
 import ListingFeatureIcons from './ListingFeatureIcons';
 import { formatListingPrice } from './formatListingPrice';
 import EventImageGallery from './EventImageGallery';
+import FavoriteButton from '@/components/ticket-listing-mobile/mobile/FavoriteButton';
+import { useFavoritesStore } from '@/core/store/data/favorites.store';
 
 interface TicketListingDetailProps {
   listing: EventListing;
@@ -16,6 +18,9 @@ export default function TicketListingDetail({
   listing,
   onBook,
 }: TicketListingDetailProps) {
+  const isSaved = useFavoritesStore((state) => state.savedListingIds.includes(listing.id));
+  const toggleSaved = useFavoritesStore((state) => state.toggleSaved);
+
   return (
     <section className="flex-1 px-6 py-8 lg:px-10">
       <EventImageGallery
@@ -54,6 +59,12 @@ export default function TicketListingDetail({
           >
             BOOK
           </button>
+          <FavoriteButton
+            className="mt-3 w-full justify-center"
+            isLiked={isSaved}
+            showCount={false}
+            onLike={() => toggleSaved(listing.id)}
+          />
           <div className="mt-4 flex items-end gap-2">
             <span className="text-[34px] font-semibold leading-none text-[#10a156]">
               {formatListingPrice(listing.price)}
@@ -78,7 +89,7 @@ export default function TicketListingDetail({
 
       <div className="mt-10 max-w-[760px]">
         <h2 className="text-[22px] font-semibold text-[#1b1b1b]">
-          Apartment details
+          Listing details
         </h2>
         <p className="mt-4 text-sm leading-6 text-[#6d6d6d]">
           {listing.description}

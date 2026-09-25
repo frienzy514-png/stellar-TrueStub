@@ -1,0 +1,49 @@
+rules_version = '2';
+
+// Firestore Security Rules for TrueStub
+//
+// NOTE: TrueStub currently uses Firebase for Authentication only (see
+// apps/frontend/src/lib/firebase.ts — only getAuth() is called).
+// Application data is stored in Hasura/Postgres and accessed via a
+// Firebase JWT, NOT via Firestore client-side reads/writes.
+//
+// These rules therefore lock down Firestore completely: no client can read
+// or write any document directly from the browser bundle.  If a future
+// feature needs client-side Firestore access, add only the minimum
+// required rules below the comment marked "Future collections".
+//
+// Deploy command:
+//   firebase deploy --only firestore:rules
+//
+// References:
+//   https://firebase.google.com/docs/firestore/security/get-started
+//   https://firebase.google.com/docs/firestore/security/rules-conditions
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -----------------------------------------------------------------------
+    // Default-deny: block all client reads and writes unless a rule below
+    // explicitly allows them.  Firestore evaluates rules top-down and stops
+    // at the first match, so this catch-all must come last.
+    // -----------------------------------------------------------------------
+
+    // Future collections — add targeted rules here when Firestore is used:
+    //
+    // Example: user-owned profile documents
+    //   match /users/{userId} {
+    //     allow read, write: if request.auth != null
+    //                        && request.auth.uid == userId;
+    //   }
+    //
+    // Example: public read, authenticated write
+    //   match /publicData/{docId} {
+    //     allow read: if true;
+    //     allow write: if request.auth != null;
+    //   }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,6 +1,9 @@
+"use client";
+
 import { DollarSign, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EscrowData } from './RoleEscrowDashboard';
+import { useTranslation } from 'react-i18next';
 
 interface EscrowsByStatusProps {
   escrows: EscrowData[];
@@ -8,6 +11,8 @@ interface EscrowsByStatusProps {
 }
 
 export function EscrowsByStatus({ escrows, userRole }: EscrowsByStatusProps) {
+  const { t } = useTranslation();
+
   const stats = {
     total: escrows.length,
     pending: escrows.filter(e => e.status === 'pending').length,
@@ -18,7 +23,6 @@ export function EscrowsByStatus({ escrows, userRole }: EscrowsByStatusProps) {
 
   const getTotalAmount = () => {
     return escrows.reduce((sum, escrow) => {
-      // Skip cancelled escrows from total
       if (escrow.status === 'cancelled') return sum;
       return sum + escrow.amount;
     }, 0);
@@ -28,18 +32,18 @@ export function EscrowsByStatus({ escrows, userRole }: EscrowsByStatusProps) {
     if (userRole === 'guest') {
       return [
         { 
-          title: 'Active Bookings',
+          title: t('dashboard.active'),
           value: stats.pending + stats.funded,
           icon: Clock,
           color: 'text-blue-500',
-          description: 'Your active reservations',
+          description: t('dashboard.active'),
         },
         { 
-          title: 'Completed Stays',
+          title: t('dashboard.completed'),
           value: stats.completed,
           icon: CheckCircle,
           color: 'text-green-500',
-          description: 'Successfully completed',
+          description: t('dashboard.completed'),
         },
       ];
     }
@@ -47,18 +51,18 @@ export function EscrowsByStatus({ escrows, userRole }: EscrowsByStatusProps) {
     if (userRole === 'event') {
       return [
         { 
-          title: 'Pending Check-ins',
+          title: t('dashboard.statusPending'),
           value: stats.pending,
           icon: Clock,
           color: 'text-yellow-500',
-          description: 'Awaiting guest confirmation',
+          description: t('dashboard.statusPending'),
         },
         { 
-          title: 'Active Stays',
+          title: t('dashboard.active'),
           value: stats.funded,
           icon: AlertCircle,
           color: 'text-blue-500',
-          description: 'Guests currently staying',
+          description: t('dashboard.active'),
         },
       ];
     }
@@ -66,25 +70,25 @@ export function EscrowsByStatus({ escrows, userRole }: EscrowsByStatusProps) {
     // Admin view
     return [
       { 
-        title: 'Active Escrows',
+        title: t('dashboard.active'),
         value: stats.pending + stats.funded,
         icon: AlertCircle,
         color: 'text-blue-500',
-        description: 'Active in the system',
+        description: t('dashboard.active'),
       },
       { 
-        title: 'Completed',
+        title: t('dashboard.completed'),
         value: stats.completed,
         icon: CheckCircle,
         color: 'text-green-500',
-        description: 'Successfully completed',
+        description: t('dashboard.completed'),
       },
       { 
-        title: 'Cancelled',
+        title: t('dashboard.cancelled'),
         value: stats.cancelled,
         icon: XCircle,
         color: 'text-red-500',
-        description: 'Cancelled or refunded',
+        description: t('dashboard.cancelled'),
       },
     ];
   };
@@ -94,7 +98,7 @@ export function EscrowsByStatus({ escrows, userRole }: EscrowsByStatusProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium dark:text-white">
-            Total Escrow Value
+            {t('dashboard.totalValue')}
           </CardTitle>
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -103,7 +107,7 @@ export function EscrowsByStatus({ escrows, userRole }: EscrowsByStatusProps) {
             ${getTotalAmount().toLocaleString()}
           </div>
           <p className="text-xs text-muted-foreground">
-            {stats.total} total {stats.total === 1 ? 'escrow' : 'escrows'}
+            {stats.total} {t('dashboard.totalEscrows')}
           </p>
         </CardContent>
       </Card>

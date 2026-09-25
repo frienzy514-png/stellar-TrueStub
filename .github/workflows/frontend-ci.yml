@@ -1,0 +1,57 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/frontend/**"
+      - "package.json"
+      - "yarn.lock"
+      - ".yarnrc.yml"
+      - ".github/workflows/frontend-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Lint, typecheck, and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Lint frontend
+        run: yarn workspace @truestub/frontend lint
+
+      - name: Typecheck frontend
+        run: yarn workspace @truestub/frontend typecheck
+
+      - name: Test frontend
+        run: yarn workspace @truestub/frontend test:ci
+
+  secret-scan:
+    name: Secret scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE is optional — only needed for org-level scanning features.
+          # Public repos and personal forks work without it.
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

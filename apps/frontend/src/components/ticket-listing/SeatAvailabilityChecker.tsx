@@ -6,7 +6,7 @@ import { CheckCircle, XCircle, Loader2 } from "lucide-react"
 
 interface SeatAvailabilityCheckerProps {
   dateRange?: DateRange
-  roomId?: string
+  listingId?: string
   onAvailabilityChange?: (isAvailable: boolean) => void
   className?: string
 }
@@ -19,7 +19,7 @@ interface AvailabilityStatus {
 
 const SeatAvailabilityChecker: React.FC<SeatAvailabilityCheckerProps> = ({
   dateRange,
-  roomId,
+  listingId,
   onAvailabilityChange,
   className
 }) => {
@@ -29,7 +29,7 @@ const SeatAvailabilityChecker: React.FC<SeatAvailabilityCheckerProps> = ({
   })
 
   const checkAvailability = React.useCallback(async () => {
-    if (!dateRange?.from || !dateRange?.to || !roomId) {
+    if (!dateRange?.from || !dateRange?.to || !listingId) {
       setAvailability({ isAvailable: false, isLoading: false })
       onAvailabilityChange?.(false)
       return
@@ -62,7 +62,7 @@ const SeatAvailabilityChecker: React.FC<SeatAvailabilityCheckerProps> = ({
       })
       onAvailabilityChange?.(false)
     }
-  }, [dateRange, roomId, onAvailabilityChange])
+  }, [dateRange, listingId, onAvailabilityChange])
 
   React.useEffect(() => {
     checkAvailability()

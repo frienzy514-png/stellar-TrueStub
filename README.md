@@ -79,7 +79,7 @@ open a public issue for vulnerabilities.
 
 ## 📚 **More docs**
 
-Repo-wide docs live in [`docs/`](docs/): [contributing guidelines](docs/CONTRIBUTORS_GUIDELINE.md), [git guidelines](docs/GIT_GUIDELINE.md), [CI/CD pipeline setup](docs/PIPELINE.md), and [project history](docs/PIVOT_NOTES.md). Workspace-specific docs live alongside each workspace (e.g. [`apps/frontend/docs/`](apps/frontend/docs/)).
+Repo-wide docs live in [`docs/`](docs/): [system architecture diagram](docs/ARCHITECTURE.md), [contributing guidelines](docs/CONTRIBUTORS_GUIDELINE.md), [git guidelines](docs/GIT_GUIDELINE.md), [CI/CD pipeline setup](docs/PIPELINE.md), [compliance notes](docs/COMPLIANCE_NOTES.md), and [project history](docs/PIVOT_NOTES.md). Workspace-specific docs live alongside each workspace (e.g. [`apps/frontend/docs/`](apps/frontend/docs/)).
 
 ---
 

@@ -3,7 +3,7 @@ import type { ErrorLike } from "@apollo/client";
 import { useRef } from "react";
 import { toast } from "react-toastify";
 import { ESCROW_STATUS_SUBSCRIPTION } from "@/graphql/subscriptions/escrow-subscriptions";
-import type { EscrowStatusSubscription } from "@/graphql/types";
+import type { EscrowStatusSubscription } from "@/graphql/subscriptions/escrow-subscriptions";
 
 const TOAST_DEBOUNCE_MS = 3000;
 

@@ -13,63 +13,63 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ChangeMilestoneStatus } from '@/components/tw-blocks/escrows/multi-release/change-milestone-status/ChangeMilestoneStatus';
-import { TicketTransferCompletionProps, CheckOutData, DamageAssessment, MilestoneStatusData } from './types';
+import { TicketTransferCompletionProps, TransferCompletionData, TicketConditionAssessment, MilestoneStatusData } from './types';
 import { useGlobalAuthenticationStore } from '@/core/store/data';
 import { useWalletContext } from '@/components/tw-blocks/wallet-kit/WalletProvider';
-// import { updateBookingStatus, sendGuestNotification, initiateDispute } from '@/services/event.service';
+// import { updatePurchaseStatus, sendBuyerNotification, initiateDispute } from '@/services/event.service';
 // import { toast } from 'react-toastify';
 
-export function TicketTransferCompletion({ booking, escrow, onSuccess, onError }: TicketTransferCompletionProps) {
+export function TicketTransferCompletion({ purchase, escrow, onSuccess, onError }: TicketTransferCompletionProps) {
   const { address } = useGlobalAuthenticationStore();
   const { walletAddress } = useWalletContext();
-  const [checkOutData, setCheckOutData] = useState<CheckOutData>({
-    checkOutTime: new Date().toISOString(),
-    roomCondition: 'good',
+  const [completionData, setCompletionData] = useState<TransferCompletionData>({
+    transferCompletedAt: new Date().toISOString(),
+    ticketCondition: 'good',
     staffMember: address || '',
   });
-  const [damageAssessment, setDamageAssessment] = useState<DamageAssessment>({
-    hasDamage: false,
+  const [conditionAssessment, setConditionAssessment] = useState<TicketConditionAssessment>({
+    hasIssue: false,
     condition: 'good',
     description: '',
   });
 
-  const handleCheckOutCompletion = async (statusData: MilestoneStatusData) => {
+  const handleCompletionSubmit = async (statusData: MilestoneStatusData) => {
     try {
-      const finalStatus = damageAssessment.hasDamage ? 'disputed' : 'completed';
-      
-      // Update booking status - in a real app, this would be an API call
-      // await updateBookingStatus(booking.id, 'checked_out', {
-      //   checkOutTime: new Date().toISOString(),
-      //   roomCondition: damageAssessment.condition,
+      const finalStatus = conditionAssessment.hasIssue ? 'disputed' : 'completed';
+
+      // Update purchase status - in a real app, this would be an API call
+      // await updatePurchaseStatus(purchase.id, 'transfer_finalized', {
+      //   transferCompletedAt: new Date().toISOString(),
+      //   ticketCondition: conditionAssessment.condition,
       //   finalStatus,
-      //   staffMember: checkOutData.staffMember
+      //   staffMember: completionData.staffMember
       // });
 
-      if (damageAssessment.hasDamage) {
+      if (conditionAssessment.hasIssue) {
         // Initiate dispute process - in a real app, this would be an API call
-        // await initiateDispute(escrow.contractId, damageAssessment);
-        // await sendGuestNotification(booking.guestEmail, 'dispute_initiated', {
-        //   bookingId: booking.id,
-        //   reason: 'room_damage',
-        //   description: damageAssessment.description,
+        // await initiateDispute(escrow.contractId, conditionAssessment);
+        // await sendBuyerNotification(purchase.guestEmail, 'dispute_initiated', {
+        //   purchaseId: purchase.id,
+        //   reason: 'ticket_issue',
+        //   description: conditionAssessment.description,
         // });
-        // toast.warning('Room damage detected. Dispute process initiated.');
+        // toast.warning('Ticket issue detected. Dispute process initiated.');
       } else {
         // Send completion notification - in a real app, this would be an API call
-        // await sendGuestNotification(booking.guestEmail, 'check_out_confirmed', {
-        //   bookingId: booking.id,
+        // await sendBuyerNotification(purchase.guestEmail, 'transfer_completed_confirmed', {
+        //   purchaseId: purchase.id,
         //   escrowStatus: 'completed',
         // });
-        // toast.success('Check-out completed successfully! Guest has been notified.');
+        // toast.success('Ticket transfer completed successfully! Buyer has been notified.');
       }
 
       if (onSuccess) {
         onSuccess(statusData);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to complete check-out process';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to complete the ticket transfer';
       // toast.error(errorMessage);
-      
+
       if (onError) {
         onError(error instanceof Error ? error : new Error(errorMessage));
       }
@@ -81,24 +81,24 @@ export function TicketTransferCompletion({ booking, escrow, onSuccess, onError }
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Guest Check-out - {booking.guestName}</CardTitle>
+        <CardTitle>Complete Ticket Transfer - {purchase.guestName}</CardTitle>
         <CardDescription>
-          Complete check-out process and release remaining funds
+          Confirm the ticket transfer and release the remaining funds
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="roomCondition">Room Condition *</Label>
+            <Label htmlFor="ticketCondition">Ticket Condition *</Label>
             <Select
-              value={checkOutData.roomCondition}
+              value={completionData.ticketCondition}
               onValueChange={(value: 'excellent' | 'good' | 'fair' | 'poor') => {
-                setCheckOutData({ ...checkOutData, roomCondition: value });
-                setDamageAssessment({ ...damageAssessment, condition: value });
+                setCompletionData({ ...completionData, ticketCondition: value });
+                setConditionAssessment({ ...conditionAssessment, condition: value });
               }}
             >
-              <SelectTrigger id="roomCondition">
-                <SelectValue placeholder="Select room condition" />
+              <SelectTrigger id="ticketCondition">
+                <SelectValue placeholder="Select ticket condition" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="excellent">Excellent</SelectItem>
@@ -111,65 +111,65 @@ export function TicketTransferCompletion({ booking, escrow, onSuccess, onError }
 
           <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
             <Checkbox
-              id="hasDamage"
-              checked={damageAssessment.hasDamage}
-              onCheckedChange={(checked) => 
-                setDamageAssessment({ ...damageAssessment, hasDamage: checked === true })
+              id="hasIssue"
+              checked={conditionAssessment.hasIssue}
+              onCheckedChange={(checked) =>
+                setConditionAssessment({ ...conditionAssessment, hasIssue: checked === true })
               }
             />
             <div className="space-y-1 leading-none">
-              <Label htmlFor="hasDamage" className="cursor-pointer">
-                Room has damage
+              <Label htmlFor="hasIssue" className="cursor-pointer">
+                Ticket has an issue
               </Label>
               <p className="text-sm text-muted-foreground">
-                Check this box if there is any damage to the room that requires attention
+                Check this box if there is any issue with the ticket that requires attention
               </p>
             </div>
           </div>
 
-          {damageAssessment.hasDamage && (
+          {conditionAssessment.hasIssue && (
             <div className="space-y-2">
-              <Label htmlFor="damageDescription">Damage Description *</Label>
+              <Label htmlFor="issueDescription">Issue Description *</Label>
               <Textarea
-                id="damageDescription"
-                placeholder="Describe the damage in detail..."
+                id="issueDescription"
+                placeholder="Describe the issue in detail..."
                 className="min-h-[100px]"
-                value={damageAssessment.description}
-                onChange={(e) => 
-                  setDamageAssessment({ ...damageAssessment, description: e.target.value })
+                value={conditionAssessment.description}
+                onChange={(e) =>
+                  setConditionAssessment({ ...conditionAssessment, description: e.target.value })
                 }
               />
             </div>
           )}
         </div>
-        
+
         <ChangeMilestoneStatus
           contractId={escrow.contractId}
-          milestoneId={escrow.milestoneId || "check_out"}
-          newStatus={damageAssessment.hasDamage ? "disputed" : "completed"}
+          milestoneId={escrow.milestoneId || "transfer_completed"}
+          newStatus={conditionAssessment.hasIssue ? "disputed" : "completed"}
           walletAddress={platformWallet}
-          onSuccess={handleCheckOutCompletion}
+          onSuccess={handleCompletionSubmit}
           customMetadata={{
-            bookingId: booking.id,
-            checkOutTime: checkOutData.checkOutTime,
-            roomCondition: damageAssessment.condition,
-            hasDamage: damageAssessment.hasDamage,
-            damageDescription: damageAssessment.description,
-            staffApprover: checkOutData.staffMember
+            purchaseId: purchase.id,
+            transferCompletedAt: completionData.transferCompletedAt,
+            ticketCondition: conditionAssessment.condition,
+            hasIssue: conditionAssessment.hasIssue,
+            issueDescription: conditionAssessment.description,
+            staffApprover: completionData.staffMember
           }}
           confirmationMessage={
-            damageAssessment.hasDamage 
-              ? "Room damage detected. This will initiate a dispute process."
-              : "Complete check-out and release remaining 30% of payment?"
+            conditionAssessment.hasIssue
+              ? "Ticket issue detected. This will initiate a dispute process."
+              : "Complete the transfer and release the remaining 30% of payment?"
           }
-          evidence={damageAssessment.hasDamage ? JSON.stringify({
-            condition: damageAssessment.condition,
-            description: damageAssessment.description,
-            hasDamage: true,
+          evidence={conditionAssessment.hasIssue ? JSON.stringify({
+            condition: conditionAssessment.condition,
+            description: conditionAssessment.description,
+            hasIssue: true,
           }) : undefined}
           className="w-full"
           size="lg"
-          variant={damageAssessment.hasDamage ? "destructive" : "default"}
+          variant={conditionAssessment.hasIssue ? "destructive" : "default"}
         />
       </CardContent>
     </Card>

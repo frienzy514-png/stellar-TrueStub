@@ -46,23 +46,23 @@ export default function WalletOption({
   };
 
   return (
-    <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+    <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 dark:border-gray-700 transition-colors">
       <div className="flex items-center space-x-3">
-        <div className="text-2xl" role="img" aria-label={config.name}>
+        <div className="text-2xl" role="img" aria-label={`${config.name} icon`}>
           {config.icon}
         </div>
         <div>
-          <h3 className="font-medium text-sm">{config.name}</h3>
+          <h3 className="font-medium text-sm text-gray-900 dark:text-white">{config.name}</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {config.description}
           </p>
           {!isAvailable && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
+            <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
               Not installed
             </p>
           )}
           {isConnected && (
-            <p className="text-xs text-green-600 dark:text-green-400">
+            <p className="text-xs font-medium text-green-700 dark:text-green-400">
               Connected
             </p>
           )}
@@ -75,6 +75,7 @@ export default function WalletOption({
             variant="ghost"
             size="sm"
             onClick={() => window.open(config.downloadUrl, "_blank")}
+            aria-label={`Install ${config.name} extension`}
             className="text-xs"
           >
             Install
@@ -86,6 +87,7 @@ export default function WalletOption({
           size="sm"
           onClick={handleClick}
           disabled={isConnecting || (!isAvailable && !config.downloadUrl)}
+          aria-label={`${getButtonText()} ${config.name}`}
           className="min-w-[80px] text-xs"
         >
           {getButtonText()}

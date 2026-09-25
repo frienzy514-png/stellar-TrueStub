@@ -5,7 +5,7 @@ import { WalletNetwork } from "@creit.tech/stellar-wallets-kit";
 import { signTransaction } from "@stellar/freighter-api";
 
 interface InitializedEscrowProps {
-  hotelName: string;
+  eventName: string;
   description: string;
   price: number;
   tax: number;
@@ -17,7 +17,7 @@ interface FundEscrowProps {
 }
 
 export const initializedReservationEscrow = async ({
-  hotelName,
+  eventName,
   description,
   price,
   tax,
@@ -39,7 +39,7 @@ export const initializedReservationEscrow = async ({
   const initializedEscrowBody: EscrowContract = {
     signer: address,
     engagementId: "HR1-223423232",
-    title: hotelName,
+    title: eventName,
     description,
     roles: {
       approver: address,

@@ -4,115 +4,115 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TicketTransferApproval } from './TicketTransferApproval';
 import { TicketTransferCompletion } from './TicketTransferCompletion';
-import { Booking, EscrowMetadata } from './types';
+import { TicketPurchase, EscrowMetadata } from './types';
 import { EscrowData } from '@/components/dashboard/RoleEscrowDashboard';
 
 interface EventMilestoneActionsProps {
   escrow: EscrowData;
-  userRole: 'guest' | 'hotel' | 'admin';
+  userRole: 'guest' | 'event' | 'admin';
   onComplete?: () => void;
 }
 
 export function EventMilestoneActions({ escrow, userRole, onComplete }: EventMilestoneActionsProps) {
-  const [isCheckInOpen, setIsCheckInOpen] = useState(false);
-  const [isCheckOutOpen, setIsCheckOutOpen] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isCompletionOpen, setIsCompletionOpen] = useState(false);
 
-  // Convert escrow metadata to booking format
-  const booking: Booking = {
-    id: escrow.metadata?.bookingId || escrow.id,
+  // Convert escrow metadata to purchase format
+  const purchase: TicketPurchase = {
+    id: escrow.metadata?.purchaseId || escrow.id,
     guestName: escrow.metadata?.guestName || 'Guest',
     guestEmail: escrow.metadata?.guestEmail || '',
-    checkInDate: escrow.metadata?.checkInDate || '',
-    checkOutDate: escrow.metadata?.checkOutDate || '',
-    roomNumber: escrow.metadata?.roomNumber,
+    transferDate: escrow.metadata?.transferDate || '',
+    eventDate: escrow.metadata?.eventDate || '',
+    seatNumber: escrow.metadata?.seatNumber,
     status: escrow.status === 'funded' ? 'pending' :
-           escrow.status === 'check_in_approved' ? 'checked_in' :
-           escrow.status === 'check_out_approved' || escrow.status === 'completed' ? 'checked_out' :
+           escrow.status === 'transfer_confirmed' ? 'transfer_confirmed' :
+           escrow.status === 'transfer_finalized' || escrow.status === 'completed' ? 'transfer_finalized' :
            escrow.status === 'cancelled' ? 'cancelled' : 'pending',
   };
 
   const escrowMetadata: EscrowMetadata = {
-    bookingId: booking.id,
-    hotelName: escrow.metadata?.hotelName || 'Hotel',
-    checkInDate: booking.checkInDate,
-    checkOutDate: booking.checkOutDate,
+    purchaseId: purchase.id,
+    eventName: escrow.metadata?.eventName || 'Event',
+    transferDate: purchase.transferDate,
+    eventDate: purchase.eventDate,
     ...(escrow.metadata || {}),
   };
 
-  const handleCheckInSuccess = () => {
-    setIsCheckInOpen(false);
+  const handleTransferSuccess = () => {
+    setIsTransferOpen(false);
     if (onComplete) {
       onComplete();
     }
   };
 
-  const handleCheckOutSuccess = () => {
-    setIsCheckOutOpen(false);
+  const handleCompletionSuccess = () => {
+    setIsCompletionOpen(false);
     if (onComplete) {
       onComplete();
     }
   };
 
   // Determine which action to show
-  const showCheckIn = userRole === 'hotel' && escrow.status === 'funded' && escrow.nextMilestone === 'check_in';
-  const showCheckOut = (userRole === 'hotel' || userRole === 'admin') && 
-                       escrow.status === 'check_in_approved' && 
-                       escrow.nextMilestone === 'check_out';
+  const showTransfer = userRole === 'event' && escrow.status === 'funded' && escrow.nextMilestone === 'transfer_initiated';
+  const showCompletion = (userRole === 'event' || userRole === 'admin') &&
+                       escrow.status === 'transfer_confirmed' &&
+                       escrow.nextMilestone === 'transfer_completed';
 
-  if (!showCheckIn && !showCheckOut) {
+  if (!showTransfer && !showCompletion) {
     return null;
   }
 
   return (
     <>
-      {showCheckIn && (
+      {showTransfer && (
         <>
           <button
-            onClick={() => setIsCheckInOpen(true)}
+            onClick={() => setIsTransferOpen(true)}
             className="w-full mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
           >
-            Process Check-in
+            Confirm Ticket Transfer
           </button>
-          <Dialog open={isCheckInOpen} onOpenChange={setIsCheckInOpen}>
+          <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Guest Check-in Process</DialogTitle>
+                <DialogTitle>Ticket Transfer Confirmation</DialogTitle>
               </DialogHeader>
               <TicketTransferApproval
-                booking={booking}
+                purchase={purchase}
                 escrow={{
                   contractId: escrow.contractId,
-                  milestoneId: '0', // Check-in is typically the first milestone
+                  milestoneId: '0', // Transfer initiation is typically the first milestone
                   metadata: escrowMetadata,
                 }}
-                onSuccess={handleCheckInSuccess}
+                onSuccess={handleTransferSuccess}
               />
             </DialogContent>
           </Dialog>
         </>
       )}
 
-      {showCheckOut && (
+      {showCompletion && (
         <>
           <button
-            onClick={() => setIsCheckOutOpen(true)}
+            onClick={() => setIsCompletionOpen(true)}
             className="w-full mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
           >
-            Process Check-out
+            Complete Ticket Transfer
           </button>
-          <Dialog open={isCheckOutOpen} onOpenChange={setIsCheckOutOpen}>
+          <Dialog open={isCompletionOpen} onOpenChange={setIsCompletionOpen}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Guest Check-out Process</DialogTitle>
+                <DialogTitle>Ticket Transfer Completion</DialogTitle>
               </DialogHeader>
               <TicketTransferCompletion
-                booking={booking}
+                purchase={purchase}
                 escrow={{
                   contractId: escrow.contractId,
-                  milestoneId: '1', // Check-out is typically the second milestone
+                  milestoneId: '1', // Transfer completion is typically the second milestone
                   metadata: escrowMetadata,
                 }}
-                onSuccess={handleCheckOutSuccess}
+                onSuccess={handleCompletionSuccess}
               />
             </DialogContent>
           </Dialog>

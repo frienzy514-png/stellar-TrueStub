@@ -1,6 +1,6 @@
 "use client";
 
-import type { EventListingFeatureSummary } from "@/@types/event";
+import type { EventListingFeatureSummary } from "@/types/event";
 import { FaBath, FaBed, FaPaw } from "react-icons/fa";
 
 interface ListingFeatureIconsProps extends EventListingFeatureSummary {
