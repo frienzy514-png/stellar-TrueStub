@@ -1,0 +1,52 @@
+name: Visual Regression (Chromatic)
+
+on:
+  pull_request:
+    paths:
+      - "apps/frontend/src/components/**"
+      - "apps/frontend/.storybook/**"
+      - "apps/frontend/src/app/globals.css"
+      - "apps/frontend/tailwind.config.ts"
+      - "apps/frontend/package.json"
+      - "yarn.lock"
+      - ".github/workflows/chromatic.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  chromatic:
+    name: Chromatic visual regression
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Chromatic needs full git history to detect what changed
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Publish to Chromatic
+        uses: chromaui/action@v11
+        with:
+          # CHROMATIC_PROJECT_TOKEN must be added to repo secrets.
+          # Get it from https://www.chromatic.com after linking the repo.
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          workingDir: apps/frontend
+          buildScriptName: build-storybook
+          # Surface visual changes as a PR check without blocking merge
+          # (maintainers review diffs in the Chromatic UI and accept/reject).
+          exitOnceUploaded: true
+          onlyChanged: true
