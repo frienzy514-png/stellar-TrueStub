@@ -41,6 +41,22 @@ export const envSchema = z.object({
   HASURA_GRAPHQL_URL: z.string().url("HASURA_GRAPHQL_URL must be a valid URL").optional(),
   HASURA_GRAPHQL_ADMIN_SECRET: z.string().min(1).optional(),
 
+  // Postgres connection for node-pg-migrate (`yarn migrate:up`) — #250
+  DATABASE_URL: z.string().url("DATABASE_URL must be a valid URL").optional(),
+
+  // Trustless Work escrow API + dispute-resolver signing key — required to
+  // execute refunds on-chain (#252). Unset → refund execution fails with 503.
+  TRUSTLESS_WORK_API_URL: z
+    .string()
+    .url("TRUSTLESS_WORK_API_URL must be a valid URL")
+    .default("https://dev.api.trustlesswork.com"),
+  TRUSTLESS_WORK_API_KEY: z.string().min(1).optional(),
+  TRUSTLESS_WORK_DISPUTE_RESOLVER_SECRET: z
+    .string()
+    .regex(/^S[A-Z2-7]{55}$/, "TRUSTLESS_WORK_DISPUTE_RESOLVER_SECRET must be a Stellar secret key (S...)")
+    .optional(),
+  STELLAR_NETWORK: z.enum(["testnet", "mainnet"]).default("testnet"),
+
   // Error tracking (#111) — unset in local dev, Sentry stays disabled
   SENTRY_DSN: z.string().url("SENTRY_DSN must be a valid URL").optional(),
 });

@@ -1,26 +1,35 @@
 /**
  * POST /api/refunds/claim
  *
- * Idempotent refund-claim endpoint (issue #153).
+ * Idempotent refund-claim endpoint (issue #153) that executes the refund
+ * on-chain via Trustless Work (issue #252).
  *
  * Calling this endpoint twice with the same `refundId` returns 409 with
- * code REFUND_ALREADY_CLAIMED on the second call.
+ * code REFUND_ALREADY_CLAIMED on the second call — unless the first on-chain
+ * attempt failed, in which case the refund is retried.
  *
  * Request body:
  *   {
- *     "refundId":  "string — unique idempotency key (e.g. on-chain tx hash)",
- *     "escrowId":  "string — the escrow being refunded",
- *     "amount":    "string | number — optional, for display",
- *     "currency":  "string — optional, e.g. USDC",
- *     "claimedBy": "string — optional, caller user-id"
+ *     "refundId":       "string — unique idempotency key",
+ *     "escrowId":       "string — Trustless Work escrow contract id (C...)",
+ *     "refundTo":       "string — buyer's Stellar address receiving the refund",
+ *     "amount":         "string | number — full disputed escrow balance",
+ *     "escrowType":     "single-release | multi-release — default single-release",
+ *     "milestoneIndex": "string — required for multi-release",
+ *     "currency":       "string — optional, e.g. USDC",
+ *     "claimedBy":      "string — optional, caller user-id"
  *   }
+ *
+ * Responses: 201 with `claim.status = "submitted"` and `claim.txHash`;
+ * 502 REFUND_EXECUTION_FAILED if the chain rejected it;
+ * 503 REFUND_EXECUTION_UNAVAILABLE if Trustless Work isn't configured.
  *
  * GET /api/refunds/claim/:refundId
  *
  * Returns the existing claim record or 404 if not yet claimed.
  */
 
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { refundService } from "../services/refund.service";
 import { AppError } from "../middleware/errorHandler";
@@ -33,10 +42,13 @@ const claimSchema = z.object({
   amount: z.union([z.string(), z.number()]).optional(),
   currency: z.string().optional(),
   claimedBy: z.string().optional(),
+  refundTo: z.string().regex(/^[GC][A-Z2-7]{55}$/, "refundTo must be a Stellar address"),
+  escrowType: z.enum(["single-release", "multi-release"]).optional(),
+  milestoneIndex: z.string().optional(),
 });
 
 // POST /api/refunds/claim
-refundsRouter.post("/claim", async (req: Request, res: Response) => {
+refundsRouter.post("/claim", async (req: Request, res: Response, next: NextFunction) => {
   const parsed = claimSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -60,7 +72,9 @@ refundsRouter.post("/claim", async (req: Request, res: Response) => {
         claim: existing ?? null,
       });
     }
-    throw err; // re-throw; global errorHandler will catch unexpected errors
+    // Express 4 doesn't catch async throws — hand off to the global errorHandler
+    // (maps REFUND_EXECUTION_FAILED → 502, REFUND_EXECUTION_UNAVAILABLE → 503).
+    return next(err);
   }
 });
 

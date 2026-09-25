@@ -20,6 +20,7 @@ RUN corepack enable
 COPY --from=build /app/package.json /app/yarn.lock /app/.yarnrc.yml ./
 COPY --from=build /app/apps/backend/package.json apps/backend/package.json
 COPY --from=build /app/apps/backend/dist apps/backend/dist
+COPY --from=build /app/apps/backend/src/db/migrations apps/backend/src/db/migrations
 COPY --from=build /app/.yarn .yarn
 COPY --from=build /app/node_modules node_modules
 
