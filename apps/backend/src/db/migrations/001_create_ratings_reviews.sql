@@ -1,7 +1,10 @@
 -- =============================================================================
 -- Migration: 001_create_ratings_reviews.sql
 -- Description: Minimal rating and review schema for buyer/seller reputation
+-- Run via node-pg-migrate: `yarn workspace @truestub/backend migrate:up`
 -- =============================================================================
+
+-- Up Migration
 
 CREATE TABLE IF NOT EXISTS reviews (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -37,3 +40,8 @@ SELECT
     ROUND((COUNT(*) FILTER (WHERE rating >= 4)::NUMERIC / NULLIF(COUNT(*), 0) * 100)::NUMERIC, 1)::FLOAT AS positive_percentage
 FROM reviews
 GROUP BY reviewee_id;
+
+-- Down Migration
+
+DROP VIEW IF EXISTS user_reputation_summary;
+DROP TABLE IF EXISTS reviews;
