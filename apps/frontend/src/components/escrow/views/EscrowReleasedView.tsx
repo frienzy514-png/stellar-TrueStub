@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,9 +8,11 @@ import { EscrowJustification } from "./EscrowJustification";
 import { EscrowPartyInfo } from "./EscrowPartyInfo";
 import { EscrowProcessStepper } from "./EscrowProcessStepper";
 import { RatingReviewModal } from "@/components/ratings/RatingReviewModal";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import type { StubEscrowDetail } from "./types";
 
 export function EscrowReleasedView({ data }: { data: StubEscrowDetail }) {
+  const receiptsEnabled = useFeatureFlag("ESCROW_RECEIPTS");
   return (
     <div className="space-y-8">
       <EscrowProcessStepper view="released" />
@@ -24,6 +27,13 @@ export function EscrowReleasedView({ data }: { data: StubEscrowDetail }) {
             <Badge className="border-transparent bg-emerald-600 text-white hover:bg-emerald-600">
               Deposit released
             </Badge>
+            {receiptsEnabled && (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/dashboard/escrow/${encodeURIComponent(data.id)}/receipt`}>
+                  View receipt
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
       </header>

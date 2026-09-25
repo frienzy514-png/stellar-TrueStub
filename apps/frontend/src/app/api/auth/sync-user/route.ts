@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { parseOr400, readJson, syncUserSchema } from "@/lib/server/validation";
 
 export async function POST(request: Request) {
   try {
@@ -19,7 +20,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true, synced: false });
     }
 
-    const body = await request.json().catch(() => ({}));
+    const parsedBody = parseOr400(syncUserSchema, (await readJson(request)) ?? {});
+    if (parsedBody.error) return parsedBody.error;
+    const body = parsedBody.data;
 
     const response = await fetch(`${backendUrl}/api/auth/sync-user`, {
       method: "POST",

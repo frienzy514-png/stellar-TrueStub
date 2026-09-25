@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
+import { parseOr400, validateResetTokenSchema } from "@/lib/server/validation";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const token = searchParams.get("token");
-
-    if (!token) {
-      return NextResponse.json({ error: "Token is required" }, { status: 400 });
-    }
+    const parsed = parseOr400(validateResetTokenSchema, {
+      token: searchParams.get("token") ?? "",
+    });
+    if (parsed.error) return parsed.error;
+    const { token } = parsed.data;
 
     const backendUrl = process.env.BACKEND_URL;
     if (!backendUrl) {
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const url = `${backendUrl}/api/auth/validate-reset-token?token=${token}`;
+    const url = `${backendUrl}/api/auth/validate-reset-token?token=${encodeURIComponent(token)}`;
     console.log("Making request to:", url);
 
     const response = await fetch(url);

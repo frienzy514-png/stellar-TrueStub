@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { getEventById } from "@/lib/mockData/events";
+import {
+  buildListingJsonLd,
+  serializeJsonLd,
+} from "@/lib/metadata/listing-jsonld";
 
 // Per-listing link-preview metadata — Issue #173
 //
@@ -47,6 +51,23 @@ export async function generateMetadata({
   };
 }
 
-export default function ListingLayout({ children }: { children: React.ReactNode }) {
-  return children;
+export default async function ListingLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const jsonLd = serializeJsonLd(buildListingJsonLd(getEventById(id)));
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLd }}
+      />
+      {children}
+    </>
+  );
 }
