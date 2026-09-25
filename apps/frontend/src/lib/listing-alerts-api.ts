@@ -33,3 +33,10 @@ export const registerWatch = (listing: { listingId: string; eventName: string; p
 
 export const unregisterWatch = (listingId: string) =>
   send("DELETE", `/api/watchlist/${encodeURIComponent(listingId)}?userId=${ALERT_USER_ID}`);
+
+export const notifyListingCreated = (listing: {
+  id: string;
+  eventName: string;
+  price: number;
+  status?: string;
+}) => send("POST", "/api/listings", listing);

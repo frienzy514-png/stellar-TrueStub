@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMutation } from "@apollo/client/react";
 import { Clock, DollarSign, Home, MapPin, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -15,6 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { INSERT_TICKET_LISTING } from "@/graphql/mutations/ticket-listing-mutations";
+import { useCurrentUserId } from "@/hooks/useCurrentUserId";
+import { notifyListingCreated } from "@/lib/listing-alerts-api";
 
 type LeftField = {
   id: string;
@@ -40,7 +45,17 @@ export function NewListingForm() {
   const [rooms, setRooms] = useState("1");
   const [baths, setBaths] = useState("1");
   const [petFriendly, setPetFriendly] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const userId = useCurrentUserId();
+  const [insertListing, { loading: isLoading }] = useMutation<{
+    insert_ticket_listings_one: { id: number; name: string; price: number | string; status: string } | null;
+  }>(INSERT_TICKET_LISTING, {
+    // Drop cached listing pages so /dashboard/listings refetches on arrival.
+    update(cache) {
+      cache.evict({ fieldName: "ticket_listings" });
+      cache.evict({ fieldName: "ticket_listings_aggregate" });
+      cache.gc();
+    },
+  });
 
   // Multi-ticket / bundle listing fields
   const [ticketQuantity, setTicketQuantity] = useState("1");
@@ -54,28 +69,44 @@ export function NewListingForm() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setIsLoading(true);
+
+    const promotionPercent = parseInt(promotion, 10) || 0;
 
     try {
-      // TODO: Replace with actual API call
-      const payload = {
-        name,
-        location,
-        pricePerUnit: parsedUnitPrice,
-        ticketQuantity: parsedQuantity,
-        allowPartialPurchase: isBundle ? allowPartialPurchase : false,
-        bundlePrice: isBundle ? parsedBundlePrice : undefined,
-        promotion,
-        details,
-        rooms,
-        baths,
-        petFriendly,
-      };
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      console.log("New listing submitted:", payload);
+      const { data } = await insertListing({
+        variables: {
+          object: {
+            owner_id: userId,
+            name,
+            location,
+            price: parsedUnitPrice,
+            ticket_quantity: parsedQuantity,
+            allow_partial_purchase: isBundle ? allowPartialPurchase : false,
+            bundle_price: isBundle ? parsedBundlePrice ?? null : null,
+            promotion_percent: promotionPercent,
+            promoted: promotionPercent > 0,
+            details,
+            bedrooms: parseInt(rooms, 10),
+            bathrooms: parseInt(baths, 10),
+            pet_friendly: petFriendly,
+          },
+        },
+      });
+
+      const created = data?.insert_ticket_listings_one;
+      if (created) {
+        void notifyListingCreated({
+          id: String(created.id),
+          eventName: created.name,
+          price: Number(created.price),
+          status: created.status,
+        });
+      }
+
+      toast.success("Listing created");
       router.push("/dashboard/listings");
-    } finally {
-      setIsLoading(false);
+    } catch {
+      toast.error("Failed to create listing. Please try again.");
     }
   };
 

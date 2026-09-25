@@ -3,8 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useMutation } from "@apollo/client/react";
 import { ArrowLeft, MapPin, Building2, FileText } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { INSERT_EVENT } from "@/graphql/mutations/event-mutations";
+import { GET_EVENTS } from "@/graphql/queries/event-queries";
+import { useCurrentUserId } from "@/hooks/useCurrentUserId";
 
 interface EventFormData {
   name: string;
@@ -24,35 +29,45 @@ const EMPTY_FORM: EventFormData = {
   longitude: "-84.0907",
 };
 
-export default function NewHotelPage() {
+export default function NewEventPage() {
   const router = useRouter();
   const [form, setForm] = useState<EventFormData>(EMPTY_FORM);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const userId = useCurrentUserId();
+  const [insertEvent, { loading: isSubmitting }] = useMutation(INSERT_EVENT, {
+    refetchQueries: [{ query: GET_EVENTS }],
+  });
 
   const set = (field: keyof EventFormData, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
 
-    // TODO: wire to Hasura mutation → INSERT INTO public.hotels
-    // Mutation payload shape:
-    // {
-    //   name: form.name,                           // VARCHAR(20)
-    //   description: form.description,             // VARCHAR(50)
-    //   address: form.address,                     // VARCHAR(50)
-    //   location_area: form.location_area,         // VARCHAR(20)
-    //   coordinates: `POINT(${form.longitude} ${form.latitude})`
-    //                                              // geometry(Point, 4326)
-    // }
-    //
-    // Note: PostGIS WKT format for coordinates is POINT(lng lat)
-    // Example: POINT(-84.0907 9.9281)
+    const latitude = parseFloat(form.latitude);
+    const longitude = parseFloat(form.longitude);
 
-    await new Promise((r) => setTimeout(r, 800)); // stub delay
-    setIsSubmitting(false);
-    router.push("/dashboard/events");
+    try {
+      await insertEvent({
+        variables: {
+          object: {
+            name: form.name,
+            description: form.description || null,
+            address: form.address,
+            location_area: form.location_area || null,
+            owner_id: userId,
+            // Hasura takes PostGIS geometry as GeoJSON — coordinates are [lng, lat].
+            coordinates:
+              Number.isFinite(latitude) && Number.isFinite(longitude)
+                ? { type: "Point", coordinates: [longitude, latitude] }
+                : null,
+          },
+        },
+      });
+      toast.success("Event created");
+      router.push("/dashboard/events");
+    } catch {
+      toast.error("Failed to create event. Please try again.");
+    }
   };
 
   const inputClass = cn(
@@ -82,7 +97,7 @@ export default function NewHotelPage() {
 
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          New Hotel
+          New Event
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
           Register a new event property on TrueStub
@@ -98,7 +113,7 @@ export default function NewHotelPage() {
             {/* Name */}
             <div>
               <label htmlFor="event-name" className={labelClass}>
-                Hotel Name <span className="text-red-500">*</span>
+                Event Name <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2
@@ -219,7 +234,7 @@ export default function NewHotelPage() {
                             dark:bg-blue-900/10 p-4 space-y-1">
               <p className="text-xs font-semibold text-blue-600
                              dark:text-blue-400">
-                Schema constraints (public.hotels)
+                Schema constraints (public.events)
               </p>
               <ul className="text-xs text-blue-500 dark:text-blue-400
                               space-y-0.5 list-disc list-inside">
@@ -256,7 +271,7 @@ export default function NewHotelPage() {
                        transition-colors disabled:opacity-60
                        disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "Creating..." : "Create Hotel"}
+            {isSubmitting ? "Creating..." : "Create Event"}
           </button>
         </div>
       </form>

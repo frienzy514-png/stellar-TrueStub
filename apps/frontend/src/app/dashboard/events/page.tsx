@@ -1,32 +1,16 @@
-import Link from "next/link";
-import { PlusCircle } from "lucide-react";
+"use client";
 
-// TODO: replace with Hasura query → public.hotels
-const STUB_HOTELS = [
-  {
-    id: "1",
-    name: "Metropolitan Tower",
-    address: "Avenida Central 100, San José",
-    location_area: "San José Centro",
-    description: "Luxury event in downtown San José",
-  },
-  {
-    id: "2",
-    name: "Mountain Peak Lodge",
-    address: "Calle 5, Escazú, San José",
-    location_area: "Escazú",
-    description: "Boutique lodge with mountain views",
-  },
-  {
-    id: "3",
-    name: "Oceanview Resort & Spa",
-    address: "Playa Jacó, Puntarenas",
-    location_area: "Jacó",
-    description: "Beachfront resort with full spa",
-  },
-];
+import Link from "next/link";
+import { useQuery } from "@apollo/client/react";
+import { PlusCircle } from "lucide-react";
+import { GET_EVENTS, type EventRow } from "@/graphql/queries/event-queries";
 
 export default function EventsPage() {
+  const { data, loading, error } = useQuery<{ events: EventRow[] }>(GET_EVENTS, {
+    fetchPolicy: "cache-and-network",
+  });
+  const events = data?.events ?? [];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -45,7 +29,7 @@ export default function EventsPage() {
                      px-4 py-2 transition-colors"
         >
           <PlusCircle className="h-4 w-4" />
-          New Hotel
+          New Event
         </Link>
       </div>
 
@@ -69,7 +53,17 @@ export default function EventsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-            {STUB_HOTELS.map((event) => (
+            {events.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                  {loading
+                    ? "Loading events..."
+                    : error
+                      ? "Failed to load events."
+                      : "No events yet."}
+                </td>
+              </tr>
+            ) : events.map((event) => (
               <tr
                 key={event.id}
                 className="bg-white dark:bg-slate-900
