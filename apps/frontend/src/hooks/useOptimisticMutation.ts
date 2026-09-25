@@ -1,11 +1,24 @@
 import type { DocumentNode } from '@apollo/client';
+import { useMutation } from '@apollo/client/react';
 import { optimisticUpdatePolicies } from '@/utils/optimistic-updates';
 
+/**
+ * Wraps Apollo's useMutation with a named optimistic-update policy.
+ *
+ * Apollo Client v4 (4.1.x) declares React ^19 as a supported peer, but its
+ * React hooks moved to the `@apollo/client/react` entry point — importing
+ * them from `@apollo/client` is what broke under v4, not React 19.
+ */
 export function useOptimisticMutation(
-    _mutation: DocumentNode,
-    _policyName: keyof typeof optimisticUpdatePolicies,
-    _options?: any
+    mutation: DocumentNode,
+    policyName: keyof typeof optimisticUpdatePolicies,
+    options?: useMutation.Options<any, any>
 ) {
-    // TODO: wire in Batch N — restore useMutation once Apollo v4 + React 19 compatibility is confirmed
-    return [() => Promise.resolve(), { loading: false, error: undefined, data: undefined }] as const;
+    const policy = optimisticUpdatePolicies[policyName];
+
+    return useMutation(mutation, {
+        ...options,
+        optimisticResponse: policy.optimisticResponse,
+        update: 'update' in policy ? policy.update : options?.update,
+    });
 }

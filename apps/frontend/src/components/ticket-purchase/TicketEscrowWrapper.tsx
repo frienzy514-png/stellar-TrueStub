@@ -11,6 +11,10 @@ import {
 } from "@/interfaces/booking-escrow.interface";
 import { EscrowCreationForm } from "./EscrowCreationForm";
 import { EscrowConfirmation } from "./EscrowConfirmation";
+import {
+  fetchBookingEscrowContext,
+  recordBookingEscrow,
+} from "@/lib/booking-escrow-api";
 
 // Providers
 import { TrustlessWorkProvider } from "@/components/tw-blocks/providers/TrustlessWork";
@@ -84,72 +88,6 @@ function ErrorState({
 }
 
 /**
- * Simulated API functions - Replace with actual API calls
- */
-async function getBooking(bookingId: string): Promise<BookingData> {
-  // TODO: Replace with actual API call
-  // const response = await fetch(`/api/bookings/${bookingId}`);
-  // return response.json();
-  
-  // Simulated response for development
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        id: bookingId,
-        roomId: "room-001",
-        eventId: "event-001",
-        totalAmount: 450.00,
-        currency: "USDC",
-        checkInDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        checkOutDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-        guestEmail: "guest@example.com",
-        guestName: "John Doe",
-        roomType: "Deluxe Suite",
-        cancellationPolicy: "Free cancellation until 24 hours before check-in",
-        preferences: {
-          milestonePayments: true,
-        },
-      });
-    }, 1000);
-  });
-}
-
-async function getEvent(eventId: string): Promise<EventData> {
-  // TODO: Replace with actual API call
-  
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        id: eventId,
-        name: "Grand Stellar Event",
-        walletAddress: "GBCXK3ZQWFWMQJXLSIMVCAHUKTJVWRJPB5XYGZGQCVBWKWVEPTSYLUHI",
-        rating: 4.8,
-        location: "Downtown, New York City",
-        imageUrl: "/img/hotels.png",
-      });
-    }, 500);
-  });
-}
-
-async function updateBookingWithEscrow(
-  bookingId: string,
-  escrowData: {
-    contractId: string;
-    escrowStatus: string;
-    unsignedXDR?: string;
-  }
-): Promise<void> {
-  // TODO: Replace with actual API call
-  // await fetch(`/api/bookings/${bookingId}/escrow`, {
-  //   method: 'PATCH',
-  //   body: JSON.stringify(escrowData),
-  // });
-  
-  console.log("Updating booking with escrow:", { bookingId, escrowData });
-  return new Promise((resolve) => setTimeout(resolve, 500));
-}
-
-/**
  * TicketEscrowWrapper Component
  * 
  * Main integration component that manages the entire escrow creation flow:
@@ -168,6 +106,7 @@ export function TicketEscrowWrapper({
   const [step, setStep] = useState<Step>(initialBookingData ? "form" : "loading");
   const [error, setError] = useState<string | null>(null);
   const [escrowData, setEscrowData] = useState<EscrowResponse | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   
   // Booking and event data
   const [bookingData, setBookingData] = useState<BookingData | null>(
@@ -197,11 +136,9 @@ export function TicketEscrowWrapper({
         setStep("loading");
         setError(null);
 
-        const booking = await getBooking(bookingId);
-        setBookingData(booking);
-
-        const event = await getEvent(booking.eventId);
-        setEventData(event);
+        const context = await fetchBookingEscrowContext(bookingId);
+        setBookingData(context.booking);
+        setEventData(context.event);
 
         setStep("form");
       } catch (err) {
@@ -216,15 +153,16 @@ export function TicketEscrowWrapper({
     }
 
     loadData();
-  }, [bookingId, initialBookingData, initialEventData]);
+  }, [bookingId, initialBookingData, initialEventData, loadAttempt]);
 
   // Handle escrow creation success
   const handleEscrowCreated = async (escrowResponse: EscrowResponse) => {
     try {
       // Update booking with escrow information
-      await updateBookingWithEscrow(bookingId, {
+      await recordBookingEscrow(bookingId, {
         contractId: escrowResponse.contractId,
         escrowStatus: escrowResponse.status,
+        amount: bookingData?.totalAmount ?? 0,
         unsignedXDR: escrowResponse.unsignedXDR,
       });
 
@@ -256,6 +194,7 @@ export function TicketEscrowWrapper({
   const handleRetry = () => {
     setError(null);
     setStep("loading");
+    setLoadAttempt((n) => n + 1);
   };
 
   // Render based on current step

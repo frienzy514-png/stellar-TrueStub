@@ -10,6 +10,10 @@ import {
   EscrowType,
 } from "@/interfaces/booking-escrow.interface";
 import { EventEscrowForm } from "./EventEscrowForm";
+import {
+  fetchBookingEscrowContext,
+  recordBookingEscrow,
+} from "@/lib/booking-escrow-api";
 
 // Providers
 import { TrustlessWorkProvider } from "@/components/tw-blocks/providers/TrustlessWork";
@@ -119,75 +123,6 @@ function EscrowConfirmationView({
 }
 
 /**
- * Simulated API functions - Replace with actual implementations
- */
-async function getBooking(bookingId: string): Promise<BookingData> {
-  // TODO: Replace with actual API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        id: bookingId,
-        roomId: "room-001",
-        eventId: "event-001",
-        totalAmount: 350.0,
-        currency: "USDC",
-        checkInDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        checkOutDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-        guestEmail: "guest@example.com",
-        roomType: "Standard Room",
-        preferences: {
-          milestonePayments: false,
-        },
-      });
-    }, 800);
-  });
-}
-
-async function getEvent(eventId: string): Promise<EventData> {
-  // TODO: Replace with actual API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        id: eventId,
-        name: "Stellar Grand Event",
-        walletAddress: "GBCXK3ZQWFWMQJXLSIMVCAHUKTJVWRJPB5XYGZGQCVBWKWVEPTSYLUHI",
-        rating: 4.5,
-        location: "Miami Beach, FL",
-      });
-    }, 400);
-  });
-}
-
-async function getRoom(roomId: string): Promise<RoomData> {
-  // TODO: Replace with actual API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        id: roomId,
-        name: "Ocean View Suite",
-        type: "Suite",
-        pricePerNight: 120,
-        capacity: 2,
-        amenities: ["WiFi", "Air Conditioning", "Mini Bar"],
-      });
-    }, 300);
-  });
-}
-
-async function updateBookingWithEscrow(
-  bookingId: string,
-  escrowInfo: {
-    contractId: string;
-    escrowStatus: string;
-    unsignedXDR?: string;
-  }
-): Promise<void> {
-  // TODO: Replace with actual API call
-  console.log("Updating booking with escrow:", { bookingId, escrowInfo });
-  return new Promise((resolve) => setTimeout(resolve, 500));
-}
-
-/**
  * TicketEscrowIntegration Component
  * 
  * Main integration component for the event booking escrow flow
@@ -212,16 +147,10 @@ export function TicketEscrowIntegration({
       try {
         setIsLoading(true);
         
-        const bookingData = await getBooking(bookingId);
-        setBooking(bookingData);
-
-        const [eventData, roomData] = await Promise.all([
-          getEvent(bookingData.eventId),
-          getRoom(bookingData.roomId),
-        ]);
-
-        setEvent(eventData);
-        setRoom(roomData);
+        const context = await fetchBookingEscrowContext(bookingId);
+        setBooking(context.booking);
+        setEvent(context.event);
+        setRoom(context.room);
       } catch (error) {
         console.error("Failed to load data:", error);
       } finally {
@@ -236,9 +165,10 @@ export function TicketEscrowIntegration({
   const handleEscrowCreated = async (escrowResponse: EscrowResponse) => {
     try {
       // Update booking with escrow details
-      await updateBookingWithEscrow(bookingId, {
+      await recordBookingEscrow(bookingId, {
         contractId: escrowResponse.contractId,
         escrowStatus: escrowResponse.status,
+        amount: booking?.totalAmount ?? 0,
         unsignedXDR: escrowResponse.unsignedXDR,
       });
 
