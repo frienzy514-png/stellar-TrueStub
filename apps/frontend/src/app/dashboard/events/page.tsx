@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useQuery } from "@apollo/client/react";
 import { PlusCircle } from "lucide-react";
 
 // TODO: replace with Hasura query → public.events
@@ -27,6 +30,11 @@ const STUB_EVENTS = [
 ];
 
 export default function EventsPage() {
+  const { data, loading, error } = useQuery<{ events: EventRow[] }>(GET_EVENTS, {
+    fetchPolicy: "cache-and-network",
+  });
+  const events = data?.events ?? [];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

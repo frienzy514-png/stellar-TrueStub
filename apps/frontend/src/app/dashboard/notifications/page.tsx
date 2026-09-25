@@ -1,52 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useMutation, useSubscription } from "@apollo/client/react";
 import { Bell } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import { NotificationItem } from "@/components/dashboard/NotificationItem";
-
-// TODO: replace with real Hasura query once public.notifications table is created
-const MOCK_NOTIFICATIONS = [
-  {
-    id: "1",
-    type: "success" as const,
-    title: "Escrow funded",
-    message: "Your escrow ST-1-1714000000000 has been funded.",
-    timestamp: "Today at 10:22 AM",
-    read: false,
-  },
-  {
-    id: "2",
-    type: "info" as const,
-    title: "Bid accepted",
-    message: "Your bid on La Sabana house was accepted.",
-    timestamp: "Yesterday at 3:15 PM",
-    read: true,
-  },
-  {
-    id: "3",
-    type: "warning" as const,
-    title: "Action required",
-    message: "Sign the escrow contract before it expires.",
-    timestamp: "May 30 at 9:00 AM",
-    read: false,
-  },
-];
-
 import { NotificationPreferences } from "@/components/notifications/NotificationPreferences";
+import { USER_NOTIFICATIONS_SUBSCRIPTION } from "@/graphql/subscriptions/notification-subscriptions";
+import {
+  MARK_ALL_NOTIFICATIONS_READ,
+  MARK_NOTIFICATION_READ,
+} from "@/graphql/mutations/notification-mutations";
+import { useCurrentUserId } from "@/hooks/useCurrentUserId";
+
+interface NotificationRow {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
+
+const SUCCESS_TYPES = new Set(["success", "funded", "completed", "released", "resolved"]);
+const WARNING_TYPES = new Set(["warning", "disputed", "cancelled", "action_required", "about_to_sell"]);
+
+/** Maps a stored notification type onto the three NotificationItem styles. */
+function toDisplayType(type: string): "success" | "info" | "warning" {
+  if (SUCCESS_TYPES.has(type)) return "success";
+  if (WARNING_TYPES.has(type)) return "warning";
+  return "info";
+}
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const userId = useCurrentUserId();
+  const { data, loading, error } = useSubscription<{ notifications: NotificationRow[] }>(
+    USER_NOTIFICATIONS_SUBSCRIPTION,
+    { variables: { userId }, skip: !userId },
+  );
+  const [markNotificationRead] = useMutation(MARK_NOTIFICATION_READ);
+  const [markAllNotificationsRead] = useMutation(MARK_ALL_NOTIFICATIONS_READ);
 
+  const notifications = data?.notifications ?? [];
   const unreadCount = notifications.filter((n) => !n.read).length;
+  const isLoading = userId === undefined || loading;
 
+  // The subscription pushes the updated rows back, so no local state to patch.
   const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    if (userId) markAllNotificationsRead({ variables: { userId } });
   };
 
   const markRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+    markNotificationRead({ variables: { id } });
   };
 
   return (
@@ -75,7 +79,15 @@ export default function NotificationsPage() {
 
         <hr className="border-border" />
 
-        {notifications.length === 0 && (
+        {isLoading && (
+          <p className="py-16 text-center text-sm text-gray-400">Loading notifications...</p>
+        )}
+
+        {!isLoading && error && (
+          <p className="py-16 text-center text-sm text-red-400">Unable to load notifications.</p>
+        )}
+
+        {!isLoading && !error && notifications.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 space-y-3">
             <Bell className="h-10 w-10 text-gray-600" />
             <p className="text-sm font-medium text-gray-400">No notifications yet</p>
@@ -88,12 +100,12 @@ export default function NotificationsPage() {
             {notifications.map((n) => (
               <NotificationItem
                 key={n.id}
-                type={n.type}
+                type={toDisplayType(n.type)}
                 title={n.title}
                 message={n.message}
-                timestamp={n.timestamp}
+                timestamp={formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                 read={n.read}
-                onClick={() => markRead(n.id)}
+                onClick={() => !n.read && markRead(n.id)}
               />
             ))}
           </div>

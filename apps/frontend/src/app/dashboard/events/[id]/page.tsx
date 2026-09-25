@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useQuery } from "@apollo/client/react";
 import { ArrowLeft, Building2, MapPin } from "lucide-react";
 
 // TODO: replace with Hasura query → public.events

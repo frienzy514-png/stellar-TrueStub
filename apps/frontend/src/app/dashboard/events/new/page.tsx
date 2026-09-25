@@ -3,8 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useMutation } from "@apollo/client/react";
 import { ArrowLeft, MapPin, Building2, FileText } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { INSERT_EVENT } from "@/graphql/mutations/event-mutations";
+import { GET_EVENTS } from "@/graphql/queries/event-queries";
+import { useCurrentUserId } from "@/hooks/useCurrentUserId";
 
 interface EventFormData {
   name: string;
@@ -27,14 +32,16 @@ const EMPTY_FORM: EventFormData = {
 export default function NewEventPage() {
   const router = useRouter();
   const [form, setForm] = useState<EventFormData>(EMPTY_FORM);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const userId = useCurrentUserId();
+  const [insertEvent, { loading: isSubmitting }] = useMutation(INSERT_EVENT, {
+    refetchQueries: [{ query: GET_EVENTS }],
+  });
 
   const set = (field: keyof EventFormData, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
 
     // TODO: wire to Hasura mutation → INSERT INTO public.events
     // Mutation payload shape:
@@ -50,9 +57,28 @@ export default function NewEventPage() {
     // Note: PostGIS WKT format for coordinates is POINT(lng lat)
     // Example: POINT(-84.0907 9.9281)
 
-    await new Promise((r) => setTimeout(r, 800)); // stub delay
-    setIsSubmitting(false);
-    router.push("/dashboard/events");
+    try {
+      await insertEvent({
+        variables: {
+          object: {
+            name: form.name,
+            description: form.description || null,
+            address: form.address,
+            location_area: form.location_area || null,
+            owner_id: userId,
+            // Hasura takes PostGIS geometry as GeoJSON — coordinates are [lng, lat].
+            coordinates:
+              Number.isFinite(latitude) && Number.isFinite(longitude)
+                ? { type: "Point", coordinates: [longitude, latitude] }
+                : null,
+          },
+        },
+      });
+      toast.success("Event created");
+      router.push("/dashboard/events");
+    } catch {
+      toast.error("Failed to create event. Please try again.");
+    }
   };
 
   const inputClass = cn(

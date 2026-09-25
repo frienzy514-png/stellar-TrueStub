@@ -33,10 +33,6 @@ export function MyListingsTable() {
   const listings = data.ticket_listings;
   const total = data.ticket_listings_aggregate.aggregate.count;
 
-  const handleDeleteConfirmed = (id: number) => {
-    console.log("(stub) Listing deleted:", id);
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -122,10 +118,7 @@ export function MyListingsTable() {
                     ${listing.price.toLocaleString()}
                   </TableCell>
                   <TableCell>
-                    <ListingActionsMenu
-                      listingId={Number(listing.id)}
-                      onDeleteConfirmed={handleDeleteConfirmed}
-                    />
+                    <ListingActionsMenu listingId={Number(listing.id)} />
                   </TableCell>
                 </TableRow>
               ))

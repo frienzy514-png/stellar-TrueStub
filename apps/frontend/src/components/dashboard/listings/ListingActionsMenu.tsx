@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useMutation } from "@apollo/client/react";
 import { MoreHorizontal, Pencil, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -20,20 +21,36 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DELETE_TICKET_LISTING } from "@/graphql/mutations/ticket-listing-mutations";
 
 interface ListingActionsMenuProps {
   listingId: number;
-  onDeleteConfirmed: (id: number) => void;
+  onDeleteConfirmed?: (id: number) => void;
 }
 
 export function ListingActionsMenu({ listingId, onDeleteConfirmed }: ListingActionsMenuProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const handleConfirmDelete = () => {
-    // TODO: replace with DELETE /api/listings/:id or GraphQL mutation
-    toast.success(`Listing ${listingId} deleted (stub)`);
-    onDeleteConfirmed(listingId);
-    setDeleteOpen(false);
+  const [deleteListing, { loading: isDeleting }] = useMutation<{
+    delete_ticket_listings_by_pk: { id: number } | null;
+  }>(DELETE_TICKET_LISTING, {
+    refetchQueries: ["GetTicketListings"],
+  });
+
+  const handleConfirmDelete = async () => {
+    try {
+      const { data } = await deleteListing({ variables: { id: listingId } });
+      // Hasura returns null when the row is missing or not owned by the caller.
+      if (!data?.delete_ticket_listings_by_pk) {
+        toast.error("Listing could not be deleted.");
+        return;
+      }
+      toast.success(`Listing ${listingId} deleted`);
+      onDeleteConfirmed?.(listingId);
+      setDeleteOpen(false);
+    } catch {
+      toast.error("Failed to delete listing. Please try again.");
+    }
   };
 
   return (
@@ -81,8 +98,13 @@ export function ListingActionsMenu({ listingId, onDeleteConfirmed }: ListingActi
             <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
               Cancel
             </Button>
-            <Button type="button" variant="destructive" onClick={handleConfirmDelete}>
-              Delete
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
