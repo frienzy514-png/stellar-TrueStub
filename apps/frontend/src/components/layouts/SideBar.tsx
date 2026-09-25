@@ -198,6 +198,18 @@ export function SideBar({
           <span>Users</span>
         </Link>
         <Link
+          href="/dashboard/admin/moderation"
+          onClick={onClose}
+          className={cn(
+            "flex items-center gap-2 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white",
+            pathname === "/dashboard/admin/moderation" &&
+              "bg-accent font-medium dark:bg-gray-800 dark:text-white",
+          )}
+        >
+          <ShieldAlert className="w-6 h-6 dark:text-gray-400" />
+          <span>Moderation</span>
+        </Link>
+        <Link
           href="/dashboard/ticket_listings"
           onClick={onClose}
           className={cn(

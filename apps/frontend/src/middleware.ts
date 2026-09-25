@@ -28,10 +28,14 @@
  *              reads it to decide role-gated redirects *before* the page
  *              renders.
  *
+ * Also closes: #192 (IP-based rate limiting on /api/auth/* proxy routes)
+ *
  * ⚠️  WARNING — do not test; implement only (per task instructions)
  */
 
 import { type NextRequest, NextResponse } from "next/server";
+
+import { checkRateLimit, getClientIp, getRuleForPath } from "@/lib/rate-limit";
 
 // ---------------------------------------------------------------------------
 // Route configuration
@@ -62,6 +66,7 @@ const PUBLIC_DASHBOARD_PATTERNS: RegExp[] = [
 const ROLE_RESTRICTED_PATHS: Array<{ path: string; requiredRole: string }> = [
   { path: "/dashboard/manager", requiredRole: "manager" },
   { path: "/dashboard/users",   requiredRole: "admin" },
+  { path: "/dashboard/admin",   requiredRole: "admin" },
 ];
 
 const SESSION_COOKIE  = "__truestamp_session";
@@ -95,6 +100,23 @@ function buildLoginUrl(request: NextRequest, next: string): URL {
 
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
+
+  // ── 0. Rate-limit auth proxy routes (#192) ───────────────────────────────
+  if (pathname.startsWith("/api/auth")) {
+    const rule = getRuleForPath(pathname);
+    const key = `${getClientIp(request.headers)}:${pathname}`;
+    const result = checkRateLimit(key, rule);
+    if (!result.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(result.retryAfter) },
+        },
+      ) as NextResponse;
+    }
+    return NextResponse.next();
+  }
 
   // ── 1. Only guard /dashboard/* routes ───────────────────────────────────
   if (!pathname.startsWith("/dashboard")) {
@@ -134,9 +156,9 @@ export function middleware(request: NextRequest): NextResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Matcher — only run this middleware for dashboard paths
+// Matcher — only run this middleware for dashboard and auth API paths
 // ---------------------------------------------------------------------------
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/dashboard/:path*", "/api/auth/:path*"],
 };
