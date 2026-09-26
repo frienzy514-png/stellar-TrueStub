@@ -10,6 +10,10 @@ import {
   EscrowType,
 } from "@/interfaces/ticket-purchase-escrow.interface";
 import { EventEscrowForm } from "./EventEscrowForm";
+import {
+  fetchBookingEscrowContext,
+  recordBookingEscrow,
+} from "@/lib/booking-escrow-api";
 
 // Providers
 import { TrustlessWorkProvider } from "@/components/tw-blocks/providers/TrustlessWork";
@@ -215,6 +219,10 @@ export function TicketEscrowIntegration({
       try {
         setIsLoading(true);
         
+        const context = await fetchBookingEscrowContext(bookingId);
+        setBooking(context.booking);
+        setEvent(context.event);
+        setRoom(context.room);
         const purchaseData = await getTicketPurchase(purchaseId);
         setBooking(purchaseData);
 
@@ -239,9 +247,11 @@ export function TicketEscrowIntegration({
   const handleEscrowCreated = async (escrowResponse: EscrowResponse) => {
     try {
       // Update booking with escrow details
+      await recordBookingEscrow(bookingId, {
       await updateTicketPurchaseWithEscrow(purchaseId, {
         contractId: escrowResponse.contractId,
         escrowStatus: escrowResponse.status,
+        amount: booking?.totalAmount ?? 0,
         unsignedXDR: escrowResponse.unsignedXDR,
       });
 

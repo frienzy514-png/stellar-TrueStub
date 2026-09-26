@@ -11,6 +11,10 @@ import {
 } from "@/interfaces/ticket-purchase-escrow.interface";
 import { EscrowCreationForm } from "./EscrowCreationForm";
 import { EscrowConfirmation } from "./EscrowConfirmation";
+import {
+  fetchBookingEscrowContext,
+  recordBookingEscrow,
+} from "@/lib/booking-escrow-api";
 import { useRequireVerifiedEmail } from "@/hooks/useRequireVerifiedEmail";
 
 // Providers
@@ -171,6 +175,7 @@ export function TicketEscrowWrapper({
   const [step, setStep] = useState<Step>(initialPurchaseData ? "form" : "loading");
   const [error, setError] = useState<string | null>(null);
   const [escrowData, setEscrowData] = useState<EscrowResponse | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   
   // Booking and event data
   const [purchaseData, setPurchaseData] = useState<TicketPurchaseData | null>(
@@ -200,6 +205,9 @@ export function TicketEscrowWrapper({
         setStep("loading");
         setError(null);
 
+        const context = await fetchBookingEscrowContext(bookingId);
+        setBookingData(context.booking);
+        setEventData(context.event);
         const purchase = await getTicketPurchase(purchaseId);
         setPurchaseData(purchase);
 
@@ -219,15 +227,19 @@ export function TicketEscrowWrapper({
     }
 
     loadData();
+  }, [bookingId, initialBookingData, initialEventData, loadAttempt]);
   }, [purchaseId, initialPurchaseData, initialEventData]);
 
   // Handle escrow creation success
   const handleEscrowCreated = async (escrowResponse: EscrowResponse) => {
     try {
+      // Update booking with escrow information
+      await recordBookingEscrow(bookingId, {
       // Update purchase with escrow information
       await updateTicketPurchaseWithEscrow(purchaseId, {
         contractId: escrowResponse.contractId,
         escrowStatus: escrowResponse.status,
+        amount: bookingData?.totalAmount ?? 0,
         unsignedXDR: escrowResponse.unsignedXDR,
       });
 
@@ -259,6 +271,7 @@ export function TicketEscrowWrapper({
   const handleRetry = () => {
     setError(null);
     setStep("loading");
+    setLoadAttempt((n) => n + 1);
   };
 
   // Block escrow creation until the signed-in user has a verified email —

@@ -3,10 +3,36 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, MapPin, Bed, PawPrint, Bath } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useQuery } from "@apollo/client/react";
+import { Heart, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import  EventHeader from "@/components/events/EventHeader";
+import { useFavorites } from "@/hooks/useFavorites";
+import {
+  GET_AVAILABLE_TICKET_LISTINGS,
+  formatListingAddress,
+  type TicketListingRow,
+} from "@/graphql/queries/ticket-listing-queries";
 
+const FALLBACK_IMAGE = "/img/room1.png";
+
+function listingImages(listing: TicketListingRow): string[] {
+  return listing.image_urls?.length ? listing.image_urls : [FALLBACK_IMAGE];
+}
+
+
+export default function GuestSuggestionsPage() {
+  const router = useRouter();
+  const { data, loading, error } = useQuery<{ apartments: TicketListingRow[] }>(
+    GET_AVAILABLE_TICKET_LISTINGS,
+  );
+  const listings = data?.apartments ?? [];
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { isFavorite, toggleFavorite } = useFavorites();
+
+  const selected =
+    listings.find((listing) => listing.id === selectedId) ?? listings[0];
 // TODO: replace with Apollo query → public.ticket_listings (Hasura)
 // Reference: dApp/apps/frontend/src/app/dashboard/guest/page.tsx
 const STUB_LISTINGS = [
@@ -56,11 +82,34 @@ export default function GuestSuggestionsPage() {
 
   const selected = STUB_LISTINGS.find((l) => l.id === selectedId)!;
 
-  const toggleFavorite = (id: string) => {
-    setFavorites((curr) =>
-      curr.includes(id) ? curr.filter((f) => f !== id) : [...curr, id],
+  if (loading || error || !selected) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-slate-900
+                      text-gray-900 dark:text-white">
+        <EventHeader showHostSwitch />
+        <div className="mx-auto max-w-[1280px] px-4 py-16 text-center
+                        text-gray-500 dark:text-gray-400">
+          {loading
+            ? "Loading listings..."
+            : error
+              ? "Could not load listings. Please try again later."
+              : "No listings are available right now."}
+          {!loading && (
+            <div className="mt-4">
+              <Link
+                href="/rent"
+                className="text-sm text-orange-500 hover:text-orange-600 font-medium"
+              >
+                Browse all →
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
     );
-  };
+  }
+
+  const selectedImages = listingImages(selected);
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900
@@ -78,6 +127,7 @@ export default function GuestSuggestionsPage() {
                 Suggestions
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
+                {listings.length} listings available
                 {STUB_LISTINGS.length} listings available
               </p>
               <Link
@@ -90,6 +140,7 @@ export default function GuestSuggestionsPage() {
             </div>
 
             <div className="space-y-3">
+              {listings.map((apt) => (
               {STUB_LISTINGS.map((listing) => (
                 <button
                   key={listing.id}
@@ -98,6 +149,7 @@ export default function GuestSuggestionsPage() {
                   className={cn(
                     "w-full text-left rounded-xl border p-3",
                     "flex items-start gap-3 transition-colors",
+                    selected.id === apt.id
                     selectedId === listing.id
                       ? "border-orange-400 bg-orange-50 dark:bg-orange-900/10"
                       : "border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800",
@@ -108,9 +160,12 @@ export default function GuestSuggestionsPage() {
                                   overflow-hidden shrink-0 bg-gray-200
                                   dark:bg-slate-700">
                     <Image
+                      src={listingImages(apt)[0]}
+                      alt={apt.name}
                       src={listing.images[0]}
                       alt={listing.name}
                       fill
+                      unoptimized
                       className="object-cover"
                       sizes="64px"
                       onError={(e) => {
@@ -137,6 +192,7 @@ export default function GuestSuggestionsPage() {
                         <Heart
                           className={cn(
                             "h-4 w-4 transition-colors",
+                            isFavorite(apt.id)
                             favorites.includes(listing.id)
                               ? "fill-red-500 text-red-500"
                               : "text-gray-300 hover:text-red-400",
@@ -146,6 +202,10 @@ export default function GuestSuggestionsPage() {
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400
                                   truncate">
+                      {formatListingAddress(apt.address)}
+                    </p>
+                    <div className="flex items-center gap-2
+                                    text-xs text-gray-400 dark:text-gray-500">
                       {listing.address}
                     </p>
                     <div className="flex items-center gap-2
@@ -179,9 +239,10 @@ export default function GuestSuggestionsPage() {
                             bg-gray-200 dark:bg-slate-700"
                  style={{ height: "340px" }}>
               <Image
-                src={selected.images[0]}
+                src={selectedImages[0]}
                 alt={selected.name}
                 fill
+                unoptimized
                 className="object-cover"
                 sizes="(max-width: 1280px) 60vw, 700px"
                 priority
@@ -189,14 +250,6 @@ export default function GuestSuggestionsPage() {
                   (e.target as HTMLImageElement).style.display = "none";
                 }}
               />
-              {selected.isPromoted && (
-                <span className="absolute bottom-3 left-3
-                                 bg-orange-500 text-white text-xs
-                                 px-2.5 py-1 rounded-full font-semibold
-                                 flex items-center gap-1 shadow-md">
-                  🔥 PROMOTED
-                </span>
-              )}
             </div>
 
             {/* Listing details */}
@@ -209,13 +262,9 @@ export default function GuestSuggestionsPage() {
                 <div className="text-right shrink-0">
                   <p className="text-xl font-bold text-orange-500">
                     ${selected.price.toLocaleString()}.00
-                    <span className="text-sm font-normal
-                                     text-gray-500 dark:text-gray-400 ml-1">
-                      Per month
-                    </span>
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Deposit: ${selected.deposit.toLocaleString()}
+                    Deposit: ${selected.warranty_deposit.toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -223,25 +272,7 @@ export default function GuestSuggestionsPage() {
               <div className="flex items-center gap-1.5
                               text-sm text-gray-500 dark:text-gray-400">
                 <MapPin className="h-4 w-4 text-orange-500 shrink-0" />
-                {selected.address}
-              </div>
-
-              <div className="flex items-center gap-4
-                              text-sm text-gray-500 dark:text-gray-400">
-                <span className="flex items-center gap-1.5">
-                  <Bed className="h-4 w-4 text-orange-500" />
-                  {selected.beds} bd
-                </span>
-                {selected.petFriendly && (
-                  <span className="flex items-center gap-1.5">
-                    <PawPrint className="h-4 w-4 text-orange-500" />
-                    pet friendly
-                  </span>
-                )}
-                <span className="flex items-center gap-1.5">
-                  <Bath className="h-4 w-4 text-orange-500" />
-                  {selected.baths} ba
-                </span>
+                {formatListingAddress(selected.address)}
               </div>
 
               <div className="space-y-1">
@@ -256,22 +287,20 @@ export default function GuestSuggestionsPage() {
               </div>
 
               <button
-                onClick={() => {
-                  // TODO: wire to /rent/${selected.id}/escrow/create
-                }}
+                onClick={() => router.push(`/rent/${selected.id}/escrow/create`)}
                 className="rounded-xl bg-orange-500 hover:bg-orange-600
                            active:bg-orange-700 text-white font-bold
                            uppercase tracking-wide px-8 py-3
                            transition-colors duration-200 shadow-md"
               >
-                Book
+                Buy
               </button>
             </div>
           </main>
 
           {/* ── Right: Thumbnail stack ── */}
           <div className="hidden lg:flex flex-col gap-3">
-            {selected.images.slice(1, 4).map((src, i) => (
+            {selectedImages.slice(1, 4).map((src, i) => (
               <div
                 key={i}
                 className="relative w-full rounded-xl overflow-hidden
@@ -285,6 +314,7 @@ export default function GuestSuggestionsPage() {
                   className="object-cover hover:scale-105 transition-transform
                              duration-300 cursor-pointer"
                   sizes="220px"
+                  unoptimized
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = "none";
                   }}
