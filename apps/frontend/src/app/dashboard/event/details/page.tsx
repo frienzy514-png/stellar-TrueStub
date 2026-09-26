@@ -1,10 +1,10 @@
 "use client";
 import Header from "@/components/layouts/Header";
 import { SideBar } from "@/components/layouts/SideBar";
-import Gallery from "@/components/ticket-events/details/Gallery";
-import Information from "@/components/ticket-events/details/Information";
-import Details from "@/components/ticket-events/details/Details";
-import EventMap from "@/components/ticket-events/payment/Map";
+import Gallery from "@/components/events/details/Gallery";
+import Information from "@/components/events/details/Information";
+import Details from "@/components/events/details/Details";
+import EventMap from "@/components/events/payment/Map";
 
 export default function EventPage() {
   const images = [

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { TicketEscrowWrapper } from "@/components/ticket-purchase";
+import { TicketEscrowWrapper } from "@/components/ticket-listing";
 
 /**
  * Ticket Purchase Escrow Creation Page

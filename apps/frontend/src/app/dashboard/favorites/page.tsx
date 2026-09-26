@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { CalendarDays, MapPin, Ticket, TrendingDown, TrendingUp } from 'lucide-react';
-import FavoriteButton from '@/components/ticket-listing-mobile/mobile/FavoriteButton';
+import FavoriteButton from '@/components/ticket-listing-mobile/FavoriteButton';
 import { useFavoritesStore } from '@/core/store/data/favorites.store';
 import { STUB_EVENTS } from '@/lib/mockData/events';
 import { getPriceChange } from '@/lib/watchlist';

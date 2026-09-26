@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Shield, Phone, Star } from "lucide-react";
-import FavoriteButton from "@/components/ticket-listing-mobile/mobile/FavoriteButton";
+import FavoriteButton from "@/components/ticket-listing-mobile/FavoriteButton";
 import ShareButton from "./ShareButton";
 import ContactButton from "./ContactButton";
 import ReportButton from "./ReportButton";
