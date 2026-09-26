@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutation } from "@apollo/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,8 +13,11 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
+import { toast } from "sonner";
+import { auth } from "@/lib/firebase";
 import { AccountOverviewTable } from "./AccountOverviewTable";
 import { AvatarUpload } from "./AvatarUpload";
+import { UPDATE_USER_PROFILE } from "@/graphql/mutations/user-mutations";
 
 interface ProfileFormData {
   firstName: string;
@@ -60,16 +64,38 @@ export function EditProfileForm() {
     avatar: null,
   });
 
+  const [updateUserProfile, { loading: isSaving }] = useMutation(UPDATE_USER_PROFILE);
+
   const handleChange =
     (field: keyof ProfileFormData) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
     };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: replace with mutation(UPDATE_USER_PROFILE)
-    console.log("Save profile", form);
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+      toast.error("You must be signed in to update your profile.");
+      return;
+    }
+    try {
+      await updateUserProfile({
+        variables: {
+          id: userId,
+          firstName: form.firstName,
+          lastName: form.surnames,
+          phoneNumber: form.phone,
+          countryCode: form.countryCode,
+          location: form.location,
+          summary: form.summary,
+        },
+      });
+      toast.success("Profile saved.");
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+      toast.error("Couldn't save your profile. Please try again.");
+    }
   };
 
   return (
@@ -174,9 +200,10 @@ export function EditProfileForm() {
         <div className="flex justify-end">
           <Button
             type="submit"
+            disabled={isSaving}
             className="bg-orange-500 hover:bg-orange-600 text-white"
           >
-            Save changes
+            {isSaving ? "Saving…" : "Save changes"}
           </Button>
         </div>
       </div>

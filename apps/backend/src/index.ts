@@ -16,6 +16,8 @@ import { refundsRouter } from "./routes/refunds";
 import { transfersRouter } from "./routes/transfers";
 import { changelogRouter } from "./routes/changelog";
 import { disputesRouter } from "./routes/disputes";
+// Issue #240 — account deletion / anonymization
+import { usersRouter } from "./routes/users";
 
 export function createApp(): Express {
   const app = express();
@@ -41,6 +43,8 @@ export function createApp(): Express {
   app.use("/api/changelog", changelogRouter);
   // #156 — Dispute state machine
   app.use("/api/disputes", disputesRouter);
+  // #240 — Account deletion / anonymization
+  app.use("/api/users", usersRouter);
   app.use(errorHandler);
   return app;
 }

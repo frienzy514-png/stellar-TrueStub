@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { deleteUser } from "firebase/auth";
 import { Download, Trash2 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchMockEscrows } from "@/lib/mockData";
@@ -99,11 +98,25 @@ export function PrivacyDataSection() {
         throw new Error("No signed-in user to delete");
       }
 
-      // TODO: also delete/anonymize the user's row and related records in
-      // Hasura via a backend endpoint, mirroring how sync-user.ts performs
-      // Hasura writes server-side. This call only removes the Firebase Auth
-      // account.
-      await deleteUser(user);
+      // Get a fresh ID token to authenticate the backend call.
+      const idToken = await user.getIdToken();
+
+      // Step 1: delete/anonymize the user's row and related records in Hasura
+      // via the backend endpoint (which holds the admin-secret). This must
+      // succeed before we remove the Firebase Auth account — if it fails, the
+      // user can retry. The backend also calls firebaseAuth.deleteUser() as
+      // its final step, so a single call covers both operations.
+      const response = await fetch("/api/users/me", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data?.error || "Failed to delete account data");
+      }
 
       toast.success("Your account has been deleted.");
       setIsDeleteOpen(false);

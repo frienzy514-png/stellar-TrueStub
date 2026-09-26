@@ -1,12 +1,10 @@
 /**
- * Tests for DisputeService state machine — issue #156
+ * Jest tests for DisputeService state machine — issue #156
  *
  * Covers: all valid transitions, all invalid transitions, final-state guard,
  * duplicate dispute guard, and state machine completeness.
  */
 
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
 import {
   DisputeService,
   InMemoryDisputeStore,
@@ -31,7 +29,6 @@ const base = {
   reason: "Ticket never arrived",
 };
 
-// ── Helper: open a dispute ─────────────────────────────────────────────────
 async function openDispute(service: DisputeService, overrides = {}) {
   return service.openDispute({ ...base, ...overrides });
 }
@@ -43,37 +40,27 @@ describe("DisputeService — state machine (#156)", () => {
       const { service } = makeService();
       const d = await openDispute(service);
 
-      assert.equal(d.state, "OPEN");
-      assert.equal(d.disputeId, base.disputeId);
-      assert.ok(d.openedAt);
+      expect(d.state).toBe("OPEN");
+      expect(d.disputeId).toBe(base.disputeId);
+      expect(d.openedAt).toBeTruthy();
     });
 
     it("throws DISPUTE_ALREADY_EXISTS for a duplicate disputeId", async () => {
       const { service } = makeService();
       await openDispute(service);
 
-      await assert.rejects(
-        () => openDispute(service),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).statusCode, 409);
-          assert.equal((err as AppError).code, DISPUTE_ERROR_CODES.ALREADY_EXISTS);
-          return true;
-        }
-      );
+      await expect(openDispute(service)).rejects.toMatchObject({
+        statusCode: 409,
+        code: DISPUTE_ERROR_CODES.ALREADY_EXISTS,
+      });
     });
 
     it("throws 400 when required fields are missing", async () => {
       const { service } = makeService();
 
-      await assert.rejects(
-        () => service.openDispute({ ...base, reason: "" }),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).statusCode, 400);
-          return true;
-        }
-      );
+      await expect(
+        service.openDispute({ ...base, reason: "" })
+      ).rejects.toMatchObject({ statusCode: 400 });
     });
   });
 
@@ -83,23 +70,23 @@ describe("DisputeService — state machine (#156)", () => {
       const { service } = makeService();
       await openDispute(service);
       const d = await service.transition(base.disputeId, "escalate");
-      assert.equal(d.state, "ESCALATED");
+      expect(d.state).toBe("ESCALATED");
     });
 
     it("OPEN → resolve → RESOLVED (sets resolvedAt)", async () => {
       const { service } = makeService();
       await openDispute(service);
       const d = await service.transition(base.disputeId, "resolve", { resolution: "Refund issued" });
-      assert.equal(d.state, "RESOLVED");
-      assert.ok(d.resolvedAt, "resolvedAt should be set");
-      assert.equal(d.resolution, "Refund issued");
+      expect(d.state).toBe("RESOLVED");
+      expect(d.resolvedAt).toBeTruthy();
+      expect(d.resolution).toBe("Refund issued");
     });
 
     it("OPEN → withdraw → WITHDRAWN", async () => {
       const { service } = makeService();
       await openDispute(service);
       const d = await service.transition(base.disputeId, "withdraw");
-      assert.equal(d.state, "WITHDRAWN");
+      expect(d.state).toBe("WITHDRAWN");
     });
 
     it("ESCALATED → resolve → RESOLVED", async () => {
@@ -107,8 +94,8 @@ describe("DisputeService — state machine (#156)", () => {
       await openDispute(service);
       await service.transition(base.disputeId, "escalate");
       const d = await service.transition(base.disputeId, "resolve");
-      assert.equal(d.state, "RESOLVED");
-      assert.ok(d.resolvedAt);
+      expect(d.state).toBe("RESOLVED");
+      expect(d.resolvedAt).toBeTruthy();
     });
 
     it("ESCALATED → withdraw → WITHDRAWN", async () => {
@@ -116,7 +103,7 @@ describe("DisputeService — state machine (#156)", () => {
       await openDispute(service);
       await service.transition(base.disputeId, "escalate");
       const d = await service.transition(base.disputeId, "withdraw");
-      assert.equal(d.state, "WITHDRAWN");
+      expect(d.state).toBe("WITHDRAWN");
     });
   });
 
@@ -126,15 +113,12 @@ describe("DisputeService — state machine (#156)", () => {
       const { service } = makeService();
       await openDispute(service);
 
-      await assert.rejects(
-        () => service.transition(base.disputeId, "reopen" as DisputeEvent),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).statusCode, 422);
-          assert.equal((err as AppError).code, DISPUTE_ERROR_CODES.INVALID_TRANSITION);
-          return true;
-        }
-      );
+      await expect(
+        service.transition(base.disputeId, "reopen" as DisputeEvent)
+      ).rejects.toMatchObject({
+        statusCode: 422,
+        code: DISPUTE_ERROR_CODES.INVALID_TRANSITION,
+      });
     });
 
     it("ESCALATED → escalate (already escalated) → DISPUTE_INVALID_TRANSITION", async () => {
@@ -142,21 +126,19 @@ describe("DisputeService — state machine (#156)", () => {
       await openDispute(service);
       await service.transition(base.disputeId, "escalate");
 
-      await assert.rejects(
-        () => service.transition(base.disputeId, "escalate"),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).code, DISPUTE_ERROR_CODES.INVALID_TRANSITION);
-          return true;
-        }
-      );
+      await expect(
+        service.transition(base.disputeId, "escalate")
+      ).rejects.toMatchObject({ code: DISPUTE_ERROR_CODES.INVALID_TRANSITION });
     });
   });
 
   // ── Final state guard ──────────────────────────────────────────────────
   describe("final state guard", () => {
-    for (const finalState of ["RESOLVED", "WITHDRAWN"] as DisputeState[]) {
-      for (const event of ["escalate", "resolve", "withdraw"] as DisputeEvent[]) {
+    const FINAL_STATE_LIST: DisputeState[] = ["RESOLVED", "WITHDRAWN"];
+    const EVENTS: DisputeEvent[] = ["escalate", "resolve", "withdraw"];
+
+    for (const finalState of FINAL_STATE_LIST) {
+      for (const event of EVENTS) {
         it(`${finalState} → ${event} → DISPUTE_ALREADY_FINAL`, async () => {
           const { service } = makeService();
           await openDispute(service);
@@ -167,15 +149,12 @@ describe("DisputeService — state machine (#156)", () => {
             await service.transition(base.disputeId, "withdraw");
           }
 
-          await assert.rejects(
-            () => service.transition(base.disputeId, event),
-            (err: unknown) => {
-              assert.ok(err instanceof AppError);
-              assert.equal((err as AppError).statusCode, 409);
-              assert.equal((err as AppError).code, DISPUTE_ERROR_CODES.ALREADY_FINAL);
-              return true;
-            }
-          );
+          await expect(
+            service.transition(base.disputeId, event)
+          ).rejects.toMatchObject({
+            statusCode: 409,
+            code: DISPUTE_ERROR_CODES.ALREADY_FINAL,
+          });
         });
       }
     }
@@ -183,15 +162,12 @@ describe("DisputeService — state machine (#156)", () => {
     it("throws 404 for unknown disputeId", async () => {
       const { service } = makeService();
 
-      await assert.rejects(
-        () => service.transition("ghost", "resolve"),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).statusCode, 404);
-          assert.equal((err as AppError).code, DISPUTE_ERROR_CODES.NOT_FOUND);
-          return true;
-        }
-      );
+      await expect(
+        service.transition("ghost", "resolve")
+      ).rejects.toMatchObject({
+        statusCode: 404,
+        code: DISPUTE_ERROR_CODES.NOT_FOUND,
+      });
     });
   });
 
@@ -214,37 +190,29 @@ describe("DisputeService — state machine (#156)", () => {
           const key = `${state}:${event}`;
           const result = resolveTransition(state, event);
           if (expectedValid.has(key)) {
-            assert.ok(result !== undefined, `Expected ${key} to be a valid transition`);
+            expect(result).not.toBeUndefined();
           } else {
-            assert.equal(result, undefined, `Expected ${key} to be an invalid transition`);
+            expect(result).toBeUndefined();
           }
         }
       }
     });
 
     it("FINAL_STATES contains exactly RESOLVED and WITHDRAWN", () => {
-      assert.ok(FINAL_STATES.has("RESOLVED"));
-      assert.ok(FINAL_STATES.has("WITHDRAWN"));
-      assert.equal(FINAL_STATES.size, 2);
+      expect(FINAL_STATES.has("RESOLVED")).toBe(true);
+      expect(FINAL_STATES.has("WITHDRAWN")).toBe(true);
+      expect(FINAL_STATES.size).toBe(2);
     });
 
     it("DISPUTE_TRANSITIONS has an entry for every known state", () => {
       for (const state of ALL_STATES) {
-        assert.ok(
-          state in DISPUTE_TRANSITIONS,
-          `DISPUTE_TRANSITIONS is missing state: ${state}`
-        );
+        expect(state in DISPUTE_TRANSITIONS).toBe(true);
       }
     });
 
     it("final states have no outgoing transitions in the table", () => {
       for (const state of FINAL_STATES) {
-        const outgoing = Object.keys(DISPUTE_TRANSITIONS[state]);
-        assert.equal(
-          outgoing.length,
-          0,
-          `Final state ${state} should have 0 outgoing transitions, found: ${outgoing.join(", ")}`
-        );
+        expect(Object.keys(DISPUTE_TRANSITIONS[state])).toHaveLength(0);
       }
     });
   });

@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useMutation } from "@apollo/client";
 import { User } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UPDATE_USER } from "@/graphql/mutations/user-mutations";
 
 interface UserProfile {
   id: string;
@@ -36,6 +39,8 @@ export function UserProfileCard({ user }: UserProfileCardProps) {
     profileImageUrl: user.profileImageUrl ?? "",
   });
 
+  const [updateUser, { loading: isSaving }] = useMutation(UPDATE_USER);
+
   const reputation = user.reputation || {
     user_id: user.id,
     total_reviews: 32,
@@ -52,10 +57,23 @@ export function UserProfileCard({ user }: UserProfileCardProps) {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
-  function handleSave() {
-    console.log("Updated profile values:", formData);
-    // TODO: replace with useMutation(UPDATE_USER) in GraphQL wiring issue
-    setIsEditing(false);
+  async function handleSave() {
+    try {
+      await updateUser({
+        variables: {
+          id: user.id,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phoneNumber: formData.phoneNumber,
+          profileImageUrl: formData.profileImageUrl || null,
+        },
+      });
+      toast.success("Profile updated.");
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+      toast.error("Couldn't save your changes. Please try again.");
+    }
   }
 
   function handleCancel() {
@@ -126,10 +144,10 @@ export function UserProfileCard({ user }: UserProfileCardProps) {
               />
             </div>
             <div className="flex gap-2 pt-2">
-              <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white">
-                Save
+              <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
+                {isSaving ? "Saving…" : "Save"}
               </Button>
-              <Button variant="outline" onClick={handleCancel}>
+              <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
                 Cancel
               </Button>
             </div>

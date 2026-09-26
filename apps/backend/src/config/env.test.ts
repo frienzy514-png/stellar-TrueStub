@@ -1,15 +1,13 @@
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
 import { validateEnv, envSchema } from "./env";
 
 describe("Backend Environment Validation", () => {
   it("should supply default values when optional vars are omitted", () => {
     const parsed = validateEnv({});
-    assert.equal(parsed.PORT, 4000);
-    assert.equal(parsed.NODE_ENV, "development");
-    assert.equal(parsed.TRUSTLESS_WORK_WEBHOOK_SECRET, undefined);
-    assert.equal(parsed.HASURA_GRAPHQL_URL, undefined);
-    assert.equal(parsed.HASURA_GRAPHQL_ADMIN_SECRET, undefined);
+    expect(parsed.PORT).toBe(4000);
+    expect(parsed.NODE_ENV).toBe("development");
+    expect(parsed.TRUSTLESS_WORK_WEBHOOK_SECRET).toBeUndefined();
+    expect(parsed.HASURA_GRAPHQL_URL).toBeUndefined();
+    expect(parsed.HASURA_GRAPHQL_ADMIN_SECRET).toBeUndefined();
   });
 
   it("should parse valid custom PORT and NODE_ENV", () => {
@@ -17,8 +15,8 @@ describe("Backend Environment Validation", () => {
       PORT: "5050",
       NODE_ENV: "production",
     });
-    assert.equal(parsed.PORT, 5050);
-    assert.equal(parsed.NODE_ENV, "production");
+    expect(parsed.PORT).toBe(5050);
+    expect(parsed.NODE_ENV).toBe("production");
   });
 
   it("should parse valid roadmap variables when provided", () => {
@@ -29,57 +27,38 @@ describe("Backend Environment Validation", () => {
       HASURA_GRAPHQL_URL: "https://graphql.example.com/v1/graphql",
       HASURA_GRAPHQL_ADMIN_SECRET: "admin_secret_456",
     });
-    assert.equal(parsed.TRUSTLESS_WORK_WEBHOOK_SECRET, "whsec_test123");
-    assert.equal(parsed.HASURA_GRAPHQL_URL, "https://graphql.example.com/v1/graphql");
-    assert.equal(parsed.HASURA_GRAPHQL_ADMIN_SECRET, "admin_secret_456");
+    expect(parsed.TRUSTLESS_WORK_WEBHOOK_SECRET).toBe("whsec_test123");
+    expect(parsed.HASURA_GRAPHQL_URL).toBe("https://graphql.example.com/v1/graphql");
+    expect(parsed.HASURA_GRAPHQL_ADMIN_SECRET).toBe("admin_secret_456");
   });
 
   it("should throw a descriptive error on non-numeric PORT", () => {
-    assert.throws(
-      () => validateEnv({ PORT: "not-a-number" }),
-      (err: Error) => {
-        assert.match(err.message, /Invalid environment variables/);
-        assert.match(err.message, /PORT/);
-        return true;
-      }
+    expect(() => validateEnv({ PORT: "not-a-number" })).toThrow(
+      expect.objectContaining({ message: expect.stringMatching(/Invalid environment variables/) })
+    );
+    expect(() => validateEnv({ PORT: "not-a-number" })).toThrow(
+      expect.objectContaining({ message: expect.stringMatching(/PORT/) })
     );
   });
 
   it("should throw on out-of-range PORT", () => {
-    assert.throws(
-      () => validateEnv({ PORT: "70000" }),
-      (err: Error) => {
-        assert.match(err.message, /PORT/);
-        return true;
-      }
+    expect(() => validateEnv({ PORT: "70000" })).toThrow(
+      expect.objectContaining({ message: expect.stringMatching(/PORT/) })
     );
-
-    assert.throws(
-      () => validateEnv({ PORT: "0" }),
-      (err: Error) => {
-        assert.match(err.message, /PORT/);
-        return true;
-      }
+    expect(() => validateEnv({ PORT: "0" })).toThrow(
+      expect.objectContaining({ message: expect.stringMatching(/PORT/) })
     );
   });
 
   it("should throw on invalid NODE_ENV", () => {
-    assert.throws(
-      () => validateEnv({ NODE_ENV: "invalid_env" as any }),
-      (err: Error) => {
-        assert.match(err.message, /NODE_ENV/);
-        return true;
-      }
+    expect(() => validateEnv({ NODE_ENV: "invalid_env" as any })).toThrow(
+      expect.objectContaining({ message: expect.stringMatching(/NODE_ENV/) })
     );
   });
 
   it("should throw on invalid HASURA_GRAPHQL_URL URL format", () => {
-    assert.throws(
-      () => validateEnv({ HASURA_GRAPHQL_URL: "not-a-valid-url" }),
-      (err: Error) => {
-        assert.match(err.message, /HASURA_GRAPHQL_URL/);
-        return true;
-      }
+    expect(() => validateEnv({ HASURA_GRAPHQL_URL: "not-a-valid-url" })).toThrow(
+      expect.objectContaining({ message: expect.stringMatching(/HASURA_GRAPHQL_URL/) })
     );
   });
 });

@@ -1,15 +1,20 @@
-
 "use client";
 
-import ResetPasswordForm from "@/components/auth/ResetPasswordForm";
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import NewPassword from "@/components/auth/NewPassword";
+
+function NewPasswordContent() {
+  const searchParams = useSearchParams();
+  const oobCode = searchParams.get("oobCode") ?? "";
+
+  return <NewPassword oobCode={oobCode} />;
+}
 
 export default function Page() {
   return (
-    <ResetPasswordForm
-      onSubmit={async (password: string, confirmPassword: string) => {
-        console.log('New password:', password);
-      }}
-      isValidToken={true}
-    />
+    <Suspense>
+      <NewPasswordContent />
+    </Suspense>
   );
 }

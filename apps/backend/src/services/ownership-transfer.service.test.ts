@@ -1,12 +1,10 @@
 /**
- * Tests for OwnershipTransferService — issue #154
+ * Jest tests for OwnershipTransferService atomic workflow — issue #154
  *
  * Covers: initiate, accept, cancel, duplicate transferId guard,
  * double-finalise guard, and concurrent access atomicity.
  */
 
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
 import {
   OwnershipTransferService,
   InMemoryOwnershipStore,
@@ -32,39 +30,29 @@ describe("OwnershipTransferService — atomic workflow (#154)", () => {
       const { service } = makeService();
       const t = await service.initiateTransfer(base);
 
-      assert.equal(t.state, "PENDING");
-      assert.equal(t.fromOwner, "alice");
-      assert.equal(t.toOwner, "bob");
-      assert.ok(t.initiatedAt);
-      assert.equal(t.finalizedAt, undefined);
+      expect(t.state).toBe("PENDING");
+      expect(t.fromOwner).toBe("alice");
+      expect(t.toOwner).toBe("bob");
+      expect(t.initiatedAt).toBeTruthy();
+      expect(t.finalizedAt).toBeUndefined();
     });
 
     it("rejects a duplicate transferId with TRANSFER_CONFLICT", async () => {
       const { service } = makeService();
       await service.initiateTransfer(base);
 
-      await assert.rejects(
-        () => service.initiateTransfer(base),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).statusCode, 409);
-          assert.equal((err as AppError).code, TRANSFER_ERROR_CODES.CONFLICT);
-          return true;
-        }
-      );
+      await expect(service.initiateTransfer(base)).rejects.toMatchObject({
+        statusCode: 409,
+        code: TRANSFER_ERROR_CODES.CONFLICT,
+      });
     });
 
     it("throws 400 on missing required fields", async () => {
       const { service } = makeService();
 
-      await assert.rejects(
-        () => service.initiateTransfer({ ...base, fromOwner: "" }),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).statusCode, 400);
-          return true;
-        }
-      );
+      await expect(
+        service.initiateTransfer({ ...base, fromOwner: "" })
+      ).rejects.toMatchObject({ statusCode: 400 });
     });
   });
 
@@ -75,8 +63,8 @@ describe("OwnershipTransferService — atomic workflow (#154)", () => {
 
       const accepted = await service.acceptTransfer(base.transferId);
 
-      assert.equal(accepted.state, "ACCEPTED");
-      assert.ok(accepted.finalizedAt);
+      expect(accepted.state).toBe("ACCEPTED");
+      expect(accepted.finalizedAt).toBeTruthy();
     });
 
     it("throws 409 ALREADY_FINALIZED when accepting an already-ACCEPTED transfer", async () => {
@@ -84,15 +72,10 @@ describe("OwnershipTransferService — atomic workflow (#154)", () => {
       await service.initiateTransfer(base);
       await service.acceptTransfer(base.transferId);
 
-      await assert.rejects(
-        () => service.acceptTransfer(base.transferId),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).statusCode, 409);
-          assert.equal((err as AppError).code, TRANSFER_ERROR_CODES.ALREADY_FINALIZED);
-          return true;
-        }
-      );
+      await expect(service.acceptTransfer(base.transferId)).rejects.toMatchObject({
+        statusCode: 409,
+        code: TRANSFER_ERROR_CODES.ALREADY_FINALIZED,
+      });
     });
 
     it("throws 409 ALREADY_FINALIZED when accepting a CANCELLED transfer", async () => {
@@ -100,28 +83,18 @@ describe("OwnershipTransferService — atomic workflow (#154)", () => {
       await service.initiateTransfer(base);
       await service.cancelTransfer(base.transferId);
 
-      await assert.rejects(
-        () => service.acceptTransfer(base.transferId),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).code, TRANSFER_ERROR_CODES.ALREADY_FINALIZED);
-          return true;
-        }
-      );
+      await expect(service.acceptTransfer(base.transferId)).rejects.toMatchObject({
+        code: TRANSFER_ERROR_CODES.ALREADY_FINALIZED,
+      });
     });
 
     it("throws 404 for a non-existent transferId", async () => {
       const { service } = makeService();
 
-      await assert.rejects(
-        () => service.acceptTransfer("ghost-id"),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).statusCode, 404);
-          assert.equal((err as AppError).code, TRANSFER_ERROR_CODES.NOT_FOUND);
-          return true;
-        }
-      );
+      await expect(service.acceptTransfer("ghost-id")).rejects.toMatchObject({
+        statusCode: 404,
+        code: TRANSFER_ERROR_CODES.NOT_FOUND,
+      });
     });
   });
 
@@ -132,27 +105,18 @@ describe("OwnershipTransferService — atomic workflow (#154)", () => {
 
       const cancelled = await service.cancelTransfer(base.transferId);
 
-      assert.equal(cancelled.state, "CANCELLED");
-      assert.ok(cancelled.finalizedAt);
+      expect(cancelled.state).toBe("CANCELLED");
+      expect(cancelled.finalizedAt).toBeTruthy();
     });
 
-    it("prevents partial states — no transfer state beyond ACCEPTED or CANCELLED exists", async () => {
+    it("throws 409 ALREADY_FINALIZED when cancelling an accepted transfer", async () => {
       const { service } = makeService();
       await service.initiateTransfer(base);
-      const accepted = await service.acceptTransfer(base.transferId);
+      await service.acceptTransfer(base.transferId);
 
-      // Once ACCEPTED the record is immutable for further transitions
-      await assert.rejects(
-        () => service.cancelTransfer(base.transferId),
-        (err: unknown) => {
-          assert.ok(err instanceof AppError);
-          assert.equal((err as AppError).code, TRANSFER_ERROR_CODES.ALREADY_FINALIZED);
-          return true;
-        }
-      );
-
-      // State has not changed from ACCEPTED
-      assert.equal(accepted.state, "ACCEPTED");
+      await expect(service.cancelTransfer(base.transferId)).rejects.toMatchObject({
+        code: TRANSFER_ERROR_CODES.ALREADY_FINALIZED,
+      });
     });
   });
 
@@ -161,7 +125,6 @@ describe("OwnershipTransferService — atomic workflow (#154)", () => {
       const { service } = makeService();
       await service.initiateTransfer(base);
 
-      // Fire two accepts simultaneously
       const results = await Promise.allSettled([
         service.acceptTransfer(base.transferId),
         service.acceptTransfer(base.transferId),
@@ -170,11 +133,11 @@ describe("OwnershipTransferService — atomic workflow (#154)", () => {
       const fulfilled = results.filter((r) => r.status === "fulfilled");
       const rejected = results.filter((r) => r.status === "rejected");
 
-      assert.equal(fulfilled.length, 1, "exactly one accept should succeed");
-      assert.equal(rejected.length, 1, "exactly one accept should fail");
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
 
       const err = (rejected[0] as PromiseRejectedResult).reason as AppError;
-      assert.equal(err.code, TRANSFER_ERROR_CODES.ALREADY_FINALIZED);
+      expect(err.code).toBe(TRANSFER_ERROR_CODES.ALREADY_FINALIZED);
     });
 
     it("only one of concurrent accept+cancel calls wins", async () => {
@@ -187,14 +150,14 @@ describe("OwnershipTransferService — atomic workflow (#154)", () => {
       ]);
 
       const fulfilled = results.filter((r) => r.status === "fulfilled");
-      assert.equal(fulfilled.length, 1, "only one final state can be set");
+      expect(fulfilled).toHaveLength(1);
     });
   });
 
   describe("getTransfer", () => {
     it("returns undefined for unknown transferId", async () => {
       const { service } = makeService();
-      assert.equal(await service.getTransfer("none"), undefined);
+      expect(await service.getTransfer("none")).toBeUndefined();
     });
 
     it("returns the current state without side effects", async () => {
@@ -202,8 +165,8 @@ describe("OwnershipTransferService — atomic workflow (#154)", () => {
       await service.initiateTransfer(base);
       const t = await service.getTransfer(base.transferId);
 
-      assert.ok(t);
-      assert.equal(t!.state, "PENDING");
+      expect(t).not.toBeUndefined();
+      expect(t!.state).toBe("PENDING");
     });
   });
 });

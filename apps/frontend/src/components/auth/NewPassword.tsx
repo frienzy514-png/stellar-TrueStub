@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { confirmPasswordReset, verifyPasswordResetCode } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,15 +11,16 @@ import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import Illustration from "@/components/auth/ui/Illustration";
-import {
-  PasswordStrengthMeter,
-  getPasswordScore,
-} from "@/components/auth/ui/PasswordStrengthMeter";
+import { PasswordStrengthMeter } from "@/components/auth/ui/PasswordStrengthMeter";
 
-export default function NewPassword() {
+interface NewPasswordProps {
+  /** Firebase oobCode extracted from the reset link URL (?oobCode=...) */
+  oobCode: string;
+}
+
+export default function NewPassword({ oobCode }: NewPasswordProps) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordStrength, setPasswordStrength] = useState<number>(-1);
   const [status, setStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
@@ -38,17 +41,43 @@ export default function NewPassword() {
       return;
     }
 
+    if (!oobCode) {
+      setStatus("error");
+      setMessage(
+        "This link is invalid or has expired. Please request a new password reset."
+      );
+      return;
+    }
+
     setStatus("loading");
     setMessage("");
 
     try {
-      // TODO: Implement password reset logic
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate API call
+      // Verify the oobCode is still valid before trying to confirm.
+      // verifyPasswordResetCode throws if the code is expired or already used.
+      await verifyPasswordResetCode(auth, oobCode);
+      await confirmPasswordReset(auth, oobCode, password);
       setStatus("success");
-      setMessage("Password has been reset successfully.");
+      setMessage(
+        "Password has been reset successfully. You can now sign in with your new password."
+      );
     } catch (error) {
-      setStatus("error");
-      setMessage("Failed to reset password. Please try again.");
+      const code = (error as { code?: string })?.code;
+      if (
+        code === "auth/expired-action-code" ||
+        code === "auth/invalid-action-code"
+      ) {
+        setStatus("error");
+        setMessage(
+          "This reset link has expired or already been used. Please request a new one."
+        );
+      } else if (code === "auth/weak-password") {
+        setStatus("error");
+        setMessage("Password is too weak. Please choose a stronger password.");
+      } else {
+        setStatus("error");
+        setMessage("Failed to reset password. Please try again.");
+      }
     }
   };
 
@@ -74,66 +103,74 @@ export default function NewPassword() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="new-password">New password</Label>
-              <Input
-                id="new-password"
-                type="password"
-                placeholder="Enter new password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setPasswordStrength(e.target.value ? zxcvbn(e.target.value).score : -1);
-                }}
-                required
-                minLength={8}
-              />
-              {passwordStrength >= 0 && (
-                <PasswordStrengthBar score={passwordStrength} />
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm new password</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                placeholder="Confirm new password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={8}
-              />
-            </div>
-
-            {message && (
-              <Alert variant={status === "error" ? "destructive" : "default"}>
+          {status === "success" ? (
+            <div className="space-y-4">
+              <Alert>
                 <AlertDescription>{message}</AlertDescription>
               </Alert>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full bg-[#2857B8] hover:bg-[#2857B8]/90"
-              disabled={status === "loading"}
-            >
-              {status === "loading" ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Setting Password...
-                </>
-              ) : (
-                "Set New Password"
-              )}
-            </Button>
-
-            <div className="text-center text-sm">
-              <Link href="/login" className="text-[#2857B8] hover:underline">
-                Back to Login
-              </Link>
+              <div className="text-center text-sm">
+                <Link href="/login" className="text-[#2857B8] hover:underline">
+                  Go to Login
+                </Link>
+              </div>
             </div>
-          </form>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  placeholder="Enter new password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                />
+                {password && <PasswordStrengthMeter password={password} />}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm new password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  placeholder="Confirm new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={8}
+                />
+              </div>
+
+              {message && status === "error" && (
+                <Alert variant="destructive">
+                  <AlertDescription>{message}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full bg-[#2857B8] hover:bg-[#2857B8]/90"
+                disabled={status === "loading"}
+              >
+                {status === "loading" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Setting Password...
+                  </>
+                ) : (
+                  "Set New Password"
+                )}
+              </Button>
+
+              <div className="text-center text-sm">
+                <Link href="/login" className="text-[#2857B8] hover:underline">
+                  Back to Login
+                </Link>
+              </div>
+            </form>
+          )}
         </div>
       </div>
 
