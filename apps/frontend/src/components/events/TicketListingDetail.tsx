@@ -6,7 +6,7 @@ import { FaMapMarkerAlt } from 'react-icons/fa';
 import ListingFeatureIcons from './ListingFeatureIcons';
 import { formatListingPrice } from './formatListingPrice';
 import EventImageGallery from './EventImageGallery';
-import FavoriteButton from '@/components/ticket-listing-mobile/mobile/FavoriteButton';
+import FavoriteButton from '@/components/ticket-listing-mobile/FavoriteButton';
 import { useFavoritesStore } from '@/core/store/data/favorites.store';
 
 interface TicketListingDetailProps {

@@ -4,7 +4,7 @@ import Header from "@/components/layouts/Header";
 import React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import DatePicker from "@/components/ticket-events/search/datepicker";
+import DatePicker from "@/components/events/search/datepicker";
 import Link from "next/link";
 import { Heart, MapPin } from "lucide-react";
 

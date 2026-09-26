@@ -40,7 +40,7 @@ Spread across 36 files. Largest contributors:
 | File                                                        | Lines |
 | ----------------------------------------------------------- | ----- |
 | `src/components/auth/wallet/hooks/useMultiWallet.ts`        | 8     |
-| `src/components/__dev__/ApolloTestComponent.tsx`            | 6     |
+| `src/components/dev/ApolloTestComponent.tsx`                | 6     |
 | `src/components/auth/wallet/hooks/metamask-wallet.hook.ts`  | 5     |
 | `src/utils/optimistic-updates.ts`                           | 4     |
 | `src/utils/cache-utils.ts`                                  | 4     |

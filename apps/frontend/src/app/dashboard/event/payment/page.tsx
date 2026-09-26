@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import EventDetails from "@/components/ticket-events/payment/EventDetails";
-import ReservationSummary from "@/components/ticket-events/payment/ReservationSummary";
+import EventDetails from "@/components/events/payment/EventDetails";
+import ReservationSummary from "@/components/events/payment/ReservationSummary";
 
 const EventPage = () => {
   const eventData = {
