@@ -43,6 +43,8 @@ const createListingSchema = z.object({
 });
 
 // #187 — a newly created listing triggers alerts for matching saved searches.
+// #333 — the same creation path also matches registered saved searches and
+// notifies each search's owner via notification.service.ts.
 listingsRouter.post("/", async (req, res, next) => {
   const parsed = createListingSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -50,7 +52,8 @@ listingsRouter.post("/", async (req, res, next) => {
   }
   try {
     const notifiedSearchIds = await listingAlertService.notifyNewListing(parsed.data);
-    return res.status(201).json({ listing: parsed.data, notifiedSearchIds });
+    const savedSearchMatches = await listingAlertService.notifySavedSearchMatches(parsed.data);
+    return res.status(201).json({ listing: parsed.data, notifiedSearchIds, savedSearchMatches });
   } catch (err) {
     return next(err);
   }

@@ -108,6 +108,17 @@ export class ListingAlertService {
     return matches.map((s) => s.id);
   }
 
+  /**
+   * Job entry point: match a newly created listing against every registered
+   * saved search and notify each match's owner. This is the backend job that
+   * issue #333 wires to listing creation (or a periodic sweep); it is a thin,
+   * idempotent wrapper over notifyNewListing so callers have a single seam.
+   */
+  async runSavedSearchMatchJob(listing: ListingSnapshot): Promise<{ matchedSearchIds: string[] }> {
+    const matchedSearchIds = await this.notifyNewListing(listing);
+    return { matchedSearchIds };
+  }
+
   // ── Watchlist ───────────────────────────────────────────────────────────
 
   watch(input: WatchInput): WatchEntry {
