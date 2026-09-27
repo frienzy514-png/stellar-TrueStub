@@ -1,6 +1,8 @@
 import { Router } from "express";
+import { z } from "zod";
 import { firebaseAuth } from "../lib/firebase-admin";
 import { hasuraRequest } from "../lib/hasura";
+import { registerRoute } from "../lib/openapi";
 
 export const usersRouter = Router();
 
@@ -49,6 +51,49 @@ interface AnonymizeUserResult {
     affected_rows: number;
   };
 }
+
+// Zod schemas describing this route's request/response shapes. They are the
+// single source of truth for both runtime validation and the generated
+// OpenAPI spec (see ../lib/openapi), so the docs cannot drift from the code.
+const deleteMeResponseSchema = z.object({
+  success: z.boolean(),
+  deleted: z.boolean(),
+});
+
+const deleteMeErrorSchema = z.object({
+  error: z.string(),
+});
+
+registerRoute({
+  method: "delete",
+  path: "/api/users/me",
+  summary: "Anonymize and delete the authenticated user",
+  description:
+    "Anonymizes the caller's PII in Hasura and deletes their Firebase Auth account.",
+  request: {
+    headers: z.object({
+      authorization: z.string().describe("Bearer <Firebase ID token>"),
+    }),
+  },
+  responses: {
+    200: {
+      description: "User anonymized and deleted",
+      content: { "application/json": { schema: deleteMeResponseSchema } },
+    },
+    400: {
+      description: "Firebase account has no email",
+      content: { "application/json": { schema: deleteMeErrorSchema } },
+    },
+    401: {
+      description: "Missing, invalid, or expired token",
+      content: { "application/json": { schema: deleteMeErrorSchema } },
+    },
+    502: {
+      description: "Failed to remove user data",
+      content: { "application/json": { schema: deleteMeErrorSchema } },
+    },
+  },
+});
 
 usersRouter.delete("/me", async (req, res) => {
   const authHeader = req.headers.authorization;
