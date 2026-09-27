@@ -90,3 +90,8 @@ TrueStub started as a personalized fork of [SafeTrust](https://github.com/safetr
 ---
 
 🌟 **Join TrueStub today and never wire money to a stranger for a ticket again!** 🌟
+
+## Handsoff notes
+
+<!-- handsoff-issue-338 -->
+- #338: Add a formal API reference doc for the new backend routes
