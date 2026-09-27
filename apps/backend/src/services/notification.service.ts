@@ -130,7 +130,7 @@ export class NotificationService {
     amount: string,
     recipientName = "User"
   ) {
-    const baseUrl = process.env.FRONTEND_URL || "https://truestub.com";
+    const baseUrl = env.FRONTEND_URL;
     const actionUrl = `${baseUrl}/dashboard/escrow/${id}`;
 
     switch (status) {

@@ -6,6 +6,7 @@ import { initSentry, Sentry } from "./lib/sentry";
 import { requestLogger } from "./middleware/requestLogger";
 import { corsMiddleware, helmetMiddleware } from "./middleware/security";
 import { authRateLimiter } from "./middleware/rateLimiter";
+import { requireAuth, requireAuthForWrites } from "./middleware/auth";
 import { errorHandler } from "./middleware/errorHandler";
 import { captureRawBody } from "./middleware/rawBody";
 import { healthRouter } from "./routes/health";
@@ -30,18 +31,18 @@ export function createApp(): Express {
   app.use(express.json({ verify: captureRawBody }));
   app.use("/api/auth", authRateLimiter);
   app.use("/health", healthRouter);
-  app.use("/api/listings", listingsRouter);
-  app.use("/api/saved-searches", savedSearchesRouter);
-  app.use("/api/watchlist", watchlistRouter);
+  app.use("/api/listings", requireAuthForWrites, listingsRouter);
+  app.use("/api/saved-searches", requireAuth, savedSearchesRouter);
+  app.use("/api/watchlist", requireAuth, watchlistRouter);
   app.use("/webhooks", webhookRouter);
   // #153 — Refund idempotency
-  app.use("/api/refunds", refundsRouter);
+  app.use("/api/refunds", requireAuth, refundsRouter);
   // #154 — Atomic ownership transfers
-  app.use("/api/transfers", transfersRouter);
+  app.use("/api/transfers", requireAuth, transfersRouter);
   // #155 — Immutable changelog
-  app.use("/api/changelog", changelogRouter);
+  app.use("/api/changelog", requireAuth, changelogRouter);
   // #156 — Dispute state machine
-  app.use("/api/disputes", disputesRouter);
+  app.use("/api/disputes", requireAuth, disputesRouter);
   // #240 — Account deletion / anonymization
   app.use("/api/users", usersRouter);
   app.use(errorHandler);

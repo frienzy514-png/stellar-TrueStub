@@ -12,6 +12,7 @@
  */
 
 import { randomUUID } from "crypto";
+import { env } from "../config/env";
 import { NotificationService } from "./notification.service";
 import { HasuraService } from "./hasura.service";
 
@@ -68,7 +69,7 @@ export class ListingAlertService {
   private readonly watches = new Map<string, WatchEntry>();
 
   private static baseUrl() {
-    return process.env.FRONTEND_URL || "https://truestub.com";
+    return env.FRONTEND_URL;
   }
 
   // ── Saved searches ──────────────────────────────────────────────────────

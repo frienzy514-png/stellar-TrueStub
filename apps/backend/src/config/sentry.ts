@@ -14,9 +14,10 @@
  * @see https://docs.sentry.io/platforms/javascript/guides/express/
  */
 import * as Sentry from "@sentry/node";
+import { env } from "./env";
 
 export function initSentry(): void {
-  const dsn = process.env.SENTRY_DSN;
+  const dsn = env.SENTRY_DSN;
   if (!dsn) {
     // No DSN configured — Sentry is a no-op.  This is fine for local dev.
     return;
@@ -24,7 +25,7 @@ export function initSentry(): void {
 
   Sentry.init({
     dsn,
-    environment: process.env.NODE_ENV ?? "development",
+    environment: env.NODE_ENV,
     // Capture 10 % of transactions for performance monitoring.
     tracesSampleRate: 0.1,
   });

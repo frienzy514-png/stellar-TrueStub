@@ -59,6 +59,9 @@ export const envSchema = z.object({
 
   // Error tracking (#111) — unset in local dev, Sentry stays disabled
   SENTRY_DSN: z.string().url("SENTRY_DSN must be a valid URL").optional(),
+
+  // Base URL for links in notification emails / listing alerts
+  FRONTEND_URL: z.string().url("FRONTEND_URL must be a valid URL").default("https://truestub.com"),
 });
 
 export type Env = z.infer<typeof envSchema>;
