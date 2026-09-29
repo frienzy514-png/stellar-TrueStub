@@ -90,3 +90,8 @@ TrueStub started as a personalized fork of [SafeTrust](https://github.com/safetr
 ---
 
 🌟 **Join TrueStub today and never wire money to a stranger for a ticket again!** 🌟
+
+## Handsoff notes
+
+<!-- handsoff-issue-313 -->
+- #313: Wire the remaining mocked API calls in `TicketEscrowIntegration`/`TicketEscrowWrapper`

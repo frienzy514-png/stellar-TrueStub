@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { assessListingRisk } from "../services/listing-fraud.service";
 import { listingAlertService } from "../services/listing-alert.service";
+import { registerRoute } from "../openapi/registry";
 
 export const listingsRouter = Router();
 
@@ -19,6 +20,13 @@ const listingSchema = z.object({
 const riskCheckSchema = z.object({
   listing: listingSchema,
   existingListings: z.array(listingSchema).default([]),
+});
+
+registerRoute({
+  method: "post",
+  path: "/api/listings/risk-check",
+  summary: "Assess fraud risk for a listing",
+  request: { body: riskCheckSchema },
 });
 
 listingsRouter.post("/risk-check", (req, res) => {
@@ -42,7 +50,16 @@ const createListingSchema = z.object({
   status: z.string().optional(),
 });
 
+registerRoute({
+  method: "post",
+  path: "/api/listings",
+  summary: "Create a listing and notify matching saved searches",
+  request: { body: createListingSchema },
+});
+
 // #187 — a newly created listing triggers alerts for matching saved searches.
+// #333 — the same creation path also matches registered saved searches and
+// notifies each search's owner via notification.service.ts.
 listingsRouter.post("/", async (req, res, next) => {
   const parsed = createListingSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -50,7 +67,8 @@ listingsRouter.post("/", async (req, res, next) => {
   }
   try {
     const notifiedSearchIds = await listingAlertService.notifyNewListing(parsed.data);
-    return res.status(201).json({ listing: parsed.data, notifiedSearchIds });
+    const savedSearchMatches = await listingAlertService.notifySavedSearchMatches(parsed.data);
+    return res.status(201).json({ listing: parsed.data, notifiedSearchIds, savedSearchMatches });
   } catch (err) {
     return next(err);
   }
@@ -62,6 +80,13 @@ const updateListingSchema = z.object({
   previousPrice: z.number().nonnegative().optional(),
   section: z.string().optional(),
   status: z.string().optional(),
+});
+
+registerRoute({
+  method: "patch",
+  path: "/api/listings/{id}",
+  summary: "Update a listing and notify watchers",
+  request: { params: z.object({ id: z.string() }), body: updateListingSchema },
 });
 
 // #189 — price change / about-to-sell notifies watchers of the listing.

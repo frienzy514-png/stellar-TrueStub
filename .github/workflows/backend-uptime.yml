@@ -1,38 +1,31 @@
-name: Backend Uptime Check
+name: Backend Uptime
 
 on:
   schedule:
-    # Every 15 minutes.
-    - cron: "*/15 * * * *"
-  workflow_dispatch: {}
-
-permissions:
-  contents: read
+    # Every 15 minutes
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
 
 jobs:
-  ping-health:
-    name: Ping /health
+  uptime:
     runs-on: ubuntu-latest
-    # Only runs once apps/backend is actually deployed somewhere and its URL
-    # is recorded in the BACKEND_HEALTH_URL repository variable (#111).
-    if: vars.BACKEND_HEALTH_URL != ''
-
     steps:
-      - name: Check backend health endpoint
+      - name: Ping backend health endpoint
         run: |
-          url="${{ vars.BACKEND_HEALTH_URL }}"
-          status=$(curl -s -o /tmp/health.json -w "%{http_code}" "$url")
+          curl --fail --silent --show-error \
+            --max-time 30 \
+            "${{ secrets.BACKEND_HEALTH_URL }}" \
+            || (echo "Backend health check failed" && exit 1)
 
-          if [ "$status" != "200" ]; then
-            echo "Health check failed with HTTP status $status"
-            cat /tmp/health.json || true
-            exit 1
-          fi
-
-          if ! grep -q '"status"[[:space:]]*:[[:space:]]*"ok"' /tmp/health.json; then
-            echo "Health check returned 200 but body did not report status: ok"
-            cat /tmp/health.json
-            exit 1
-          fi
-
-          echo "Backend healthy: $(cat /tmp/health.json)"
+  reconcile-escrow-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reconcile Hasura escrow status against Trustless Work
+        run: |
+          curl --fail --silent --show-error \
+            --max-time 60 \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.RECONCILIATION_JOB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.BACKEND_BASE_URL }}/internal/reconcile/escrow-status" \
+            || (echo "Escrow status reconciliation failed" && exit 1)

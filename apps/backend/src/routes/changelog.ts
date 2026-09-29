@@ -80,16 +80,19 @@ changelogRouter.get("/resource/:resourceId", async (req: Request, res: Response)
   const limit = parsed.data.limit ?? DEFAULT_PAGE_SIZE;
   const offset = parsed.data.offset ?? 0;
 
-  const entries = await changelogService.listEntries(req.params.resourceId);
-  const page = entries.slice(offset, offset + limit);
+  const page = await changelogService.listEntries(req.params.resourceId, {
+    limit,
+    offset,
+  });
+  const total = (await changelogService.listEntries(req.params.resourceId)).length;
 
   return res.json({
     entries: page,
     pagination: {
       limit,
       offset,
-      total: entries.length,
-      hasMore: offset + page.length < entries.length,
+      total,
+      hasMore: offset + page.length < total,
     },
   });
 });

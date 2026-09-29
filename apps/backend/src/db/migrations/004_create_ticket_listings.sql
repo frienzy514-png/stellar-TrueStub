@@ -97,9 +97,12 @@ BEGIN
         WHERE table_schema = 'public' AND table_name = 'events'
     ) THEN
         EXECUTE $q$
-            SELECT COUNT(*) FROM public.events
-            WHERE (name IS NULL OR btrim(name) = '')
-               OR (location IS NULL OR btrim(location) = '')
+            SELECT COUNT(*) FROM public.events AS e
+            WHERE (e.name IS NULL OR btrim(e.name) = '')
+               OR COALESCE(
+                    NULLIF(to_jsonb(e)->>'location', ''),
+                    NULLIF(to_jsonb(e)->>'address', '')
+               ) IS NULL
         $q$ INTO suspicious_count;
     END IF;
 

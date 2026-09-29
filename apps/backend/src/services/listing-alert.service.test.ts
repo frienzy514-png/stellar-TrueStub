@@ -41,6 +41,19 @@ describe("ListingAlertService", () => {
       expect(service.deleteSearch(s.id, "u2")).toBe(false);
       expect(service.deleteSearch(s.id, "u1")).toBe(true);
     });
+
+    it("scopes list to the requesting user", () => {
+      service.createSearch({ userId: "u1", eventName: "a" });
+      service.createSearch({ userId: "u2", eventName: "b" });
+      expect(service.listSearches("u1").map((s) => s.userId)).toEqual(["u1"]);
+      expect(service.listSearches("u2").map((s) => s.userId)).toEqual(["u2"]);
+    });
+
+    it("does not let a user delete another user's search", () => {
+      const s = service.createSearch({ userId: "u1", eventName: "x" });
+      expect(service.deleteSearch(s.id, "u2")).toBe(false);
+      expect(service.listSearches("u1")).toHaveLength(1);
+    });
   });
 
   describe("watchlist (#189)", () => {
@@ -65,6 +78,18 @@ describe("ListingAlertService", () => {
       const r = await service.notifyListingUpdate({ ...listing, status: "active" }, 300);
       expect(r).toEqual({ priceChange: [], aboutToSell: [] });
       expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("scopes list to the requesting user", () => {
+      expect(service.listWatchlist("u1").map((w) => w.listingId)).toEqual(["L1"]);
+      expect(service.listWatchlist("u2").map((w) => w.listingId)).toEqual(["OTHER"]);
+    });
+
+    it("only lets the owner remove a watch", () => {
+      expect(service.unwatch("L1", "u2")).toBe(false);
+      expect(service.listWatchlist("u1")).toHaveLength(1);
+      expect(service.unwatch("L1", "u1")).toBe(true);
+      expect(service.listWatchlist("u1")).toHaveLength(0);
     });
   });
 });

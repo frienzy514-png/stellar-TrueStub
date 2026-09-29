@@ -1,3 +1,5 @@
+import { auth } from "@/lib/firebase";
+
 /**
  * Best-effort client for the backend saved-search (#187) and watchlist (#189)
  * endpoints. Local zustand stores stay the source of truth for the UI; these
@@ -19,20 +21,34 @@ async function send(method: string, path: string, body?: unknown): Promise<void>
   }
 }
 
-// TODO: replace with the authenticated user's id once the session is wired in.
-export const ALERT_USER_ID = "current-user";
+function getAlertUserId(): string | null {
+  return auth.currentUser?.uid ?? null;
+}
 
 export const registerSavedSearch = (search: {
   eventName: string;
   maxPrice?: number;
   section?: string;
-}) => send("POST", "/api/saved-searches", { userId: ALERT_USER_ID, ...search });
+}) => {
+  const userId = getAlertUserId();
+  return userId
+    ? send("POST", "/api/saved-searches", { userId, ...search })
+    : Promise.resolve();
+};
 
-export const registerWatch = (listing: { listingId: string; eventName: string; price: number }) =>
-  send("POST", "/api/watchlist", { userId: ALERT_USER_ID, ...listing });
+export const registerWatch = (listing: { listingId: string; eventName: string; price: number }) => {
+  const userId = getAlertUserId();
+  return userId
+    ? send("POST", "/api/watchlist", { userId, ...listing })
+    : Promise.resolve();
+};
 
-export const unregisterWatch = (listingId: string) =>
-  send("DELETE", `/api/watchlist/${encodeURIComponent(listingId)}?userId=${ALERT_USER_ID}`);
+export const unregisterWatch = (listingId: string) => {
+  const userId = getAlertUserId();
+  if (!userId) return Promise.resolve();
+  const query = new URLSearchParams({ userId });
+  return send("DELETE", `/api/watchlist/${encodeURIComponent(listingId)}?${query}`);
+};
 
 export const notifyListingCreated = (listing: {
   id: string;

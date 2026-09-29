@@ -14,14 +14,6 @@
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 
-DO $$
-BEGIN
-    IF to_regclass('public.hotels') IS NOT NULL
-       AND to_regclass('public.events') IS NULL THEN
-        ALTER TABLE public.hotels RENAME TO events;
-    END IF;
-END $$;
-
 CREATE TABLE IF NOT EXISTS events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(20) NOT NULL,

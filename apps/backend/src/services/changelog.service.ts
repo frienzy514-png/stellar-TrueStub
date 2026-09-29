@@ -88,6 +88,20 @@ export const CHANGELOG_ERROR_CODES = {
   DUPLICATE_ENTRY: "CHANGELOG_DUPLICATE_ENTRY",
 } as const;
 
+/**
+ * Canonical action names for money-movement audit entries (issue #324).
+ *
+ * Refund and ownership-transfer routes must record these actions so every
+ * completed refund / transfer has a permanent, immutable changelog entry.
+ */
+export const CHANGELOG_ACTIONS = {
+  REFUND_SUBMITTED: "refund_submitted",
+  REFUND_COMPLETED: "refund_completed",
+  TRANSFER_COMPLETED: "ownership_transferred",
+} as const;
+
+export type ChangelogAction = (typeof CHANGELOG_ACTIONS)[keyof typeof CHANGELOG_ACTIONS];
+
 // ── Storage interface ──────────────────────────────────────────────────────
 
 export interface ChangelogStore {
@@ -199,6 +213,38 @@ export class ChangelogService {
   }
 
   /**
+   * Records a money-movement audit entry (refund / transfer) idempotently.
+   *
+   * Refund and transfer routes call this so every completed refund and
+   * ownership transfer has a corresponding permanent changelog entry
+   * (issue #324).  The `entryId` is derived from the action + resource so a
+   * retried request cannot create duplicate audit lines; if the entry already
+   * exists the existing record is returned unchanged (write-once preserved).
+   */
+  async recordMoneyMovement(payload: {
+    action: ChangelogAction;
+    actorId: string;
+    resourceId: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<ChangelogEntry> {
+    const { action, actorId, resourceId } = payload;
+    const entryId = `${action}:${resourceId}`;
+
+    const existing = await this.store.get(entryId);
+    if (existing) {
+      return existing;
+    }
+
+    return this.appendEntry({
+      entryId,
+      action,
+      actorId,
+      resourceId,
+      metadata: payload.metadata,
+    });
+  }
+
+  /**
    * UPDATE IS FORBIDDEN — always throws CHANGELOG_UPDATE_FORBIDDEN.
    *
    * This method exists to provide an explicit, documented error rather than
@@ -247,10 +293,24 @@ export class ChangelogService {
   }
 
   /**
-   * Returns all entries for a given resource, sorted chronologically.
+   * Returns entries for a given resource in chronological order.
+   *
+   * When `options` are supplied, the method behaves as a paginated query and
+   * returns only the selected slice. The legacy no-options call keeps the
+   * original "return all entries" contract for route consumers.
    */
-  async listEntries(resourceId: string): Promise<ChangelogEntry[]> {
-    return this.store.listByResource(resourceId);
+  async listEntries(
+    resourceId: string,
+    options: ChangelogPaginationOptions = {}
+  ): Promise<ChangelogEntry[]> {
+    const all = await this.store.listByResource(resourceId);
+    if (Object.keys(options).length === 0) {
+      return all;
+    }
+
+    const limit = this.normalizeLimit(options.limit);
+    const offset = this.normalizeOffset(options.offset);
+    return all.slice(offset, offset + limit);
   }
 
   /**
