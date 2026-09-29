@@ -188,6 +188,30 @@ describe("POST /webhooks/escrow-status", () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ success: true, rowsUpdated: 1, notifications: null });
   });
+
+  it("is idempotent: replaying the identical signed payload does not duplicate side effects", async () => {
+    // First delivery: the escrow transitions to the new status and a notification fires.
+    const first = await post(payload, { "x-trustless-work-signature": sign(payload) });
+    expect(first.status).toBe(200);
+    expect(updateEscrowStatus).toHaveBeenCalledTimes(1);
+    expect(notifyEscrowStatusChange).toHaveBeenCalledTimes(1);
+
+    // Replay of the exact same signed bytes: the status write is a no-op
+    // (affected_rows: 0) because the row already holds the target status, so
+    // no duplicate notification is emitted.
+    updateEscrowStatus.mockResolvedValue({ affected_rows: 0 });
+    const replay = await post(payload, { "x-trustless-work-signature": sign(payload) });
+
+    expect(replay.status).toBe(200);
+    expect(replay.body).toMatchObject({
+      success: true,
+      contractId: "contract-123",
+      status: "completed",
+      rowsUpdated: 0,
+    });
+    // The replay must not trigger a second notification for the same event.
+    expect(notifyEscrowStatusChange).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("POST /webhooks/escrow-status under concurrent load", () => {

@@ -23,12 +23,20 @@ import { AppError } from "../middleware/errorHandler";
 
 export const changelogRouter = Router();
 
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
+
 const appendSchema = z.object({
   entryId: z.string().min(1, "entryId is required"),
   action: z.string().min(1, "action is required"),
   actorId: z.string().min(1, "actorId is required"),
   resourceId: z.string().min(1, "resourceId is required"),
   metadata: z.record(z.unknown()).optional(),
+});
+
+const paginationSchema = z.object({
+  limit: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).optional(),
+  offset: z.coerce.number().int().nonnegative().optional(),
 });
 
 // POST /api/changelog — append a new immutable entry
@@ -58,8 +66,35 @@ changelogRouter.post("/", async (req: Request, res: Response) => {
 // GET /api/changelog/resource/:resourceId — list entries for a resource
 // NOTE: This route must be declared BEFORE /:entryId to avoid route shadowing
 changelogRouter.get("/resource/:resourceId", async (req: Request, res: Response) => {
-  const entries = await changelogService.listEntries(req.params.resourceId);
-  return res.json({ entries });
+  const parsed = paginationSchema.safeParse(req.query);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: {
+        code: "CHANGELOG_INVALID_PAGINATION",
+        message: `Invalid pagination parameters. limit must be between 1 and ${MAX_PAGE_SIZE}, offset must be >= 0.`,
+        details: parsed.error.flatten(),
+      },
+    });
+  }
+
+  const limit = parsed.data.limit ?? DEFAULT_PAGE_SIZE;
+  const offset = parsed.data.offset ?? 0;
+
+  const page = await changelogService.listEntries(req.params.resourceId, {
+    limit,
+    offset,
+  });
+  const total = (await changelogService.listEntries(req.params.resourceId)).length;
+
+  return res.json({
+    entries: page,
+    pagination: {
+      limit,
+      offset,
+      total,
+      hasMore: offset + page.length < total,
+    },
+  });
 });
 
 // GET /api/changelog/:entryId

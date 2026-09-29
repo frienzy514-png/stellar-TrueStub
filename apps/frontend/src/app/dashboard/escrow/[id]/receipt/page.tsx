@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
-import { getMockEscrowDetail } from "@/components/escrow/mocks/escrowDetail.mock";
+import { getEscrowById } from "@/lib/graphql/escrow";
+import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { PrintReceiptButton } from "@/components/escrow/PrintReceiptButton";
 import { formatEscrowAmount } from "@/lib/formatEscrowAmount";
 import { isFeatureEnabled } from "@/lib/featureFlags";
@@ -19,8 +20,18 @@ export default async function EscrowReceiptPage({
   if (!isFeatureEnabled("ESCROW_RECEIPTS")) notFound();
 
   const { id } = await params;
-  // TODO: replace with GET_ESCROW_BY_ID once GraphQL wiring lands.
-  const escrow = getMockEscrowDetail(id);
+
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?next=/dashboard/escrow/${encodeURIComponent(id)}/receipt`);
+
+  const escrow = await getEscrowById(id);
+  if (!escrow) notFound();
+
+  const isParty =
+    escrow.tenant.wallet === user.wallet ||
+    escrow.beneficiary.wallet === user.wallet;
+  if (!isParty) notFound();
+
   const amount = formatEscrowAmount(escrow.amount, escrow.currency);
   const explorerUrl = `https://stellar.expert/explorer/${explorerNetwork}/contract/${encodeURIComponent(escrow.id)}`;
 

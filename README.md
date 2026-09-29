@@ -93,5 +93,5 @@ TrueStub started as a personalized fork of [SafeTrust](https://github.com/safetr
 
 ## Handsoff notes
 
-<!-- handsoff-issue-338 -->
-- #338: Add a formal API reference doc for the new backend routes
+<!-- handsoff-issue-313 -->
+- #313: Wire the remaining mocked API calls in `TicketEscrowIntegration`/`TicketEscrowWrapper`

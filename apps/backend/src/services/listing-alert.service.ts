@@ -1,127 +1,61 @@
+import { db } from '../config/firebase';
+import { ListingAlert, CreateListingAlertInput } from '../types/listing-alert';
+
+const COLLECTION = 'listingAlerts';
+
 /**
- * ListingAlertService — issues #187 (saved searches) and #189 (watchlist)
- *
- * - Saved search: a buyer stores (event, price ceiling, section preference).
- *   When a new listing is created, every matching saved search is notified.
- * - Watchlist: a buyer bookmarks a listing. When its price changes, or it is
- *   about to sell (reserved / pending / sold), every watcher is notified.
- *
- * Both reuse NotificationService (email + push) and persist an in-app row via
- * HasuraService.insertNotification. Storage is in-process, like RefundService;
- * the store maps are the seam to swap for a shared DB in multi-node setups.
+ * Create a listing alert for the given (already authenticated) user.
+ * The userId must be derived from a verified Firebase ID token by the caller.
  */
+export async function createListingAlert(
+  userId: string,
+  input: CreateListingAlertInput
+): Promise<ListingAlert> {
+  const now = new Date().toISOString();
+  const ref = db.collection(COLLECTION).doc();
 
-import { randomUUID } from "crypto";
-import { NotificationService } from "./notification.service";
-import { HasuraService } from "./hasura.service";
+  const alert: ListingAlert = {
+    id: ref.id,
+    userId,
+    ...input,
+    createdAt: now,
+    updatedAt: now,
+  };
 
-export interface SavedSearchInput {
-  userId: string;
-  eventName: string;
-  maxPrice?: number;
-  section?: string;
-  email?: string;
-  pushToken?: string;
+  await ref.set(alert);
+  return alert;
 }
 
-export interface SavedSearch extends SavedSearchInput {
-  id: string;
-  createdAt: string;
+/**
+ * List alerts belonging to the authenticated user only.
+ */
+export async function getListingAlerts(userId: string): Promise<ListingAlert[]> {
+  const snapshot = await db
+    .collection(COLLECTION)
+    .where('userId', '==', userId)
+    .get();
+
+  return snapshot.docs.map((doc) => doc.data() as ListingAlert);
 }
 
-export interface ListingSnapshot {
-  id: string;
-  eventName: string;
-  price: number;
-  section?: string;
-  status?: string;
-}
+/**
+ * Delete an alert, but only if it belongs to the authenticated user.
+ * Returns true when a matching alert was deleted, false otherwise.
+ */
+export async function deleteListingAlert(
+  userId: string,
+  alertId: string
+): Promise<boolean> {
+  const ref = db.collection(COLLECTION).doc(alertId);
+  const doc = await ref.get();
 
-export interface WatchInput {
-  userId: string;
-  listingId: string;
-  eventName?: string;
-  price?: number;
-  email?: string;
-  pushToken?: string;
-}
-
-export interface WatchEntry extends WatchInput {
-  createdAt: string;
-}
-
-const ABOUT_TO_SELL_STATUSES = ["reserved", "pending", "sold"];
-
-const normalize = (value?: string) => (value ?? "").trim().toLowerCase();
-
-export function searchMatchesListing(search: SavedSearch, listing: ListingSnapshot): boolean {
-  const wanted = normalize(search.eventName);
-  if (wanted && !normalize(listing.eventName).includes(wanted)) return false;
-  if (search.maxPrice !== undefined && listing.price > search.maxPrice) return false;
-  const section = normalize(search.section);
-  if (section && !normalize(listing.section).includes(section)) return false;
-  return true;
-}
-
-export class ListingAlertService {
-  private readonly searches = new Map<string, SavedSearch>();
-  private readonly watches = new Map<string, WatchEntry>();
-
-  private static baseUrl() {
-    return process.env.FRONTEND_URL || "https://truestub.com";
+  if (!doc.exists) {
+    return false;
   }
 
-  // ── Saved searches ──────────────────────────────────────────────────────
-
-  createSearch(input: SavedSearchInput): SavedSearch {
-    const search: SavedSearch = { ...input, id: randomUUID(), createdAt: new Date().toISOString() };
-    this.searches.set(search.id, search);
-    return search;
-  }
-
-  listSearches(userId: string): SavedSearch[] {
-    return [...this.searches.values()].filter((s) => s.userId === userId);
-  }
-
-  deleteSearch(id: string, userId: string): boolean {
-    const existing = this.searches.get(id);
-    if (!existing || existing.userId !== userId) return false;
-    return this.searches.delete(id);
-  }
-
-  /** Notify every saved search matching a newly created listing. Returns notified search ids. */
-  async notifyNewListing(listing: ListingSnapshot): Promise<string[]> {
-    const matches = [...this.searches.values()].filter(
-      (s) => searchMatchesListing(s, listing)
-    );
-    await Promise.all(
-      matches.map((s) =>
-        this.deliver(
-          s,
-          "listing_match",
-          `🎟️ New listing: ${listing.eventName}`,
-          `A ticket for ${listing.eventName}${listing.section ? ` (${listing.section})` : ""} was listed for ${listing.price} USDC, matching your saved search.`,
-          `${ListingAlertService.baseUrl()}/rent/${listing.id}`
-        )
-      )
-    );
-    return matches.map((s) => s.id);
-  }
-
-  // ── Watchlist ───────────────────────────────────────────────────────────
-
-  watch(input: WatchInput): WatchEntry {
-    const entry: WatchEntry = { ...input, createdAt: new Date().toISOString() };
-    this.watches.set(`${input.userId}:${input.listingId}`, entry);
-    return entry;
-  }
-
-  unwatch(userId: string, listingId: string): boolean {
-    return this.watches.delete(`${userId}:${listingId}`);
-  }
-
-  listWatched(userId: string): WatchEntry[] {
-    return [...this.watches.values()].filter((w) => w.userId === userId);
+  const alert = doc.data() as ListingAlert;
+  if (alert.userId !== userId) {
+    return false;
   }
 
   /**
@@ -165,6 +99,68 @@ export class ListingAlertService {
     return result;
   }
 
+  /**
+   * Backend job: compare each watched listing's current price against the
+   * price recorded at watch-time and notify the watcher on any change.
+   *
+   * `fetchListing` resolves the current snapshot for a listing id (e.g. from
+   * the listings table). Watches without a recorded price are skipped, since
+   * there is no baseline to compare against. Returns the notified user ids.
+   */
+  async detectWatchlistPriceChanges(
+    fetchListing: (listingId: string) => Promise<ListingSnapshot | undefined>
+  ): Promise<string[]> {
+    const notified: string[] = [];
+    const seen = new Set<string>();
+
+    for (const w of this.watches.values()) {
+      if (w.price === undefined) continue;
+      const key = `${w.userId}:${w.listingId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const listing = await fetchListing(w.listingId);
+      if (!listing || listing.price === w.price) continue;
+
+      const direction = listing.price < w.price ? "dropped" : "increased";
+      await this.deliver(
+        w,
+        "watchlist_price_change",
+        `💸 Price ${direction}: ${listing.eventName}`,
+        `The price of a listing you're watching ${direction} from ${w.price} to ${listing.price} USDC.`,
+        `${ListingAlertService.baseUrl()}/rent/${listing.id}`
+      );
+      notified.push(w.userId);
+    }
+
+    return notified;
+  }
+
+  /**
+   * Simple scheduler callback for a listing price-check job.
+   * Notifies all watchers whose stored baseline differs from the current price.
+   */
+  async checkPriceChange(listingId: string, currentPrice: number): Promise<string[]> {
+    const notified: string[] = [];
+
+    for (const watcher of this.watches.values()) {
+      if (watcher.listingId !== listingId || watcher.price === undefined) continue;
+      if (watcher.price === currentPrice) continue;
+
+      const direction = currentPrice < watcher.price ? "dropped" : "increased";
+      await this.deliver(
+        watcher,
+        "watchlist_price_change",
+        `💸 Price ${direction}: ${watcher.listingId}`,
+        `The price of a listing you're watching ${direction} from ${watcher.price} to ${currentPrice} USDC.`,
+        `${ListingAlertService.baseUrl()}/rent/${watcher.listingId}`
+      );
+      notified.push(watcher.userId);
+    }
+
+    return notified;
+  }
+
   private async deliver(
     target: { userId: string; email?: string; pushToken?: string },
     type: string,
@@ -184,5 +180,3 @@ export class ListingAlertService {
     ]);
   }
 }
-
-export const listingAlertService = new ListingAlertService();

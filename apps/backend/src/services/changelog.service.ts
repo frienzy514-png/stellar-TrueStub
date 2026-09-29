@@ -53,12 +53,54 @@ export interface ChangelogEvent {
   occurredAt: string;
 }
 
+/**
+ * Pagination options for listing changelog entries.
+ *
+ * `limit` is clamped to `[1, MAX_CHANGELOG_PAGE_SIZE]` and defaults to
+ * `DEFAULT_CHANGELOG_PAGE_SIZE`; `offset` is clamped to `>= 0`.
+ */
+export interface ChangelogPaginationOptions {
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * A bounded page of changelog entries, mirroring the pagination shape used
+ * elsewhere in the app (EscrowTable, WalletAddressTable).
+ */
+export interface ChangelogPage {
+  entries: ChangelogEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+/** Default page size when the caller does not specify a `limit`. */
+export const DEFAULT_CHANGELOG_PAGE_SIZE = 50;
+/** Hard cap so a single response can never be unbounded. */
+export const MAX_CHANGELOG_PAGE_SIZE = 200;
+
 export const CHANGELOG_ERROR_CODES = {
   UPDATE_FORBIDDEN: "CHANGELOG_UPDATE_FORBIDDEN",
   NOT_FOUND: "CHANGELOG_ENTRY_NOT_FOUND",
   INVALID_PAYLOAD: "CHANGELOG_INVALID_PAYLOAD",
   DUPLICATE_ENTRY: "CHANGELOG_DUPLICATE_ENTRY",
 } as const;
+
+/**
+ * Canonical action names for money-movement audit entries (issue #324).
+ *
+ * Refund and ownership-transfer routes must record these actions so every
+ * completed refund / transfer has a permanent, immutable changelog entry.
+ */
+export const CHANGELOG_ACTIONS = {
+  REFUND_SUBMITTED: "refund_submitted",
+  REFUND_COMPLETED: "refund_completed",
+  TRANSFER_COMPLETED: "ownership_transferred",
+} as const;
+
+export type ChangelogAction = (typeof CHANGELOG_ACTIONS)[keyof typeof CHANGELOG_ACTIONS];
 
 // ── Storage interface ──────────────────────────────────────────────────────
 
@@ -171,6 +213,38 @@ export class ChangelogService {
   }
 
   /**
+   * Records a money-movement audit entry (refund / transfer) idempotently.
+   *
+   * Refund and transfer routes call this so every completed refund and
+   * ownership transfer has a corresponding permanent changelog entry
+   * (issue #324).  The `entryId` is derived from the action + resource so a
+   * retried request cannot create duplicate audit lines; if the entry already
+   * exists the existing record is returned unchanged (write-once preserved).
+   */
+  async recordMoneyMovement(payload: {
+    action: ChangelogAction;
+    actorId: string;
+    resourceId: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<ChangelogEntry> {
+    const { action, actorId, resourceId } = payload;
+    const entryId = `${action}:${resourceId}`;
+
+    const existing = await this.store.get(entryId);
+    if (existing) {
+      return existing;
+    }
+
+    return this.appendEntry({
+      entryId,
+      action,
+      actorId,
+      resourceId,
+      metadata: payload.metadata,
+    });
+  }
+
+  /**
    * UPDATE IS FORBIDDEN — always throws CHANGELOG_UPDATE_FORBIDDEN.
    *
    * This method exists to provide an explicit, documented error rather than
@@ -219,13 +293,73 @@ export class ChangelogService {
   }
 
   /**
-   * Returns all entries for a given resource, sorted chronologically.
+   * Returns entries for a given resource in chronological order.
+   *
+   * When `options` are supplied, the method behaves as a paginated query and
+   * returns only the selected slice. The legacy no-options call keeps the
+   * original "return all entries" contract for route consumers.
    */
-  async listEntries(resourceId: string): Promise<ChangelogEntry[]> {
-    return this.store.listByResource(resourceId);
+  async listEntries(
+    resourceId: string,
+    options: ChangelogPaginationOptions = {}
+  ): Promise<ChangelogEntry[]> {
+    const all = await this.store.listByResource(resourceId);
+    if (Object.keys(options).length === 0) {
+      return all;
+    }
+
+    const limit = this.normalizeLimit(options.limit);
+    const offset = this.normalizeOffset(options.offset);
+    return all.slice(offset, offset + limit);
+  }
+
+  /**
+   * Returns a bounded page of entries for a given resource, sorted
+   * chronologically.
+   *
+   * `limit` defaults to `DEFAULT_CHANGELOG_PAGE_SIZE` and is clamped to
+   * `MAX_CHANGELOG_PAGE_SIZE` so a single response can never be unbounded.
+   * `offset` is clamped to `>= 0` and lets callers fetch subsequent pages.
+   */
+  async listEntriesPaginated(
+    resourceId: string,
+    options: ChangelogPaginationOptions = {}
+  ): Promise<ChangelogPage> {
+    const limit = this.normalizeLimit(options.limit);
+    const offset = this.normalizeOffset(options.offset);
+
+    const all = await this.store.listByResource(resourceId);
+    const entries = all.slice(offset, offset + limit);
+
+    return {
+      entries,
+      total: all.length,
+      limit,
+      offset,
+      hasMore: offset + entries.length < all.length,
+    };
   }
 
   // ── Private ──────────────────────────────────────────────────────────────
+
+  private normalizeLimit(limit?: number): number {
+    if (limit === undefined || !Number.isFinite(limit)) {
+      return DEFAULT_CHANGELOG_PAGE_SIZE;
+    }
+    const floored = Math.floor(limit);
+    if (floored < 1) {
+      return DEFAULT_CHANGELOG_PAGE_SIZE;
+    }
+    return Math.min(floored, MAX_CHANGELOG_PAGE_SIZE);
+  }
+
+  private normalizeOffset(offset?: number): number {
+    if (offset === undefined || !Number.isFinite(offset)) {
+      return 0;
+    }
+    const floored = Math.floor(offset);
+    return floored < 0 ? 0 : floored;
+  }
 
   private emit(event: ChangelogEvent): void {
     for (const listener of this.listeners) {

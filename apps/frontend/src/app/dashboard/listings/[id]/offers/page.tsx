@@ -2,15 +2,14 @@
 
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-// import { useSuspenseQuery } from "@apollo/client";
+import { useSuspenseQuery } from "@apollo/client";
 import { ArrowLeft, MapPin, Tag, BadgeCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InterestedPeopleTable } from "@/components/dashboard/listings/InterestedPeopleTable";
-// TODO: Uncomment after running `npm run codegen` with Hasura running
-// import {
-//   GET_TICKET_LISTING_BY_ID,
-//   GET_LISTING_OFFERS,
-// } from "@/graphql/queries/ticket-listing-queries";
+import {
+  GET_TICKET_LISTING_BY_ID,
+  GET_LISTING_OFFERS,
+} from "@/graphql/queries/ticket-listing-queries";
 import type { ListingOffer } from "@/components/dashboard/listings/InterestedPeopleTable";
 
 export default function InterestedPeoplePage() {
@@ -18,47 +17,14 @@ export default function InterestedPeoplePage() {
   const router = useRouter();
   const listingId = Number(params.id);
 
-  // TODO: Replace with actual GraphQL queries once codegen is run
-  // const { data: listingData } = useSuspenseQuery(GET_TICKET_LISTING_BY_ID, {
-  //   variables: { id: listingId },
-  // });
-  // const { data: offersData } = useSuspenseQuery(GET_LISTING_OFFERS, {
-  //   variables: { listing_id: listingId, order_by: [{ offer_date: "desc" }] },
-  // });
-
-  // Temporary stub data until GraphQL is set up
-  const listingData = {
-    ticket_listings_by_pk: {
-      id: listingId,
-      name: "Coldplay — West Floor",
-      location: "San José",
-      address: "329 Calle Santos, Paseo Colón, San José",
-      is_available: true,
-      warranty_deposit: 2400,
-      price: 1200.0,
-      status: "available",
-      promoted: true,
-    },
-  };
-
-  const offersData = {
-    listing_offers: Array(10)
-      .fill(null)
-      .map((_, i) => ({
-        id: i + 1,
-        buyer_name: "Diego Duarte Fernández",
-        buyer_phone: "+506 6483252",
-        buyer_wallet_address: "XR6...32D",
-        offer_date: new Date(2024, 8, 12 + i).toISOString(),
-        bid_status: i === 1 ? "accepted" : i === 5 ? "rejected" : "pending",
-      })),
-    listing_offers_aggregate: { aggregate: { count: 10 } },
-  };
-
-  const listingLoading = false;
-  const offersLoading = false;
-  const listingError = null;
-  const offersError = null;
+  const { data: listingData, loading: listingLoading, error: listingError } =
+    useSuspenseQuery(GET_TICKET_LISTING_BY_ID, {
+      variables: { id: listingId },
+    });
+  const { data: offersData, loading: offersLoading, error: offersError } =
+    useSuspenseQuery(GET_LISTING_OFFERS, {
+      variables: { listing_id: listingId, order_by: [{ offer_date: "desc" }] },
+    });
 
   const listing = listingData?.ticket_listings_by_pk;
   const offers = offersData?.listing_offers || [];
