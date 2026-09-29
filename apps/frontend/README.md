@@ -11,7 +11,7 @@ sales. It's one piece of the `stellar-TrueStub` monorepo — see the
 
 ### **Prerequisites**
 
-- Node.js v18 or later 🖥️
+- Node.js v20 or later 🖥️
 - Yarn 4 (this repo pins it via the root `package.json`'s `packageManager` field — Corepack will pick it up automatically) 📦
 - A Stellar blockchain wallet — **Freighter** is recommended 🔐
 - Trustless Work API access ([docs here](https://docs.trustlesswork.com/trustless-work)) 📖

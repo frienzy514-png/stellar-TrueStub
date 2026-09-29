@@ -6,7 +6,7 @@ import { initSentry, Sentry } from "./lib/sentry";
 import { requestLogger } from "./middleware/requestLogger";
 import { corsMiddleware, helmetMiddleware } from "./middleware/security";
 import { authRateLimiter } from "./middleware/rateLimiter";
-import { requireAuth, requireAuthForWrites } from "./middleware/auth";
+import { requireAdmin, requireAuth, requireAuthForWrites } from "./middleware/auth";
 import { errorHandler } from "./middleware/errorHandler";
 import { captureRawBody } from "./middleware/rawBody";
 import { healthRouter } from "./routes/health";

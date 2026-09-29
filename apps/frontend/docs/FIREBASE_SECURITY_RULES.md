@@ -79,6 +79,22 @@ Same posture for Cloud Storage.
    firebase deploy --only firestore:rules,storage
    ```
 
+## Verifying cross-user access is denied
+
+The rules regression tests use the Firestore and Storage emulators and load
+the checked-in rules directly. Install the Firebase CLI once, then run the
+tests from the repository root:
+
+```bash
+npm install -g firebase-tools
+firebase emulators:exec --only firestore,storage --project demo-truestub-rules \
+  "yarn workspace @truestub/frontend test --runInBand src/security/firebase-rules.test.ts"
+```
+
+The tests assert that an authenticated user cannot read or write another
+user's Firestore document or Storage object. The `demo-` project ID keeps
+the emulator isolated from any real Firebase project.
+
 ---
 
 ## Adding rules when Firestore is used in future
