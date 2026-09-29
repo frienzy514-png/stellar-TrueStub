@@ -5,6 +5,7 @@
  * GET  /api/disputes/:disputeId              → get dispute state
  * GET  /api/disputes/escrow/:escrowId        → list disputes for an escrow
  * GET  /api/disputes/sla/breaches            → list ESCALATED disputes past SLA
+ * GET  /api/disputes/metrics                 → aggregate metrics for analytics (#273)
  * POST /api/disputes/:disputeId/escalate     → OPEN → ESCALATED
  * POST /api/disputes/:disputeId/resolve      → OPEN|ESCALATED → RESOLVED
  * POST /api/disputes/:disputeId/withdraw     → OPEN|ESCALATED → WITHDRAWN
@@ -13,7 +14,7 @@
  * Transitions from final states return 409 DISPUTE_ALREADY_FINAL.
  *
  * Every state transition is recorded in the write-once changelog audit log
- * (issue #314).
+ * by DisputeService.transition (issue #314).
  *
  * Escalated-dispute SLA (issue #317):
  * A dispute that sits in ESCALATED for longer than ESCALATED_SLA_MS (30 days)
@@ -46,6 +47,11 @@ const openSchema = z.object({
   reason: z.string().min(1),
 });
 
+const metricsQuerySchema = z.object({
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+});
+
 const resolveBodySchema = z.object({
   resolution: z.string().optional(),
 });
@@ -55,35 +61,6 @@ function handleAppError(err: unknown, res: Response): Response | void {
     return res.status(err.statusCode).json({ error: { code: err.code, message: err.message } });
   }
   throw err;
-}
-
-/**
- * Record a dispute state transition in the immutable changelog audit log.
- * Audit logging must never break the transition itself, so failures are
- * swallowed after being surfaced to the error handler.
- */
-async function recordDisputeTransition(
-  dispute: { disputeId: string; escrowId: string; state: string },
-  action: "escalate" | "resolve" | "withdraw",
-  metadata: Record<string, unknown> = {},
-): Promise<void> {
-  try {
-    await changelogService.append({
-      entityType: "dispute",
-      entityId: dispute.disputeId,
-      action: `dispute.${action}`,
-      actor: dispute.raisedBy ?? "system",
-      metadata: {
-        escrowId: dispute.escrowId,
-        state: dispute.state,
-        ...metadata,
-      },
-    });
-  } catch (err) {
-    // Audit logging is best-effort; never fail the state transition.
-    // eslint-disable-next-line no-console
-    console.error(`Failed to write changelog entry for dispute ${dispute.disputeId}`, err);
-  }
 }
 
 /**
@@ -110,11 +87,13 @@ async function recordSlaBreachAlert(
   elapsedMs: number,
 ): Promise<void> {
   try {
-    await changelogService.append({
-      entityType: "dispute",
-      entityId: dispute.disputeId,
+    // One alert per breach: the deterministic entryId makes repeated reads of
+    // /sla/breaches collide with the existing write-once entry (swallowed below).
+    await changelogService.appendEntry({
+      entryId: `dispute.sla_breach:${dispute.disputeId}`,
       action: "dispute.sla_breach",
-      actor: "system",
+      actorId: "system",
+      resourceId: dispute.disputeId,
       metadata: {
         escrowId: dispute.escrowId,
         state: "ESCALATED",
@@ -182,6 +161,23 @@ disputesRouter.get("/sla/breaches", async (_req: Request, res: Response) => {
   });
 });
 
+// GET /api/disputes/metrics?from=&to= — must come before /:disputeId (#273)
+disputesRouter.get("/metrics", async (req: Request, res: Response) => {
+  const parsed = metricsQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: {
+        code: "DISPUTE_INVALID_PAYLOAD",
+        message: "from/to must be valid dates",
+        details: parsed.error.flatten(),
+      },
+    });
+  }
+
+  const metrics = await disputeService.getMetrics(parsed.data);
+  return res.json({ metrics });
+});
+
 // GET /api/disputes/:disputeId
 disputesRouter.get("/:disputeId", async (req: Request, res: Response) => {
   const dispute = await disputeService.getDispute(req.params.disputeId);
@@ -197,7 +193,6 @@ disputesRouter.get("/:disputeId", async (req: Request, res: Response) => {
 disputesRouter.post("/:disputeId/escalate", async (req: Request, res: Response) => {
   try {
     const dispute = await disputeService.transition(req.params.disputeId, "escalate");
-    await recordDisputeTransition(dispute, "escalate");
     return res.json({ dispute });
   } catch (err) {
     return handleAppError(err, res);
@@ -210,7 +205,6 @@ disputesRouter.post("/:disputeId/resolve", async (req: Request, res: Response) =
 
   try {
     const dispute = await disputeService.transition(req.params.disputeId, "resolve", { resolution });
-    await recordDisputeTransition(dispute, "resolve", { resolution });
     return res.json({ dispute });
   } catch (err) {
     return handleAppError(err, res);
@@ -221,7 +215,6 @@ disputesRouter.post("/:disputeId/resolve", async (req: Request, res: Response) =
 disputesRouter.post("/:disputeId/withdraw", async (req: Request, res: Response) => {
   try {
     const dispute = await disputeService.transition(req.params.disputeId, "withdraw");
-    await recordDisputeTransition(dispute, "withdraw");
     return res.json({ dispute });
   } catch (err) {
     return handleAppError(err, res);
