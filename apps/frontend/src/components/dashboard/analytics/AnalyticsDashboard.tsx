@@ -5,12 +5,6 @@ import { motion } from "motion/react";
 import {
   RefreshCw,
   TrendingUp,
-  Shield,
-  Layers,
-  Activity,
-  AlertCircle,
-  Clock,
-  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,7 +12,7 @@ import { MetricCard } from "./MetricCard";
 import { ChartContainer, MetricButtonItem } from "./ChartContainer";
 import { DateRangePicker } from "./DateRangePicker";
 import { useAnalyticsData } from "@/hooks/use-analytics-data";
-import { escrowChartConfigs, formatCurrency, formatNumber } from "@/lib/chart-utils";
+import { escrowChartConfigs, formatCurrency } from "@/lib/chart-utils";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
@@ -43,8 +37,7 @@ export const AnalyticsDashboard: React.FC = () => {
     escrowChartData,
     escrowMetrics,
     platformHealth,
-    mode,
-    setMode,
+    hasData,
     isLoading,
     error,
     refetch,
@@ -53,11 +46,12 @@ export const AnalyticsDashboard: React.FC = () => {
     refreshInterval: 60000,
   });
 
-  const handleRefresh = () => {
-    refetch();
-    toast.success("Data Refreshed", {
-      description: "Platform analytics have been updated successfully.",
-    });
+  const handleRefresh = async () => {
+    if (await refetch()) {
+      toast.success("Data Refreshed", {
+        description: "Platform analytics have been updated successfully.",
+      });
+    }
   };
 
   const handleDateRangeChange = (newRange: DateRange | null) => {
@@ -68,7 +62,7 @@ export const AnalyticsDashboard: React.FC = () => {
     { key: "volume", label: "Volume ($)", color: "#3b82f6" },
     { key: "escrowsCompleted", label: "Completed", color: "#22c55e" },
     { key: "disputes", label: "Disputes", color: "#ef4444" },
-    { key: "avgReleaseHours", label: "Avg Release (hrs)", color: "#f59e0b" },
+    { key: "avgReleaseHours", label: "Avg Release Time (hrs)", color: "#f59e0b" },
   ];
 
   const disputeMetricButtons: MetricButtonItem[] = [
@@ -130,44 +124,6 @@ export const AnalyticsDashboard: React.FC = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-            {/* Mode Switcher */}
-            <div className="flex items-center p-1 bg-slate-800 rounded-lg border border-slate-700">
-              <Button
-                size="sm"
-                variant={mode === "escrow" ? "default" : "ghost"}
-                onClick={() => setMode("escrow")}
-                className={cn(
-                  "h-8 text-xs font-medium text-white",
-                  mode === "escrow" && "bg-primary text-primary-foreground"
-                )}
-              >
-                <Shield className="w-3.5 h-3.5 mr-1.5" />
-                Escrow & Disputes
-              </Button>
-              <Button
-                size="sm"
-                variant={mode === "traffic" ? "default" : "ghost"}
-                onClick={() => setMode("traffic")}
-                className={cn(
-                  "h-8 text-xs font-medium text-white",
-                  mode === "traffic" && "bg-primary text-primary-foreground"
-                )}
-              >
-                <Activity className="w-3.5 h-3.5 mr-1.5" />
-                Traffic
-              </Button>
-            </div>
-
-            {/* Live Data indicator */}
-            <div className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800/80 px-3 py-2 backdrop-blur-sm">
-              <motion.div
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="w-2 h-2 bg-green-400 rounded-full"
-              />
-              <span className="text-xs text-muted-foreground">Live Data</span>
-            </div>
-
             <DateRangePicker
               value={dateRange}
               onChange={handleDateRangeChange}
@@ -192,10 +148,10 @@ export const AnalyticsDashboard: React.FC = () => {
         </motion.div>
 
         {/* Platform Health Overview Banner (when in escrow mode) */}
-        {mode === "escrow" && !isLoading && (
+        {!isLoading && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-800/60 border border-slate-700/80 rounded-xl p-4">
             <div className="space-y-1">
-              <span className="text-xs text-muted-foreground">Total Value Locked</span>
+                <span className="text-xs text-muted-foreground">Active USD / USDC Locked</span>
               <p className="text-lg sm:text-xl font-bold text-white">
                 {formatCurrency(platformHealth.totalValueLocked)}
               </p>
@@ -207,13 +163,13 @@ export const AnalyticsDashboard: React.FC = () => {
               </p>
             </div>
             <div className="space-y-1">
-              <span className="text-xs text-muted-foreground">Dispute Resolution</span>
+                <span className="text-xs text-muted-foreground">Completion Rate</span>
               <p className="text-lg sm:text-xl font-bold text-green-400">
-                {platformHealth.disputeResolutionRate}%
+                {platformHealth.completionRate.toFixed(1)}%
               </p>
             </div>
             <div className="space-y-1">
-              <span className="text-xs text-muted-foreground">Completed Volume</span>
+              <span className="text-xs text-muted-foreground">USD / USDC Period Volume</span>
               <p className="text-lg sm:text-xl font-bold text-blue-400">
                 {formatCurrency(platformHealth.totalVolume)}
               </p>
@@ -243,7 +199,7 @@ export const AnalyticsDashboard: React.FC = () => {
         {/* Metrics Grid */}
         {!isLoading && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {(mode === "escrow" ? escrowMetrics : metrics).map((metric, index) => (
+            {escrowMetrics.map((metric, index) => (
               <MetricCard
                 key={metric.label}
                 metric={metric}
@@ -255,13 +211,13 @@ export const AnalyticsDashboard: React.FC = () => {
         )}
 
         {/* Escrow Mode Charts Section */}
-        {mode === "escrow" && !isLoading && escrowChartData.length > 0 && (
+        {!isLoading && hasData && (
           <div className="space-y-8 text-white">
             {/* Main Escrow Volume Chart */}
             <ChartContainer
               data={escrowChartData}
               title="Escrow Volume & Completion Trends"
-              description="Aggregate platform volume, completed payouts, and active escrow contracts over time"
+              description="USD / USDC volume and current outcomes grouped by escrow creation date"
               defaultType="area"
               height={420}
               showExport={true}
@@ -288,7 +244,7 @@ export const AnalyticsDashboard: React.FC = () => {
               <ChartContainer
                 data={escrowChartData}
                 title="Time-to-Release Trends"
-                description="Average duration in hours from funding to milestone release"
+                description="Average duration from escrow creation to release for completed records with a release timestamp"
                 defaultType="bar"
                 height={350}
                 showExport={false}
@@ -300,42 +256,8 @@ export const AnalyticsDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Traffic Mode Charts Section */}
-        {mode === "traffic" && !isLoading && data.length > 0 && (
-          <div className="space-y-8 text-white">
-            <ChartContainer
-              data={data}
-              title="Traffic Overview"
-              description="Interactive visualization of page views and interactions over time"
-              defaultType="line"
-              height={420}
-              showExport={true}
-            />
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ChartContainer
-                data={data}
-                title="Engagement"
-                description="User interaction trends"
-                defaultType="area"
-                height={350}
-                showExport={false}
-              />
-
-              <ChartContainer
-                data={data}
-                title="User Growth"
-                description="Active user metrics"
-                defaultType="bar"
-                height={350}
-                showExport={false}
-              />
-            </div>
-          </div>
-        )}
-
         {/* Empty State */}
-        {!isLoading && ((mode === "escrow" ? escrowChartData.length : data.length) === 0) && (
+        {!isLoading && !hasData && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}

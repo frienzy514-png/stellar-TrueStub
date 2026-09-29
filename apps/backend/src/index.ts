@@ -6,7 +6,7 @@ import { initSentry, Sentry } from "./lib/sentry";
 import { requestLogger } from "./middleware/requestLogger";
 import { corsMiddleware, helmetMiddleware } from "./middleware/security";
 import { authRateLimiter } from "./middleware/rateLimiter";
-import { requireAuth, requireAuthForWrites } from "./middleware/auth";
+import { requireAdmin, requireAuth, requireAuthForWrites } from "./middleware/auth";
 import { errorHandler } from "./middleware/errorHandler";
 import { captureRawBody } from "./middleware/rawBody";
 import { healthRouter } from "./routes/health";
@@ -22,6 +22,7 @@ import { disputesRouter } from "./routes/disputes";
 import { usersRouter } from "./routes/users";
 // Issue #339 — auto-generated OpenAPI spec + Swagger UI
 import { docsRouter } from "./routes/docs";
+import { analyticsRouter } from "./routes/analytics";
 
 export function createApp(): Express {
   const app = express();
@@ -47,6 +48,7 @@ export function createApp(): Express {
   app.use("/api/disputes", requireAuth, disputesRouter);
   // #240 — Account deletion / anonymization
   app.use("/api/users", usersRouter);
+  app.use("/api/analytics", requireAdmin, analyticsRouter);
   // #339 — OpenAPI spec + Swagger UI, generated from the route Zod schemas
   app.use("/api/docs", docsRouter);
   app.use(errorHandler);

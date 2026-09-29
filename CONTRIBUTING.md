@@ -20,15 +20,44 @@ See the [root README](README.md) for the full pitch and architecture, and
 
 ## Getting set up
 
+### Prerequisites
+
+- Node.js 20 or later (the root and workspace package manifests enforce this).
+- Corepack enabled, which selects the Yarn 4.9.4 version pinned in the root
+   `package.json`.
+
+Check the selected Yarn version with `yarn --version`; it should report
+`4.9.4`.
+
 ```bash
 git clone https://github.com/<your_user>/stellar-TrueStub
 cd stellar-TrueStub
+corepack enable
 yarn install
+cp apps/frontend/.env.example apps/frontend/.env.local
+```
+
+Before starting the app, fill in the Firebase client settings and a reachable
+Hasura GraphQL endpoint in `apps/frontend/.env.local`. These are needed for
+authentication and data-backed pages; Firebase and Hasura credentials are
+provided by the project maintainer. Trustless Work credentials are only needed
+for escrow operations. See [`apps/frontend/README.md`](apps/frontend/README.md)
+for where each value comes from and which values are optional.
+
+```bash
 yarn dev              # runs apps/frontend on http://localhost:3000
 ```
 
-For frontend-specific environment variables (Firebase, Hasura, Trustless
-Work), follow [`apps/frontend/README.md`](apps/frontend/README.md).
+The frontend can start without the sibling backend. Features that call it,
+including operator analytics, require `NEXT_PUBLIC_BACKEND_URL` to point at a
+running backend. To run that service locally, copy
+`apps/backend/.env.example` to `apps/backend/.env`, then set `DATABASE_URL`,
+`HASURA_GRAPHQL_URL`, `HASURA_ADMIN_SECRET`, and the Firebase Admin service
+account values. Sentry is optional. Start it in a second terminal with
+`yarn workspace @truestub/backend dev`. Apply SQL migrations with
+`yarn workspace @truestub/backend migrate:up` only when a local Postgres
+database is configured; Hasura metadata must separately track the tables as
+described in [`docs/DATABASE.md`](docs/DATABASE.md).
 
 ## Finding something to work on
 
