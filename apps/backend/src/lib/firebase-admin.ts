@@ -33,7 +33,6 @@ export const firebaseAuth = shouldInitializeFirebase
         throw new Error("Firebase Admin is disabled in test mode");
       },
     } as any);
-export const firebaseAuth = getAuth(app);
 
 /**
  * Express middleware that verifies a Firebase ID token from the

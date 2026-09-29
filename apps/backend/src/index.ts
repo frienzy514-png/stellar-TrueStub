@@ -20,9 +20,6 @@ import { changelogRouter } from "./routes/changelog";
 import { disputesRouter } from "./routes/disputes";
 // Issue #240 — account deletion / anonymization
 import { usersRouter } from "./routes/users";
-// Issue #339 — auto-generated OpenAPI spec + Swagger UI
-import { docsRouter } from "./routes/docs";
-import { analyticsRouter } from "./routes/analytics";
 
 export function createApp(): Express {
   const app = express();
@@ -48,9 +45,6 @@ export function createApp(): Express {
   app.use("/api/disputes", requireAuth, disputesRouter);
   // #240 — Account deletion / anonymization
   app.use("/api/users", usersRouter);
-  app.use("/api/analytics", requireAdmin, analyticsRouter);
-  // #339 — OpenAPI spec + Swagger UI, generated from the route Zod schemas
-  app.use("/api/docs", docsRouter);
   app.use(errorHandler);
   return app;
 }

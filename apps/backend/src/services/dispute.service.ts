@@ -139,6 +139,32 @@ export function isEscalatedOverdue(
   return age !== undefined && age >= slaDays;
 }
 
+// ── Metrics (issue #273) ────────────────────────────────────────────────────
+
+const MS_PER_HOUR = 60 * 60 * 1000;
+
+/** Aggregate dispute metrics surfaced on the operator analytics dashboard. */
+export interface DisputeMetrics {
+  /** Disputes opened in the requested range. */
+  total: number;
+  /** Current state breakdown of those disputes. */
+  byState: Record<DisputeState, number>;
+  /** OPEN + ESCALATED. */
+  active: number;
+  /** RESOLVED + WITHDRAWN (outcome breakdown lives in `byState`). */
+  closed: number;
+  /** Disputes that were escalated at any point. */
+  escalatedCount: number;
+  /** escalatedCount / total (0–1). */
+  escalationRate: number;
+  /** RESOLVED / total (0–1). */
+  resolutionRate: number;
+  /** Mean hours from open to final state across closed disputes; null if none closed. */
+  avgResolutionHours: number | null;
+  /** ESCALATED disputes past the SLA (issue #317). */
+  overdueEscalated: number;
+}
+
 // ── State machine definition ───────────────────────────────────────────────
 
 export type TransitionTable = Readonly<
@@ -334,17 +360,98 @@ export class DisputeService {
 
     await this.store.set(disputeId, updated);
 
-    // Write-once audit trail (issues #155 / #314).
-    await this.changelog.append({
-      entity: "dispute",
-      entityId: disputeId,
-      action: event,
-      fromState: dispute.state,
-      toState: nextState,
-      at: now,
-    });
+    // Write-once audit trail (issues #155 / #314). Audit logging must never
+    // block or roll back the transition, so failures are swallowed after the
+    // dispute has been persisted.
+    try {
+      await this.changelog.appendEntry({
+        entryId: `dispute.${event}:${disputeId}:${now}`,
+        action: `dispute.${event}`,
+        actorId: dispute.raisedBy,
+        resourceId: disputeId,
+        metadata: {
+          escrowId: dispute.escrowId,
+          fromState: dispute.state,
+          toState: nextState,
+          ...(opts?.resolution ? { resolution: opts.resolution } : {}),
+        },
+      });
+    } catch {
+      // Changelog is best-effort; the dispute transition already succeeded.
+    }
 
     return updated;
+  }
+
+  /** Returns the current state without side effects. */
+  async getDispute(disputeId: string): Promise<Dispute | undefined> {
+    return this.store.get(disputeId);
+  }
+
+  /** Lists all disputes for an escrow. */
+  async listDisputesByEscrow(escrowId: string): Promise<Dispute[]> {
+    return this.store.listByEscrow(escrowId);
+  }
+
+  /** Lists every dispute currently in `state`. */
+  async listDisputesByState(state: DisputeState): Promise<Dispute[]> {
+    const all = this.store.listAll ? await this.store.listAll() : await this.collectAll();
+    return all.filter((d) => d.state === state);
+  }
+
+  /**
+   * Aggregate dispute metrics for the operator analytics dashboard (#273).
+   *
+   * Only disputes opened within [from, to] (inclusive, either bound optional)
+   * are counted. Resolution time is measured from `openedAt` to the final
+   * transition — `resolvedAt` for RESOLVED, `updatedAt` for WITHDRAWN (the
+   * only transition out of a final state is the one that entered it).
+   */
+  async getMetrics(range: { from?: Date; to?: Date } = {}): Promise<DisputeMetrics> {
+    const all = this.store.listAll ? await this.store.listAll() : await this.collectAll();
+    const fromMs = range.from?.getTime() ?? -Infinity;
+    const toMs = range.to?.getTime() ?? Infinity;
+    const inRange = all.filter((d) => {
+      const opened = new Date(d.openedAt).getTime();
+      return opened >= fromMs && opened <= toMs;
+    });
+
+    const byState: Record<DisputeState, number> = {
+      OPEN: 0,
+      ESCALATED: 0,
+      RESOLVED: 0,
+      WITHDRAWN: 0,
+    };
+    let escalatedEver = 0;
+    const resolutionHours: number[] = [];
+
+    for (const d of inRange) {
+      byState[d.state] += 1;
+      if (d.escalatedAt) escalatedEver += 1;
+      if (FINAL_STATES.has(d.state)) {
+        const closedAt = d.state === "RESOLVED" ? d.resolvedAt ?? d.updatedAt : d.updatedAt;
+        const hours = (new Date(closedAt).getTime() - new Date(d.openedAt).getTime()) / MS_PER_HOUR;
+        if (Number.isFinite(hours) && hours >= 0) resolutionHours.push(hours);
+      }
+    }
+
+    const closed = byState.RESOLVED + byState.WITHDRAWN;
+    const avg =
+      resolutionHours.length > 0
+        ? resolutionHours.reduce((sum, h) => sum + h, 0) / resolutionHours.length
+        : null;
+
+    return {
+      total: inRange.length,
+      byState,
+      active: byState.OPEN + byState.ESCALATED,
+      closed,
+      escalatedCount: escalatedEver,
+      escalationRate: inRange.length > 0 ? escalatedEver / inRange.length : 0,
+      resolutionRate: inRange.length > 0 ? byState.RESOLVED / inRange.length : 0,
+      avgResolutionHours: avg === null ? null : Math.round(avg * 10) / 10,
+      overdueEscalated: inRange.filter((d) => isEscalatedOverdue(d)).length,
+    };
   }
 
   /**
@@ -403,3 +510,6 @@ export class DisputeService {
     return [];
   }
 }
+
+// Singleton shared by routes
+export const disputeService = new DisputeService();

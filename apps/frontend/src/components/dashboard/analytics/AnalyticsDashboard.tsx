@@ -11,8 +11,10 @@ import { Card } from "@/components/ui/card";
 import { MetricCard } from "./MetricCard";
 import { ChartContainer, MetricButtonItem } from "./ChartContainer";
 import { DateRangePicker } from "./DateRangePicker";
+import { DisputeMetricsSection } from "./DisputeMetricsSection";
 import { useAnalyticsData } from "@/hooks/use-analytics-data";
-import { escrowChartConfigs, formatCurrency } from "@/lib/chart-utils";
+import { useDisputeMetrics } from "@/hooks/use-dispute-metrics";
+import { escrowChartConfigs, formatCurrency, formatNumber } from "@/lib/chart-utils";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
@@ -46,12 +48,21 @@ export const AnalyticsDashboard: React.FC = () => {
     refreshInterval: 60000,
   });
 
-  const handleRefresh = async () => {
-    if (await refetch()) {
-      toast.success("Data Refreshed", {
-        description: "Platform analytics have been updated successfully.",
-      });
-    }
+  const disputeMetrics = useDisputeMetrics({
+    dateRange,
+    refreshInterval: 60000,
+  });
+  const totalEscrowsCreated = escrowChartData.reduce(
+    (sum, item) => sum + item.escrowsCreated,
+    0,
+  );
+
+  const handleRefresh = () => {
+    refetch();
+    disputeMetrics.refetch();
+    toast.success("Data Refreshed", {
+      description: "Platform analytics have been updated successfully.",
+    });
   };
 
   const handleDateRangeChange = (newRange: DateRange | null) => {
@@ -208,6 +219,17 @@ export const AnalyticsDashboard: React.FC = () => {
               />
             ))}
           </div>
+        )}
+
+        {/* Dispute Resolution Metrics (#273) */}
+        {mode === "escrow" && !isLoading && (
+          <DisputeMetricsSection
+            metrics={disputeMetrics.metrics}
+            totalEscrows={totalEscrowsCreated}
+            isLoading={disputeMetrics.isLoading}
+            error={disputeMetrics.error}
+            onRetry={disputeMetrics.refetch}
+          />
         )}
 
         {/* Escrow Mode Charts Section */}

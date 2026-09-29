@@ -2,6 +2,36 @@
 
 Node/TypeScript backend for the ticket-resale platform.
 
+## Running with docker-compose
+
+The root `docker-compose.yml` builds this app (`apps/backend/Dockerfile`) as the
+`backend` service alongside Postgres and Hasura:
+
+```bash
+cp .env.example .env   # at the repo root
+yarn docker:up
+curl http://localhost:4000/health   # → {"status":"ok","service":"truestub-backend"}
+```
+
+Every variable validated by `src/config/env.ts` is passed through by the
+compose file. Empty values are treated as unset.
+
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `HASURA_GRAPHQL_ADMIN_SECRET` | yes | Shared with the `hasura` service. |
+| `FIREBASE_ADMIN_PROJECT_ID` / `_CLIENT_EMAIL` / `_PRIVATE_KEY` | yes | Env validation fails without them; auth-protected routes (`/api/refunds`, `/api/transfers`, `/api/disputes`, `/api/saved-searches`, …) 401 every request without a real service-account key. |
+| `DATABASE_URL`, `HASURA_GRAPHQL_URL` | set by compose | Point at the in-network `postgres` / `hasura` services. |
+| `TRUSTLESS_WORK_API_KEY`, `TRUSTLESS_WORK_DISPUTE_RESOLVER_SECRET` | no | Refund execution and dispute resolution return 503 until set. |
+| `TRUSTLESS_WORK_WEBHOOK_SECRET` | no | `POST /webhooks/escrow-status` rejects every delivery until set. |
+| `TRUSTLESS_WORK_API_URL`, `STELLAR_NETWORK` | no | Default to testnet. |
+| `SENTRY_DSN`, `CRITICAL_ALERT_WEBHOOK_URL` | no | Error tracking / refund-transfer failure alerts. |
+| `CORS_ORIGINS`, `LOG_LEVEL`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX` | no | Defaults: `http://localhost:3000`, `info`, `900000`, `100`. |
+| `EMAIL_PROVIDER`, `SENDGRID_API_KEY`, `NOTIFICATION_FROM_EMAIL` | no | Notification delivery. |
+
+When a new required variable is added to `src/config/env.ts`, add it to the
+`backend` service in `docker-compose.yml`, the root `.env.example`, and this
+table.
+
 ## Database migrations
 
 Migrations live in `src/db/migrations/` and are applied in filename order.

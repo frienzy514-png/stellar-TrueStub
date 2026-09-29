@@ -62,12 +62,16 @@ Trustless Work, testing), see **[`apps/frontend/README.md`](apps/frontend/README
 For the backend scaffold, see **[`apps/backend/README.md`](apps/backend/README.md)**.
 For the contracts placeholder, see **[`contracts/README.md`](contracts/README.md)**.
 
-Optional local Postgres + Hasura stack (`docker-compose.yml`, root-level):
+Optional local Postgres + Hasura + backend stack (`docker-compose.yml`, root-level):
 
 ```bash
+cp .env.example .env   # fill in the Hasura secret and Firebase Admin credentials
 yarn docker:up
 yarn docker:down
 ```
+
+See [`apps/backend/README.md`](apps/backend/README.md#running-with-docker-compose)
+for the full list of variables the `backend` service needs.
 
 ---
 
