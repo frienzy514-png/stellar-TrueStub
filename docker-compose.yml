@@ -45,14 +45,51 @@ services:
       context: .
       dockerfile: apps/backend/Dockerfile
     restart: unless-stopped
+    # Every variable validated by apps/backend/src/config/env.ts is passed
+    # through here. Required ones use `:?` so `docker-compose up` fails fast
+    # with a clear message instead of the container crash-looping on boot.
+    # Optional ones default to empty, which the backend treats as unset.
     environment:
       NODE_ENV: production
       PORT: 4000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+      # Postgres / Hasura (in-network service names, not localhost)
+      DATABASE_URL: postgres://postgres:postgrespassword@postgres:5432/safetrust
       HASURA_GRAPHQL_URL: http://hasura:8080/v1/graphql
       HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_GRAPHQL_ADMIN_SECRET:?HASURA_GRAPHQL_ADMIN_SECRET is required — copy .env.example to .env and set a value}
+      # Firebase Admin SDK — required by the env schema; auth-protected routes
+      # 401 every request without a real service-account key.
+      FIREBASE_ADMIN_PROJECT_ID: ${FIREBASE_ADMIN_PROJECT_ID:?FIREBASE_ADMIN_PROJECT_ID is required — see .env.example}
+      FIREBASE_ADMIN_CLIENT_EMAIL: ${FIREBASE_ADMIN_CLIENT_EMAIL:?FIREBASE_ADMIN_CLIENT_EMAIL is required — see .env.example}
+      FIREBASE_ADMIN_PRIVATE_KEY: ${FIREBASE_ADMIN_PRIVATE_KEY:?FIREBASE_ADMIN_PRIVATE_KEY is required — see .env.example}
+      # Trustless Work / Stellar — optional; refunds, dispute resolution and
+      # escrow-status webhooks return 503/401 until these are set.
+      TRUSTLESS_WORK_API_URL: ${TRUSTLESS_WORK_API_URL:-https://dev.api.trustlesswork.com}
+      TRUSTLESS_WORK_API_KEY: ${TRUSTLESS_WORK_API_KEY:-}
+      TRUSTLESS_WORK_DISPUTE_RESOLVER_SECRET: ${TRUSTLESS_WORK_DISPUTE_RESOLVER_SECRET:-}
+      TRUSTLESS_WORK_WEBHOOK_SECRET: ${TRUSTLESS_WORK_WEBHOOK_SECRET:-}
+      STELLAR_NETWORK: ${STELLAR_NETWORK:-testnet}
+      # Observability — optional
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      CRITICAL_ALERT_WEBHOOK_URL: ${CRITICAL_ALERT_WEBHOOK_URL:-}
+      # Notifications — optional
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      NOTIFICATION_FROM_EMAIL: ${NOTIFICATION_FROM_EMAIL:-noreply@truestub.local}
     depends_on:
-      - postgres
-      - hasura
+      postgres:
+        condition: service_healthy
+      hasura:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     ports:
       - "4000:4000"
 
