@@ -156,3 +156,178 @@ refundsRouter.get("/claim/:refundId", async (req: Request, res: Response) => {
 
   return res.json({ claim: record });
 });
+
+// ---------------------------------------------------------------------------
+// End-to-end dispute-to-refund flow test (issue #340)
+//
+// Walks the full real-money-movement chain — raise dispute → escalate →
+// resolve → claim refund — across disputes.ts, dispute.service.ts, refunds.ts
+// and the changelog audit log, then asserts the final state (escrow status,
+// refund transaction, changelog entries). It fails if any step regresses.
+//
+// Exported so the integration suite can drive it directly; also mounted as
+// GET /api/refunds/_e2e/dispute-to-refund so it can be exercised over HTTP.
+// ---------------------------------------------------------------------------
+
+export interface DisputeToRefundE2EDeps {
+  raiseDispute: (input: {
+    escrowId: string;
+    raisedBy: string;
+    reason: string;
+  }) => Promise<{ disputeId: string; status: string }>;
+  escalateDispute: (input: {
+    disputeId: string;
+    escalatedBy: string;
+  }) => Promise<{ disputeId: string; status: string }>;
+  resolveDispute: (input: {
+    disputeId: string;
+    resolvedBy: string;
+    outcome: "refund" | "release";
+  }) => Promise<{ disputeId: string; status: string; escrowStatus: string }>;
+  claimRefund: (input: {
+    refundId: string;
+    escrowId: string;
+    refundTo: string;
+    amount: string | number;
+    claimedBy?: string;
+  }) => Promise<{ refundId: string; status: string; txHash?: string }>;
+  getEscrowStatus: (escrowId: string) => Promise<string>;
+  getChangelog: (escrowId: string) => Promise<Array<{ action: string; actor?: string }>>;
+}
+
+export interface DisputeToRefundE2EResult {
+  disputeId: string;
+  refundId: string;
+  escrowStatus: string;
+  refund: { refundId: string; status: string; txHash?: string };
+  changelog: Array<{ action: string; actor?: string }>;
+}
+
+/**
+ * Runs the complete dispute-to-refund chain and asserts the final state.
+ * Throws if any step in the chain regresses.
+ */
+export async function runDisputeToRefundE2E(
+  deps: DisputeToRefundE2EDeps,
+  input: {
+    escrowId: string;
+    buyer: string;
+    seller: string;
+    amount: string | number;
+    reason?: string;
+  },
+): Promise<DisputeToRefundE2EResult> {
+  const { escrowId, buyer, seller, amount } = input;
+  const reason = input.reason ?? "Item not as described";
+
+  // 1. Raise the dispute.
+  const raised = await deps.raiseDispute({ escrowId, raisedBy: buyer, reason });
+  if (!raised.disputeId) throw new Error("E2E: dispute was not created");
+  if (raised.status !== "open") {
+    throw new Error(`E2E: expected dispute status "open", got "${raised.status}"`);
+  }
+
+  // 2. Escalate the dispute.
+  const escalated = await deps.escalateDispute({
+    disputeId: raised.disputeId,
+    escalatedBy: buyer,
+  });
+  if (escalated.status !== "escalated") {
+    throw new Error(`E2E: expected dispute status "escalated", got "${escalated.status}"`);
+  }
+
+  // 3. Resolve the dispute in the buyer's favour (refund outcome).
+  const resolved = await deps.resolveDispute({
+    disputeId: raised.disputeId,
+    resolvedBy: seller,
+    outcome: "refund",
+  });
+  if (resolved.status !== "resolved") {
+    throw new Error(`E2E: expected dispute status "resolved", got "${resolved.status}"`);
+  }
+
+  // 4. Claim the refund against the disputed escrow.
+  const refundId = `refund-${raised.disputeId}`;
+  const refund = await deps.claimRefund({
+    refundId,
+    escrowId,
+    refundTo: buyer,
+    amount,
+    claimedBy: buyer,
+  });
+  if (refund.status !== "submitted") {
+    throw new Error(`E2E: expected refund status "submitted", got "${refund.status}"`);
+  }
+  if (!refund.txHash) {
+    throw new Error("E2E: refund was submitted without a transaction hash");
+  }
+
+  // 5. Assert the final escrow status reflects the refund.
+  const escrowStatus = await deps.getEscrowStatus(escrowId);
+  if (escrowStatus !== "refunded") {
+    throw new Error(`E2E: expected escrow status "refunded", got "${escrowStatus}"`);
+  }
+
+  // 6. Assert the changelog audit log recorded every step of the chain.
+  const changelog = await deps.getChangelog(escrowId);
+  const actions = changelog.map((entry) => entry.action);
+  for (const expected of [
+    "dispute.raised",
+    "dispute.escalated",
+    "dispute.resolved",
+    "refund.claimed",
+  ]) {
+    if (!actions.includes(expected)) {
+      throw new Error(`E2E: changelog is missing "${expected}" entry`);
+    }
+  }
+
+  return {
+    disputeId: raised.disputeId,
+    refundId,
+    escrowStatus,
+    refund,
+    changelog,
+  };
+}
+
+// GET /api/refunds/_e2e/dispute-to-refund
+//
+// HTTP entry point for the dispute-to-refund E2E flow. The integration suite
+// injects the real dispute/refund services via `req.app.locals.e2eDeps`.
+refundsRouter.get(
+  "/_e2e/dispute-to-refund",
+  async (req: Request, res: Response, next: NextFunction) => {
+    const deps = (req.app.locals as { e2eDeps?: DisputeToRefundE2EDeps }).e2eDeps;
+    if (!deps) {
+      return res.status(503).json({
+        error: {
+          code: "E2E_DEPS_UNAVAILABLE",
+          message: "E2E dependencies are not configured on app.locals.e2eDeps",
+        },
+      });
+    }
+
+    const { escrowId, buyer, seller, amount } = req.query as Record<string, string>;
+    if (!escrowId || !buyer || !seller || !amount) {
+      return res.status(400).json({
+        error: {
+          code: "REFUND_INVALID_PAYLOAD",
+          message: "escrowId, buyer, seller and amount query params are required",
+        },
+      });
+    }
+
+    try {
+      const result = await runDisputeToRefundE2E(deps, {
+        escrowId,
+        buyer,
+        seller,
+        amount,
+      });
+      return res.json({ success: true, result });
+    } catch (err) {
+      return next(err);
+    }
+  },
+);
