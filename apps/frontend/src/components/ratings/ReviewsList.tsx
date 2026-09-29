@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { StarRating } from "./StarRating";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { User, MessageSquare } from "lucide-react";
 import type { Review } from "@/types/ratings";
 
@@ -9,7 +11,10 @@ interface ReviewsListProps {
   reviews?: Review[];
   title?: string;
   emptyMessage?: string;
+  pageSize?: number;
 }
+
+const DEFAULT_PAGE_SIZE = 5;
 
 const STUB_REVIEWS: Review[] = [
   {
@@ -51,8 +56,12 @@ export function ReviewsList({
   reviews = STUB_REVIEWS,
   title = "Recent Reviews & Feedback",
   emptyMessage = "No reviews yet.",
+  pageSize = DEFAULT_PAGE_SIZE,
 }: ReviewsListProps) {
   const items = reviews.length > 0 ? reviews : STUB_REVIEWS;
+  const [visibleCount, setVisibleCount] = useState(pageSize);
+  const visibleItems = items.slice(0, visibleCount);
+  const hasMore = visibleCount < items.length;
 
   return (
     <div className="space-y-4">
@@ -69,7 +78,7 @@ export function ReviewsList({
         </div>
       ) : (
         <div className="space-y-3">
-          {items.map((review) => (
+          {visibleItems.map((review) => (
             <div
               key={review.id}
               className="p-4 rounded-xl border bg-card/60 hover:bg-card transition-colors space-y-2"
@@ -107,6 +116,17 @@ export function ReviewsList({
               )}
             </div>
           ))}
+          {hasMore && (
+            <div className="flex justify-center pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVisibleCount((count) => count + pageSize)}
+              >
+                Load more ({items.length - visibleCount} remaining)
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
