@@ -36,3 +36,47 @@ describe("HasuraService.updateEscrowStatus", () => {
     await expect(call).rejects.not.toThrow(/super-secret/);
   });
 });
+
+describe("HasuraService.getEscrowById", () => {
+  it("returns the escrow when the requesting user is a party to it", async () => {
+    const escrow = {
+      id: "escrow-1",
+      contract_id: "contract-123",
+      buyer_id: "user-buyer",
+      seller_id: "user-seller",
+      amount: 500,
+      status: "funded",
+    };
+    hasuraRequest.mockResolvedValue({ escrow_transactions_by_pk: escrow });
+
+    await expect(HasuraService.getEscrowById("escrow-1", "user-buyer")).resolves.toEqual(escrow);
+    expect(hasuraRequest).toHaveBeenCalledWith(
+      expect.stringContaining("escrow_transactions_by_pk"),
+      { id: "escrow-1" }
+    );
+  });
+
+  it("denies a non-party request for an escrow receipt", async () => {
+    const escrow = {
+      id: "escrow-1",
+      contract_id: "contract-123",
+      buyer_id: "user-buyer",
+      seller_id: "user-seller",
+      amount: 500,
+      status: "funded",
+    };
+    hasuraRequest.mockResolvedValue({ escrow_transactions_by_pk: escrow });
+
+    await expect(HasuraService.getEscrowById("escrow-1", "user-stranger")).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
+  it("returns 404 when the escrow does not exist", async () => {
+    hasuraRequest.mockResolvedValue({ escrow_transactions_by_pk: null });
+
+    await expect(HasuraService.getEscrowById("missing", "user-buyer")).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+});

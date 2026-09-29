@@ -167,5 +167,53 @@ describe("ChangelogService — write-once immutability (#155)", () => {
       const { service } = makeService();
       expect(await service.listEntries("no-such-resource")).toEqual([]);
     });
+
+    it("supports limit/offset pagination for a resource", async () => {
+      const { service } = makeService();
+
+      for (let i = 1; i <= 5; i++) {
+        await service.appendEntry({
+          ...baseEntry,
+          entryId: `page-${i}`,
+          action: `step_${i}`,
+        });
+      }
+
+      const firstPage = await service.listEntries(baseEntry.resourceId, {
+        limit: 2,
+        offset: 0,
+      });
+      expect(firstPage.map((e) => e.action)).toEqual(["step_1", "step_2"]);
+
+      const secondPage = await service.listEntries(baseEntry.resourceId, {
+        limit: 2,
+        offset: 2,
+      });
+      expect(secondPage.map((e) => e.action)).toEqual(["step_3", "step_4"]);
+
+      const thirdPage = await service.listEntries(baseEntry.resourceId, {
+        limit: 2,
+        offset: 4,
+      });
+      expect(thirdPage.map((e) => e.action)).toEqual(["step_5"]);
+    });
+
+    it("caps the page size at the maximum allowed limit", async () => {
+      const { service } = makeService();
+
+      for (let i = 1; i <= 3; i++) {
+        await service.appendEntry({
+          ...baseEntry,
+          entryId: `cap-${i}`,
+          action: `step_${i}`,
+        });
+      }
+
+      const entries = await service.listEntries(baseEntry.resourceId, {
+        limit: 10_000,
+      });
+
+      expect(entries.length).toBeLessThanOrEqual(3);
+    });
   });
 });

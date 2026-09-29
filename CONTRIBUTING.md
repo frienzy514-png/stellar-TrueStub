@@ -58,6 +58,15 @@ are a good place to start.
 The full walkthrough (forking, branch naming, PR expectations) is in
 [`docs/CONTRIBUTORS_GUIDELINE.md`](docs/CONTRIBUTORS_GUIDELINE.md).
 
+## Tracking mocked / unwired flows
+
+If you add a `// TODO: Replace with actual API call` marker (or any other
+GraphQL-wiring placeholder), **pair it with a filed tracking issue** and add
+a row to [`docs/GRAPHQL_WIRING_STATUS.md`](docs/GRAPHQL_WIRING_STATUS.md).
+That doc is the single source of truth for which flows are real vs. mocked,
+so keeping it in sync avoids a fresh repo-wide grep every time someone wants
+to know how much of the app is still stubbed.
+
 ## Reporting bugs
 
 Open an issue using the bug report template. Include reproduction steps,

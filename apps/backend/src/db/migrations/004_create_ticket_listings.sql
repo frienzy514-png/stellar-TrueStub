@@ -50,3 +50,71 @@ CREATE TABLE IF NOT EXISTS listing_offers (
 CREATE INDEX IF NOT EXISTS idx_ticket_listings_owner_id ON ticket_listings(owner_id);
 CREATE INDEX IF NOT EXISTS idx_ticket_listings_created_at ON ticket_listings(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_listing_offers_listing_id ON listing_offers(listing_id);
+
+-- =============================================================================
+-- SafeTrust-era `hotels` data-migration verification (issue #335)
+-- -----------------------------------------------------------------------------
+-- 002_rename_hotels_to_events.sql renames a carried-over public.hotels table
+-- in place so existing rows survive. A rename alone does not prove those rows
+-- are meaningful in the ticket-resale domain: hospitality-shaped rows can be
+-- renamed into an events table without becoming valid ticket-resale events.
+--
+-- This pass is idempotent and safe on fresh databases (no legacy table => no
+-- rows => nothing to do). It records a verification report so operators can
+-- confirm whether any real environment actually carried pre-pivot data.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS migration_verification_reports (
+    id SERIAL PRIMARY KEY,
+    migration VARCHAR(255) NOT NULL,
+    checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    legacy_rows INTEGER NOT NULL DEFAULT 0,
+    suspicious_rows INTEGER NOT NULL DEFAULT 0,
+    details JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
+DO $$
+DECLARE
+    legacy_count INTEGER := 0;
+    suspicious_count INTEGER := 0;
+    legacy_table_exists BOOLEAN := FALSE;
+BEGIN
+    -- Detect whether a SafeTrust-era `hotels` table still exists (i.e. the
+    -- rename in 002 has not run in this environment).
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'hotels'
+    ) INTO legacy_table_exists;
+
+    IF legacy_table_exists THEN
+        EXECUTE 'SELECT COUNT(*) FROM public.hotels' INTO legacy_count;
+    END IF;
+
+    -- If the rename already happened, inspect the resulting events table for
+    -- rows that still look hospitality-shaped rather than ticket-resale shaped.
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'events'
+    ) THEN
+        EXECUTE $q$
+            SELECT COUNT(*) FROM public.events AS e
+            WHERE (e.name IS NULL OR btrim(e.name) = '')
+               OR COALESCE(
+                    NULLIF(to_jsonb(e)->>'location', ''),
+                    NULLIF(to_jsonb(e)->>'address', '')
+               ) IS NULL
+        $q$ INTO suspicious_count;
+    END IF;
+
+    INSERT INTO migration_verification_reports
+        (migration, legacy_rows, suspicious_rows, details)
+    VALUES (
+        '002_rename_hotels_to_events',
+        legacy_count,
+        suspicious_count,
+        jsonb_build_object(
+            'legacy_hotels_table_present', legacy_table_exists,
+            'note', 'Fresh databases report 0 legacy rows; nothing to backfill. Non-zero legacy_rows means pre-pivot SafeTrust data exists and must be reviewed before it is treated as ticket-resale events.'
+        )
+    );
+END $$;

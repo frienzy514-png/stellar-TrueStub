@@ -42,6 +42,32 @@ interface SyncUserResult {
   };
 }
 
+/**
+ * Verifies the caller's Firebase ID token from the `Authorization: Bearer`
+ * header and returns the decoded token, or `null` if the header is missing
+ * or the token is invalid/expired. Shared by routes that must act only on
+ * the authenticated caller's own data (see listing-alerts.ts).
+ */
+export async function verifyRequestUser(
+  req: { headers: { authorization?: string } },
+): Promise<{ uid: string; email?: string } | null> {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader?.startsWith("Bearer ")) {
+    return null;
+  }
+
+  const token = authHeader.slice("Bearer ".length);
+
+  try {
+    const decoded = await firebaseAuth.verifyIdToken(token);
+    return { uid: decoded.uid, email: decoded.email };
+  } catch (error) {
+    console.error("auth: token verification failed", error);
+    return null;
+  }
+}
+
 syncUserRouter.post("/", async (req, res) => {
   const authHeader = req.headers.authorization;
 

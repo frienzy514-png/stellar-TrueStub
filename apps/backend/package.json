@@ -17,7 +17,8 @@
     "migrate:down": "yarn migrate down",
     "migrate:create": "yarn migrate create",
     "test": "jest --runInBand",
-    "test:ci": "jest --ci --coverage --runInBand"
+    "test:ci": "jest --ci --coverage --runInBand",
+    "loadtest:webhooks": "k6 run loadtest/webhooks.loadtest.js"
   },
   "dependencies": {
     "@sentry/node": "^8.55.0",

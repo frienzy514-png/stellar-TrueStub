@@ -1,5 +1,10 @@
 import type { EventListing } from '@/types/event';
 
+/**
+ * STUB_EVENTS is retained for tests, storybook, and dev tooling only.
+ * Production-facing code paths (favorites store, dashboard favorites page,
+ * etc.) must read from real Hasura data instead of this stub.
+ */
 export const STUB_EVENTS: EventListing[] = [
   { id: '1', name: 'Coldplay: Music of the Spheres', address: 'Estadio Nacional, San José', price: 405, faceValue: 280, eventDate: '2026-11-14T20:00:00Z', section: 'West Floor', seat: 'Row 12, Seat 8', seatCount: 1, rowCount: 12, mobileTransfer: true, promoted: true, images: ['/img/event/event1.jpg'], category: 'Concerts', location: 'San José', owner: { name: 'Alberto Casas', avatar: '/img/person.png' }, description: 'Mobile-transfer ticket with a clear view of the main stage. Face value and resale price are shown before purchase.', favorite: false },
   { id: '2', name: 'Costa Rica vs. Mexico', address: 'Estadio Nacional, San José', price: 190, faceValue: 120, eventDate: '2026-10-03T19:30:00Z', section: 'East Stand', seat: 'Row 18, Seat 22', seatCount: 1, rowCount: 18, mobileTransfer: true, promoted: false, images: ['/img/event/event1.jpg'], category: 'Sports', location: 'San José', owner: { name: 'María López', avatar: '/img/person.png' }, description: 'Verified resale ticket for an international football match, delivered by mobile transfer.', favorite: false },

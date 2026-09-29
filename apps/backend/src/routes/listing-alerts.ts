@@ -2,24 +2,23 @@
  * Saved-search (#187) and watchlist (#189) endpoints.
  *
  *   POST   /api/saved-searches           create a saved search
- *   GET    /api/saved-searches?userId=   list a user's saved searches
- *   DELETE /api/saved-searches/:id?userId=
- *   POST   /api/saved-searches/match     match a new listing against saved searches (#333)
+ *   GET    /api/saved-searches           list the caller's saved searches
+ *   DELETE /api/saved-searches/:id
  *   POST   /api/watchlist                watch a listing
  *   GET    /api/watchlist?userId=
  *   DELETE /api/watchlist/:listingId?userId=
+ *   POST   /api/watchlist/price-check    run the watchlist price-change job (#334)
  */
 
 import { Router } from "express";
 import { z } from "zod";
 import { listingAlertService } from "../services/listing-alert.service";
-import { notificationService } from "../services/notification.service";
+import { verifyIdToken } from "../services/auth.service";
 
 export const savedSearchesRouter = Router();
 export const watchlistRouter = Router();
 
 const searchSchema = z.object({
-  userId: z.string().min(1),
   eventName: z.string().min(1),
   maxPrice: z.number().positive().optional(),
   section: z.string().optional(),
@@ -28,7 +27,6 @@ const searchSchema = z.object({
 });
 
 const watchSchema = z.object({
-  userId: z.string().min(1),
   listingId: z.string().min(1),
   eventName: z.string().optional(),
   price: z.number().nonnegative().optional(),
@@ -36,94 +34,76 @@ const watchSchema = z.object({
   pushToken: z.string().optional(),
 });
 
-const matchSchema = z.object({
+const priceCheckSchema = z.object({
   listingId: z.string().min(1),
-  eventName: z.string().min(1),
-  price: z.number().nonnegative().optional(),
-  section: z.string().optional(),
+  currentPrice: z.number().nonnegative(),
 });
 
 const userIdOf = (q: unknown) => (typeof q === "string" && q ? q : undefined);
 
-savedSearchesRouter.post("/", (req, res) => {
+savedSearchesRouter.post("/", async (req, res) => {
+  const userId = await authenticatedUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
   const parsed = searchSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid saved search", details: parsed.error.flatten() });
   }
-  return res.status(201).json(listingAlertService.createSearch(parsed.data));
+  return res.status(201).json(listingAlertService.createSearch({ ...parsed.data, userId }));
 });
 
-savedSearchesRouter.get("/", (req, res) => {
-  const userId = userIdOf(req.query.userId);
-  if (!userId) return res.status(400).json({ error: "userId is required" });
+savedSearchesRouter.get("/", async (req, res) => {
+  const userId = await authenticatedUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
   return res.json(listingAlertService.listSearches(userId));
 });
 
-savedSearchesRouter.delete("/:id", (req, res) => {
-  const userId = userIdOf(req.query.userId);
-  if (!userId) return res.status(400).json({ error: "userId is required" });
+savedSearchesRouter.delete("/:id", async (req, res) => {
+  const userId = await authenticatedUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
   return listingAlertService.deleteSearch(req.params.id, userId)
     ? res.status(204).end()
     : res.status(404).json({ error: "Saved search not found" });
 });
 
-/**
- * Match a newly created listing against every registered saved search and
- * notify each matching search's owner. Invoked on new-listing creation (or by
- * a periodic sweep) so a registered search actually fires a notification.
- */
-savedSearchesRouter.post("/match", async (req, res) => {
-  const parsed = matchSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: "Invalid listing", details: parsed.error.flatten() });
-  }
-
-  const { listingId, eventName, price, section } = parsed.data;
-  const matches = listingAlertService
-    .listAllSearches()
-    .filter((search) => {
-      if (search.eventName !== eventName) return false;
-      if (search.maxPrice !== undefined && price !== undefined && price > search.maxPrice) return false;
-      if (search.section !== undefined && section !== undefined && search.section !== section) return false;
-      return true;
-    });
-
-  const notified = await Promise.all(
-    matches.map(async (search) => {
-      await notificationService.send({
-        userId: search.userId,
-        type: "saved_search_match",
-        title: `New match for "${search.eventName}"`,
-        body: `A new listing matching your saved search is available.`,
-        data: { listingId, savedSearchId: search.id },
-        email: search.email,
-        pushToken: search.pushToken,
-      });
-      return search.id;
-    }),
-  );
-
-  return res.json({ listingId, matched: notified.length, savedSearchIds: notified });
-});
-
-watchlistRouter.post("/", (req, res) => {
+watchlistRouter.post("/", async (req, res) => {
+  const userId = await authenticatedUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
   const parsed = watchSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid watchlist payload", details: parsed.error.flatten() });
   }
-  return res.status(201).json(listingAlertService.watch(parsed.data));
+  return res.status(201).json(listingAlertService.watch({ ...parsed.data, userId }));
 });
 
-watchlistRouter.get("/", (req, res) => {
-  const userId = userIdOf(req.query.userId);
-  if (!userId) return res.status(400).json({ error: "userId is required" });
+watchlistRouter.get("/", async (req, res) => {
+  const userId = await authenticatedUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
   return res.json(listingAlertService.listWatched(userId));
 });
 
-watchlistRouter.delete("/:listingId", (req, res) => {
-  const userId = userIdOf(req.query.userId);
-  if (!userId) return res.status(400).json({ error: "userId is required" });
+watchlistRouter.delete("/:listingId", async (req, res) => {
+  const userId = await authenticatedUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
   return listingAlertService.unwatch(userId, req.params.listingId)
     ? res.status(204).end()
     : res.status(404).json({ error: "Not on watchlist" });
+});
+
+/**
+ * Watchlist price-change job (#334).
+ *
+ * Compares a watched listing's current price against the price recorded at
+ * watch-time and notifies every watcher whose saved price differs. Intended to
+ * be invoked by the backend scheduler whenever a listing's price is updated.
+ */
+watchlistRouter.post("/price-check", async (req, res) => {
+  const parsed = priceCheckSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid price check payload", details: parsed.error.flatten() });
+  }
+  const notifications = await listingAlertService.checkPriceChange(
+    parsed.data.listingId,
+    parsed.data.currentPrice
+  );
+  return res.json({ notifications });
 });

@@ -63,3 +63,38 @@ export async function hasuraRequest<T>(
 ): Promise<T> {
   return hasuraClient.request<T>(query, variables);
 }
+
+export interface EscrowStatusRow {
+  id: string;
+  contract_id: string;
+  status: string;
+  updated_at: string;
+}
+
+interface EscrowStatusQueryResult {
+  escrow_transactions: EscrowStatusRow[];
+}
+
+/**
+ * Fetches a sample of recent escrow transactions from Hasura so their stored
+ * status can be reconciled against Trustless Work's live state.
+ *
+ * This is a read-only helper used by the reconciliation job; it does not touch
+ * the webhook write path that remains the single authoritative writer of
+ * `escrow_transactions.status`.
+ */
+export async function fetchRecentEscrowStatuses(limit = 50): Promise<EscrowStatusRow[]> {
+  const query = `
+    query RecentEscrowStatuses($limit: Int!) {
+      escrow_transactions(order_by: { updated_at: desc }, limit: $limit) {
+        id
+        contract_id
+        status
+        updated_at
+      }
+    }
+  `;
+
+  const data = await hasuraRequest<EscrowStatusQueryResult>(query, { limit });
+  return data.escrow_transactions ?? [];
+}
