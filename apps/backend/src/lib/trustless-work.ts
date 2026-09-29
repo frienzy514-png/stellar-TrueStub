@@ -77,6 +77,23 @@ export class TrustlessWorkError extends Error {
   }
 }
 
+/**
+ * Thrown when a refund's `amount` does not match the escrow's actual disputed
+ * balance. Callers should surface this as a 400 (client error) rather than a
+ * 502, since the request is invalid before it ever reaches Trustless Work.
+ */
+export class RefundAmountMismatchError extends Error {
+  constructor(
+    public readonly requestedAmount: number,
+    public readonly disputedBalance: number,
+  ) {
+    super(
+      `Refund amount ${requestedAmount} does not match the escrow's disputed balance ${disputedBalance}`,
+    );
+    this.name = "RefundAmountMismatchError";
+  }
+}
+
 export class TrustlessWorkNotConfiguredError extends Error {
   constructor() {
     super(
@@ -150,6 +167,28 @@ function requireTrustlessWorkConfig(): { apiUrl: string; apiKey: string; signer:
     signer: Keypair.fromSecret(secret),
     networkPassphrase: env.STELLAR_NETWORK === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
   };
+}
+
+/**
+ * Compares a requested refund amount against the escrow's actual disputed
+ * balance, failing fast locally before any on-chain call is attempted. This is
+ * a defensive guard: Trustless Work and the contract also reject mismatched
+ * amounts, but catching it here avoids a wasted round-trip and keeps the
+ * backend from depending solely on an external API's validation.
+ *
+ * Amounts are compared with a small epsilon to tolerate floating-point noise
+ * from token-unit arithmetic.
+ */
+export function assertRefundAmountMatchesDisputedBalance(
+  requestedAmount: number,
+  disputedBalance: number,
+): void {
+  if (!Number.isFinite(requestedAmount) || !Number.isFinite(disputedBalance)) {
+    throw new RefundAmountMismatchError(requestedAmount, disputedBalance);
+  }
+  if (Math.abs(requestedAmount - disputedBalance) > 1e-7) {
+    throw new RefundAmountMismatchError(requestedAmount, disputedBalance);
+  }
 }
 
 /**

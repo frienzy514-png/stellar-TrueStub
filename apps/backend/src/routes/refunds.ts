@@ -28,6 +28,10 @@
  * (issue #303) — it is never read from the request body.
  *
  * Responses: 201 with `claim.status = "submitted"` and `claim.txHash`;
+ * 400 REFUND_AMOUNT_MISMATCH when `amount` doesn't equal the disputed balance;
+ * 409 REFUND_ALREADY_CLAIMED for a second identical call against the same
+ * escrow; 409 REFUND_ID_REUSED_ACROSS_ESCROWS when the same `refundId` is
+ * reused against a different escrow;
  * 502 REFUND_EXECUTION_FAILED if the chain rejected it;
  * 503 REFUND_EXECUTION_UNAVAILABLE if Trustless Work isn't configured;
  * 409 REFUND_NEEDS_MANUAL_INTERVENTION once the retry budget is exhausted.
