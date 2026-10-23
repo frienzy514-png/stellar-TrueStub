@@ -8,11 +8,30 @@ on:
       - "yarn.lock"
       - ".yarnrc.yml"
       - ".github/workflows/frontend-ci.yml"
+      - "docs/GRAPHQL_WIRING_STATUS.md"
+      - "scripts/check-wiring-status-paths.mjs"
 
 permissions:
   contents: read
 
 jobs:
+  # Fails if docs/GRAPHQL_WIRING_STATUS.md points at a file that doesn't
+  # exist (closes #366). No install needed, so it runs in a few seconds.
+  wiring-status-paths:
+    name: Check GRAPHQL_WIRING_STATUS.md paths
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify every referenced path exists
+        run: node scripts/check-wiring-status-paths.mjs
+
   frontend:
     name: Lint, typecheck, and test
     runs-on: ubuntu-latest

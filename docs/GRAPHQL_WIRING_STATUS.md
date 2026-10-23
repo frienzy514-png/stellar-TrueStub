@@ -12,7 +12,12 @@ running a fresh repo-wide grep.
 > the last marker from a file, delete its row. See the note in
 > [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 >
-> **Last verified:** 2026-10-18, by grepping `apps/frontend/src` for wiring
+> **Paths are checked in CI:** every backtick-quoted repo path in this file
+> must exist. `node scripts/check-wiring-status-paths.mjs` runs in
+> `frontend-ci.yml` and fails the build if one doesn't. Always write full
+> paths from the repo root, starting with `apps/`.
+>
+> **Last verified:** 2026-10-22, by grepping `apps/frontend/src` for wiring
 > markers. Re-run that grep if this date is old:
 >
 > ```bash
@@ -35,12 +40,13 @@ running a fresh repo-wide grep.
 | `apps/frontend/src/components/ticket-listing/TicketEscrowWrapper.tsx` | 🔴 Mocked | 3 | [#319](https://github.com/frienzy514-png/stellar-TrueStub/issues/319) |
 | `apps/frontend/src/app/dashboard/events/new/page.tsx` (create event → `INSERT INTO public.events`) | 🔴 Mocked | 1 (`TODO: wire to Hasura mutation`) | _none filed_ |
 
-## Removed since the previous version of this table
+## No longer mocked
 
-None of these files has a wiring marker any more. Some had moved, which
-left the old paths in this table pointing nowhere.
+These files were listed in earlier versions of this table (some under old
+paths that no longer exist). They have no wiring marker any more. Paths
+below are their current locations.
 
-| Previously listed as | Now |
+| File | Notes |
 | --- | --- |
 | `components/auth/NewPassword.tsx` | Uses Firebase `confirmPasswordReset`; no marker. |
 | `components/profile/UserProfileCard.tsx` | Now `components/dashboard/UserProfileCard.tsx`; no marker. |
