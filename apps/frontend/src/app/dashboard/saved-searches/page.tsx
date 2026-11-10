@@ -1,23 +1,42 @@
 'use client';
 
-import { useState } from 'react';
-import { BellRing, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertCircle, BellRing, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useSavedSearchStore } from '@/core/store/data/saved-searches.store';
 
 export default function SavedSearchesPage() {
-  const { searches, addSearch, removeSearch } = useSavedSearchStore();
+  const {
+    searches,
+    pendingDeleteIds,
+    lastError,
+    addSearch,
+    removeSearch,
+    retryPendingDeletes,
+    clearError,
+  } = useSavedSearchStore();
   const [eventName, setEventName] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [section, setSection] = useState('');
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      if (useSavedSearchStore.getState().pendingDeleteIds.length > 0) {
+        void useSavedSearchStore.getState().retryPendingDeletes();
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const name = eventName.trim();
     if (!name) return;
     const price = Number(maxPrice);
-    addSearch({
+    void addSearch({
       eventName: name,
       maxPrice: maxPrice && price > 0 ? price : undefined,
       section: section.trim() || undefined,
@@ -25,6 +44,15 @@ export default function SavedSearchesPage() {
     setEventName('');
     setMaxPrice('');
     setSection('');
+  };
+
+  const handleRetryDeletes = async () => {
+    setIsRetrying(true);
+    try {
+      await retryPendingDeletes();
+    } finally {
+      setIsRetrying(false);
+    }
   };
 
   return (
@@ -35,6 +63,40 @@ export default function SavedSearchesPage() {
           Get notified when a new listing matches an event, price ceiling and section.
         </p>
       </div>
+
+      {lastError && (
+        <div
+          role="alert"
+          className="border border-destructive/40 bg-destructive/10 text-destructive rounded-xl p-4 flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-2 text-sm">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{lastError}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {pendingDeleteIds.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isRetrying}
+                onClick={handleRetryDeletes}
+              >
+                <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                Retry delete
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={clearError}
+            >
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="border rounded-xl p-4 bg-card grid gap-3 sm:grid-cols-4">
         <Input
@@ -80,12 +142,17 @@ export default function SavedSearchesPage() {
                   {' · '}
                   {s.section || 'Any section'}
                 </p>
+                {s.deleteError && (
+                  <p className="text-xs text-destructive mt-1">{s.deleteError}</p>
+                )}
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 aria-label={`Delete saved search for ${s.eventName}`}
-                onClick={() => removeSearch(s.id)}
+                onClick={() => {
+                  void removeSearch(s.id);
+                }}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
