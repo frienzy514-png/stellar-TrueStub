@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   Users,
   UserPlus,
@@ -59,170 +60,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { auth } from "@/lib/firebase";
+import {
+  AdminAuthError,
+  createAdminUser,
+  fetchAdminUsers,
+  updateAdminUser,
+  type ManagedUser,
+  type UserRole,
+  type UserStatus,
+} from "@/lib/admin-users-api";
 
-export type UserRole = "admin" | "moderator" | "seller" | "buyer";
-export type UserStatus = "active" | "pending" | "suspended" | "flagged";
-
-export interface ManagedUser {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phoneNumber: string;
-  role: UserRole;
-  status: UserStatus;
-  kycVerified: boolean;
-  walletAddress: string;
-  fullWalletAddress: string;
-  escrowsCount: number;
-  completedVolume: string;
-  reputationScore: number;
-  totalReviews: number;
-  joinedDate: string;
-  avatarUrl?: string;
-}
-
-const INITIAL_USERS: ManagedUser[] = [
-  {
-    id: "usr_stb_001",
-    firstName: "Sarah",
-    lastName: "Connor",
-    email: "sarah.c@truestub.io",
-    phoneNumber: "+1 (555) 234-5678",
-    role: "admin",
-    status: "active",
-    kycVerified: true,
-    walletAddress: "GDQP...4X9Z",
-    fullWalletAddress: "GDQP2LMKABCDEF1234567890MNOPQRSTUVWXYZ12345678904X9Z",
-    escrowsCount: 48,
-    completedVolume: "$24,500 USDC",
-    reputationScore: 5.0,
-    totalReviews: 42,
-    joinedDate: "2025-11-12",
-  },
-  {
-    id: "usr_stb_002",
-    firstName: "John",
-    lastName: "Smith",
-    email: "john.smith@gmail.com",
-    phoneNumber: "+506 6489 5321",
-    role: "seller",
-    status: "active",
-    kycVerified: true,
-    walletAddress: "GASK...XN32",
-    fullWalletAddress: "GASKQBX7ABCDEF1234567890MNOPQRSTUVWXYZ1234567890XN32",
-    escrowsCount: 32,
-    completedVolume: "$12,800 USDC",
-    reputationScore: 4.9,
-    totalReviews: 29,
-    joinedDate: "2026-01-08",
-  },
-  {
-    id: "usr_stb_003",
-    firstName: "Elena",
-    lastName: "Rostova",
-    email: "elena.r@blockchain-tickets.com",
-    phoneNumber: "+44 20 7946 0912",
-    role: "seller",
-    status: "active",
-    kycVerified: true,
-    walletAddress: "GBLM...9Y2A",
-    fullWalletAddress: "GBLM9876543210ABCDEF1234567890MNOPQRSTUVWXYZ9Y2A",
-    escrowsCount: 65,
-    completedVolume: "$38,200 USDC",
-    reputationScore: 4.8,
-    totalReviews: 57,
-    joinedDate: "2025-12-03",
-  },
-  {
-    id: "usr_stb_004",
-    firstName: "Marcus",
-    lastName: "Vance",
-    email: "marcus.vance@cryptoevents.org",
-    phoneNumber: "+1 (555) 876-5432",
-    role: "moderator",
-    status: "active",
-    kycVerified: true,
-    walletAddress: "GCKX...7W1B",
-    fullWalletAddress: "GCKX112233445566778899AABBCCDDEEFF00112233447W1B",
-    escrowsCount: 19,
-    completedVolume: "$8,900 USDC",
-    reputationScore: 4.9,
-    totalReviews: 18,
-    joinedDate: "2026-01-19",
-  },
-  {
-    id: "usr_stb_005",
-    firstName: "Amara",
-    lastName: "Diallo",
-    email: "amara.d@stubfan.net",
-    phoneNumber: "+33 1 42 68 55 00",
-    role: "buyer",
-    status: "active",
-    kycVerified: true,
-    walletAddress: "GBVF...3T8K",
-    fullWalletAddress: "GBVF887766554433221100FFEEDDCCBBAA99887766553T8K",
-    escrowsCount: 12,
-    completedVolume: "$3,400 USDC",
-    reputationScore: 4.7,
-    totalReviews: 11,
-    joinedDate: "2026-02-02",
-  },
-  {
-    id: "usr_stb_006",
-    firstName: "Liam",
-    lastName: "Chen",
-    email: "liam.chen@techfest.io",
-    phoneNumber: "+65 6789 0123",
-    role: "buyer",
-    status: "pending",
-    kycVerified: false,
-    walletAddress: "GAZX...6M4P",
-    fullWalletAddress: "GAZX55443322110099887766554433221100998877666M4P",
-    escrowsCount: 2,
-    completedVolume: "$450 USDC",
-    reputationScore: 4.2,
-    totalReviews: 2,
-    joinedDate: "2026-02-21",
-  },
-  {
-    id: "usr_stb_007",
-    firstName: "Victor",
-    lastName: "Novak",
-    email: "v.novak@suspicious-domain.cc",
-    phoneNumber: "+7 495 123-45-67",
-    role: "seller",
-    status: "flagged",
-    kycVerified: false,
-    walletAddress: "GC99...1L88",
-    fullWalletAddress: "GC9900112233445566778899AABBCCDDEEFF001122331L88",
-    escrowsCount: 4,
-    completedVolume: "$1,100 USDC",
-    reputationScore: 2.1,
-    totalReviews: 5,
-    joinedDate: "2026-02-14",
-  },
-  {
-    id: "usr_stb_008",
-    firstName: "Dmitri",
-    lastName: "Kozlov",
-    email: "dmitri.k@banned-tickets.ru",
-    phoneNumber: "+7 812 987-65-43",
-    role: "buyer",
-    status: "suspended",
-    kycVerified: false,
-    walletAddress: "GD88...5Q11",
-    fullWalletAddress: "GD8811223344556677889900AABBCCDDEEFF112233445Q11",
-    escrowsCount: 1,
-    completedVolume: "$200 USDC",
-    reputationScore: 1.0,
-    totalReviews: 3,
-    joinedDate: "2026-01-25",
-  },
-];
+export type { ManagedUser, UserRole, UserStatus };
 
 export default function UsersManagementPage() {
-  const [users, setUsers] = useState<ManagedUser[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isUnauthorized, setIsUnauthorized] = useState(false);
+  const [isMutating, setIsMutating] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -239,7 +96,6 @@ export default function UsersManagementPage() {
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
 
-  // New User Form State
   const [newUserForm, setNewUserForm] = useState({
     firstName: "",
     lastName: "",
@@ -250,7 +106,41 @@ export default function UsersManagementPage() {
     kycVerified: false,
   });
 
-  // Copy handler
+  const loadDirectory = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    setIsUnauthorized(false);
+
+    try {
+      const directory = await fetchAdminUsers();
+      setUsers(directory);
+    } catch (err) {
+      if (err instanceof AdminAuthError) {
+        setIsUnauthorized(true);
+        setUsers([]);
+      } else {
+        setLoadError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load user directory.",
+        );
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, () => {
+      void loadDirectory();
+    });
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, [loadDirectory]);
+
   const handleCopy = async (address: string) => {
     try {
       await navigator.clipboard.writeText(address);
@@ -262,81 +152,93 @@ export default function UsersManagementPage() {
     }
   };
 
-  // Toggle user status (suspend / activate)
-  const handleToggleStatus = (user: ManagedUser) => {
+  const handleToggleStatus = async (user: ManagedUser) => {
     const nextStatus: UserStatus =
       user.status === "suspended" || user.status === "flagged"
         ? "active"
         : "suspended";
-    setUsers((prev) =>
-      prev.map((u) => (u.id === user.id ? { ...u, status: nextStatus } : u))
-    );
-    toast.success(
-      `User ${user.firstName} ${user.lastName} is now ${nextStatus}`
-    );
+
+    setIsMutating(true);
+    try {
+      const updated = await updateAdminUser(user.id, { status: nextStatus });
+      setUsers((prev) =>
+        prev.map((u) => (u.id === updated.id ? updated : u)),
+      );
+      toast.success(
+        `User ${updated.firstName} ${updated.lastName} is now ${updated.status}`,
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update account status",
+      );
+    } finally {
+      setIsMutating(false);
+    }
   };
 
-  // Save role edit
-  const handleSaveRole = () => {
+  const handleSaveRole = async () => {
     if (!editingRoleUser) return;
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === editingRoleUser.id ? { ...u, role: newRoleValue } : u
-      )
-    );
-    toast.success(
-      `Role for ${editingRoleUser.firstName} ${editingRoleUser.lastName} updated to ${newRoleValue}`
-    );
-    setEditingRoleUser(null);
+    setIsMutating(true);
+    try {
+      const updated = await updateAdminUser(editingRoleUser.id, {
+        role: newRoleValue,
+      });
+      setUsers((prev) =>
+        prev.map((u) => (u.id === updated.id ? updated : u)),
+      );
+      toast.success(
+        `Role for ${updated.firstName} ${updated.lastName} updated to ${updated.role}`,
+      );
+      setEditingRoleUser(null);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update user role",
+      );
+    } finally {
+      setIsMutating(false);
+    }
   };
 
-  // Create new user
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserForm.firstName || !newUserForm.lastName || !newUserForm.email) {
       toast.error("Please fill in the required fields (First Name, Last Name, Email)");
       return;
     }
 
-    const shortWallet = newUserForm.walletAddress
-      ? `${newUserForm.walletAddress.slice(0, 4)}...${newUserForm.walletAddress.slice(-4)}`
-      : "GB...TEMP";
+    setIsMutating(true);
+    try {
+      const created = await createAdminUser({
+        firstName: newUserForm.firstName,
+        lastName: newUserForm.lastName,
+        email: newUserForm.email,
+        phoneNumber: newUserForm.phoneNumber || undefined,
+        role: newUserForm.role,
+        walletAddress: newUserForm.walletAddress || undefined,
+        kycVerified: newUserForm.kycVerified,
+      });
 
-    const created: ManagedUser = {
-      id: `usr_stb_${Math.floor(100 + Math.random() * 900)}`,
-      firstName: newUserForm.firstName,
-      lastName: newUserForm.lastName,
-      email: newUserForm.email,
-      phoneNumber: newUserForm.phoneNumber || "+1 (555) 000-0000",
-      role: newUserForm.role,
-      status: "active",
-      kycVerified: newUserForm.kycVerified,
-      walletAddress: shortWallet,
-      fullWalletAddress:
-        newUserForm.walletAddress ||
-        "GBLANKWALLETADDRESS1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-      escrowsCount: 0,
-      completedVolume: "$0 USDC",
-      reputationScore: 5.0,
-      totalReviews: 0,
-      joinedDate: new Date().toISOString().split("T")[0],
-    };
-
-    setUsers((prev) => [created, ...prev]);
-    toast.success(`User ${created.firstName} ${created.lastName} created successfully!`);
-    setIsAddUserOpen(false);
-    setNewUserForm({
-      firstName: "",
-      lastName: "",
-      email: "",
-      phoneNumber: "",
-      role: "buyer",
-      walletAddress: "",
-      kycVerified: false,
-    });
+      setUsers((prev) => [created, ...prev]);
+      toast.success(`User ${created.firstName} ${created.lastName} created successfully!`);
+      setIsAddUserOpen(false);
+      setNewUserForm({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phoneNumber: "",
+        role: "buyer",
+        walletAddress: "",
+        kycVerified: false,
+      });
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to create user",
+      );
+    } finally {
+      setIsMutating(false);
+    }
   };
 
-  // Export to CSV
   const handleExportCSV = () => {
     const headers = [
       "User ID",
@@ -372,7 +274,7 @@ export default function UsersManagementPage() {
 
     const csvContent = [headers, ...rows]
       .map((row) =>
-        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
       )
       .join("\n");
 
@@ -386,7 +288,6 @@ export default function UsersManagementPage() {
     toast.success("User list exported to CSV");
   };
 
-  // Filter & Sort Logic
   const filteredUsers = useMemo(() => {
     return users
       .filter((user) => {
@@ -422,18 +323,16 @@ export default function UsersManagementPage() {
       });
   }, [users, searchQuery, roleFilter, statusFilter, kycFilter, sortField, sortAsc]);
 
-  // Metrics
   const stats = useMemo(() => {
     const total = users.length;
     const sellers = users.filter((u) => u.role === "seller").length;
     const activeEscrows = users.reduce((acc, u) => acc + u.escrowsCount, 0);
     const flaggedOrSuspended = users.filter(
-      (u) => u.status === "flagged" || u.status === "suspended"
+      (u) => u.status === "flagged" || u.status === "suspended",
     ).length;
     return { total, sellers, activeEscrows, flaggedOrSuspended };
   }, [users]);
 
-  // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const startIndex = (safePage - 1) * pageSize;
@@ -511,6 +410,56 @@ export default function UsersManagementPage() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="py-20 text-center text-sm text-muted-foreground">
+        Loading user directory...
+      </div>
+    );
+  }
+
+  if (isUnauthorized) {
+    return (
+      <Card role="alert" className="border-amber-300 dark:border-amber-800">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+            <ShieldAlert className="w-5 h-5" />
+            Administrator access required
+          </CardTitle>
+          <CardDescription>
+            You do not have permission to view or manage the user directory. Please sign in with an authorized administrator account.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <Card role="alert" className="border-red-300 dark:border-red-800">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
+            <AlertTriangle className="w-5 h-5" />
+            Failed to load user directory
+          </CardTitle>
+          <CardDescription>{loadError}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void loadDirectory()}
+            className="gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-12">
       {/* Header section */}
@@ -558,7 +507,7 @@ export default function UsersManagementPage() {
             <div className="text-2xl font-bold">{stats.total}</div>
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
               <TrendingUp className="w-3 h-3 text-emerald-500" />
-              <span>+14% from last month</span>
+              <span>Authorized user accounts</span>
             </p>
           </CardContent>
         </Card>
@@ -638,7 +587,6 @@ export default function UsersManagementPage() {
                 />
               </div>
 
-              {/* Role filter */}
               <select
                 value={roleFilter}
                 onChange={(e) => {
@@ -655,7 +603,6 @@ export default function UsersManagementPage() {
                 <option value="buyer">Buyer</option>
               </select>
 
-              {/* Status filter */}
               <select
                 value={statusFilter}
                 onChange={(e) => {
@@ -672,7 +619,6 @@ export default function UsersManagementPage() {
                 <option value="suspended">Suspended</option>
               </select>
 
-              {/* KYC filter */}
               <select
                 value={kycFilter}
                 onChange={(e) => {
@@ -766,9 +712,15 @@ export default function UsersManagementPage() {
                     <TableCell colSpan={9} className="h-32 text-center">
                       <div className="flex flex-col items-center justify-center text-muted-foreground">
                         <Users className="w-8 h-8 mb-2 opacity-30" />
-                        <p className="text-sm font-medium">No users match your criteria</p>
+                        <p className="text-sm font-medium">
+                          {users.length === 0
+                            ? "No registered users found"
+                            : "No users match your criteria"}
+                        </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Try adjusting search terms or filters
+                          {users.length === 0
+                            ? "No accounts have been provisioned in the directory yet."
+                            : "Try adjusting search terms or filters"}
                         </p>
                       </div>
                     </TableCell>
@@ -779,8 +731,8 @@ export default function UsersManagementPage() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
-                            {user.firstName[0]}
-                            {user.lastName[0]}
+                            {user.firstName[0] ?? "?"}
+                            {user.lastName[0] ?? ""}
                           </div>
                           <div className="min-w-0">
                             <div className="font-medium text-sm text-foreground truncate">
@@ -849,7 +801,12 @@ export default function UsersManagementPage() {
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              aria-label={`Actions for ${user.firstName} ${user.lastName}`}
+                            >
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -881,7 +838,8 @@ export default function UsersManagementPage() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              onClick={() => handleToggleStatus(user)}
+                              disabled={isMutating}
+                              onClick={() => void handleToggleStatus(user)}
                               className="cursor-pointer gap-2 text-destructive focus:text-destructive"
                             >
                               {user.status === "suspended" || user.status === "flagged" ? (
@@ -965,8 +923,8 @@ export default function UsersManagementPage() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
-                  {selectedUser.firstName[0]}
-                  {selectedUser.lastName[0]}
+                  {selectedUser.firstName[0] ?? "?"}
+                  {selectedUser.lastName[0] ?? ""}
                 </div>
                 {selectedUser.firstName} {selectedUser.lastName}
               </DialogTitle>
@@ -1084,7 +1042,9 @@ export default function UsersManagementPage() {
               <Button variant="outline" onClick={() => setEditingRoleUser(null)}>
                 Cancel
               </Button>
-              <Button onClick={handleSaveRole}>Save Changes</Button>
+              <Button disabled={isMutating} onClick={() => void handleSaveRole()}>
+                Save Changes
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1093,7 +1053,7 @@ export default function UsersManagementPage() {
       {/* Add User Modal */}
       <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
         <DialogContent className="max-w-lg">
-          <form onSubmit={handleCreateUser}>
+          <form onSubmit={(e) => void handleCreateUser(e)}>
             <DialogHeader>
               <DialogTitle>Add New User</DialogTitle>
               <DialogDescription>
@@ -1208,7 +1168,9 @@ export default function UsersManagementPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit">Create User</Button>
+              <Button disabled={isMutating} type="submit">
+                Create User
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
