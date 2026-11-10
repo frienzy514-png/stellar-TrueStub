@@ -10,30 +10,44 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  getStoredLifecycleEscrows,
+  LifecycleEscrowStatus,
+} from "@/lib/escrow-lifecycle-storage";
 import { PlusIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const STUB_ESCROWS = [
+type DashboardEscrowStatus = "PENDING" | "ACTIVE" | "COMPLETED" | "DISPUTED";
+
+interface DashboardEscrowRow {
+  id: string;
+  event: string;
+  amount: number;
+  status: DashboardEscrowStatus;
+  createdAt: string;
+}
+
+const STUB_ESCROWS: DashboardEscrowRow[] = [
   {
     id: "abc-123",
     event: "Coldplay Live — West Floor",
     amount: 4000,
-    status: "PENDING" as const,
+    status: "PENDING",
     createdAt: "2025-01-20",
   },
   {
     id: "def-456",
     event: "Costa Rica vs Mexico — East Stand",
     amount: 2500,
-    status: "ACTIVE" as const,
+    status: "ACTIVE",
     createdAt: "2025-01-15",
   },
   {
     id: "ghi-789",
     event: "Hamilton — Orchestra",
     amount: 6000,
-    status: "COMPLETED" as const,
+    status: "COMPLETED",
     createdAt: "2025-01-10",
   },
 ];
@@ -46,18 +60,45 @@ const FILTER_TABS = [
   "Disputed",
 ] as const;
 
+function mapLifecycleStatusToDashboard(
+  status: LifecycleEscrowStatus,
+): DashboardEscrowStatus {
+  if (status === "COMPLETED") return "COMPLETED";
+  if (status === "FUNDED" || status === "TRANSFER_CONFIRMED") return "ACTIVE";
+  return "PENDING";
+}
+
 export default function EscrowPage() {
   const router = useRouter();
   const [activeFilter, setActiveFilter] =
     useState<(typeof FILTER_TABS)[number]>("All");
+  const [storedRows, setStoredRows] = useState<DashboardEscrowRow[]>([]);
+
+  useEffect(() => {
+    const stored = getStoredLifecycleEscrows().map((escrow) => ({
+      id: escrow.id,
+      event: escrow.event,
+      amount: escrow.amount,
+      status: mapLifecycleStatusToDashboard(escrow.status),
+      createdAt: escrow.createdAt.slice(0, 10),
+    }));
+    setStoredRows(stored);
+  }, []);
+
+  const allEscrows = useMemo(() => {
+    const storedIds = new Set(storedRows.map((row) => row.id));
+    return [
+      ...storedRows,
+      ...STUB_ESCROWS.filter((row) => !storedIds.has(row.id)),
+    ];
+  }, [storedRows]);
 
   const handleViewEscrow = (id: string) => {
     router.push(`/dashboard/escrow/${id}`);
   };
 
   const handleNewEscrow = () => {
-    // TODO: Navigate to new escrow creation page
-    console.log("Navigate to new escrow creation");
+    router.push("/dashboard/event/create-escrow");
   };
 
   const formatCurrency = (amount: number) => {
@@ -67,7 +108,7 @@ export default function EscrowPage() {
     }).format(amount);
   };
 
-  const filteredEscrows = STUB_ESCROWS.filter((escrow) => {
+  const filteredEscrows = allEscrows.filter((escrow) => {
     if (activeFilter === "All") return true;
     return escrow.status.toUpperCase() === activeFilter.toUpperCase();
   });
@@ -141,7 +182,11 @@ export default function EscrowPage() {
                 </TableRow>
               ) : (
                 filteredEscrows.map((escrow) => (
-                  <TableRow key={escrow.id} className="overflow-scroll border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                  <TableRow
+                    key={escrow.id}
+                    data-testid={`escrow-row-${escrow.id}`}
+                    className="overflow-scroll border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700/50"
+                  >
                     <TableCell className="font-mono text-sm text-gray-500 dark:text-gray-400">
                       {escrow.id.slice(0, 8)}...
                     </TableCell>
@@ -182,9 +227,9 @@ export default function EscrowPage() {
             results
           </div>
           <div className="flex items-center space-x-1">
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               disabled
               className="bg-white border-gray-300 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-400"
             >
@@ -197,25 +242,25 @@ export default function EscrowPage() {
             >
               1
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               disabled
               className="bg-white border-gray-300 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-400"
             >
               2
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               disabled
               className="bg-white border-gray-300 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-400"
             >
               3
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               disabled
               className="bg-white border-gray-300 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-400"
             >

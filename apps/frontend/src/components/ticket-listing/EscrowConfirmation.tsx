@@ -4,9 +4,17 @@ import React, { useEffect, useState } from "react";
 import {
   TicketPurchaseData,
   EventData,
-  EscrowResponse,
   EscrowConfirmationProps,
 } from "@/interfaces/ticket-purchase-escrow.interface";
+import { useWallet } from "@/components/auth/wallet/hooks/wallet.hook";
+import { useEscrowsMutations } from "@/components/tw-blocks/tanstack/useEscrowsMutations";
+import { readStoredWalletAuth } from "@/core/store/data/slices/authentication.slice";
+import {
+  getStoredLifecycleEscrows,
+  LifecycleEscrowStatus,
+  updateLifecycleEscrowStatus,
+  upsertLifecycleEscrow,
+} from "@/lib/escrow-lifecycle-storage";
 
 // UI Components
 import {
@@ -15,11 +23,9 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 
 // Icons
 import {
@@ -34,6 +40,8 @@ import {
   Sparkles,
   Clock,
   FileText,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 
 /**
@@ -44,12 +52,12 @@ function SuccessIcon() {
     <div className="relative">
       {/* Outer glow */}
       <div className="absolute inset-0 animate-ping rounded-full bg-emerald-400/30" />
-      
+
       {/* Inner circle with checkmark */}
       <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/30">
         <CheckCircle2 className="h-12 w-12 text-white" />
       </div>
-      
+
       {/* Sparkle decorations */}
       <Sparkles className="absolute -right-2 -top-2 h-6 w-6 animate-pulse text-yellow-400" />
       <Sparkles className="absolute -bottom-1 -left-1 h-4 w-4 animate-pulse text-emerald-300" />
@@ -97,8 +105,10 @@ function CopyButton({ text, label }: { text: string; label: string }) {
  * Contract ID Display Component
  */
 function ContractIdDisplay({ contractId }: { contractId: string }) {
-  // Truncate contract ID for display
-  const truncatedId = `${contractId.slice(0, 12)}...${contractId.slice(-12)}`;
+  const truncatedId =
+    contractId.length > 24
+      ? `${contractId.slice(0, 12)}...${contractId.slice(-12)}`
+      : contractId;
 
   return (
     <div className="rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 p-4 dark:border-emerald-800 dark:from-emerald-900/20 dark:to-teal-900/20">
@@ -216,10 +226,19 @@ function PurchaseDetailsSummary({
   );
 }
 
+const STATUS_LABELS: Record<LifecycleEscrowStatus, string> = {
+  PENDING: "Pending Funding",
+  FUNDED: "Funded",
+  TRANSFER_CONFIRMED: "Transfer Confirmed",
+  COMPLETED: "Completed",
+};
+
 /**
  * EscrowConfirmation Component
- * 
- * Displays a beautiful confirmation screen after successful escrow creation
+ *
+ * Displays a confirmation screen after escrow creation and provides lifecycle
+ * controls (Fund Escrow -> Confirm Transfer -> Release Funds) backed by the
+ * Trustless Work mutations and wallet signing flow.
  */
 export function EscrowConfirmation({
   purchase,
@@ -228,13 +247,135 @@ export function EscrowConfirmation({
   onComplete,
   onViewDetails,
 }: EscrowConfirmationProps) {
-  const [showConfetti, setShowConfetti] = useState(true);
+  const { address: walletAddress } = useWallet();
+  const { fundEscrow, approveMilestone, releaseFunds } = useEscrowsMutations();
+
+  const [lifecycleStatus, setLifecycleStatus] = useState<LifecycleEscrowStatus>(
+    () => {
+      const existing = getStoredLifecycleEscrows().find(
+        (item) => item.id === escrowData.contractId,
+      );
+      return existing?.status || "PENDING";
+    },
+  );
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Hide confetti after animation
-    const timer = setTimeout(() => setShowConfetti(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+    const existing = getStoredLifecycleEscrows().find(
+      (item) => item.id === escrowData.contractId,
+    );
+    if (!existing) {
+      const nowIso = new Date().toISOString();
+      upsertLifecycleEscrow({
+        id: escrowData.contractId,
+        purchaseId: purchase.id,
+        event: event.name,
+        amount: purchase.totalAmount,
+        currency: purchase.currency || "USDC",
+        status: "PENDING",
+        createdAt: escrowData.createdAt || nowIso,
+        updatedAt: nowIso,
+      });
+    }
+  }, [escrowData.contractId, escrowData.createdAt, event.name, purchase]);
+
+  const resolveSignerAddress = () => {
+    return walletAddress || readStoredWalletAuth().address;
+  };
+
+  const handleFundEscrow = async () => {
+    const signer = resolveSignerAddress();
+    if (!signer) {
+      setLifecycleError("Please connect your wallet before funding the escrow.");
+      return;
+    }
+
+    setIsProcessing(true);
+    setLifecycleError(null);
+    try {
+      await fundEscrow.mutateAsync({
+        payload: {
+          contractId: escrowData.contractId,
+          amount: purchase.totalAmount,
+          signer,
+        },
+        type: "multi-release",
+        address: signer,
+      });
+      setLifecycleStatus("FUNDED");
+      updateLifecycleEscrowStatus(escrowData.contractId, "FUNDED");
+    } catch (err) {
+      setLifecycleError(
+        err instanceof Error ? err.message : "Failed to fund escrow.",
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleConfirmTransfer = async () => {
+    const signer = resolveSignerAddress();
+    if (!signer) {
+      setLifecycleError("Please connect your wallet before confirming transfer.");
+      return;
+    }
+
+    setIsProcessing(true);
+    setLifecycleError(null);
+    try {
+      await approveMilestone.mutateAsync({
+        payload: {
+          contractId: escrowData.contractId,
+          milestoneIndex: "0",
+          approver: signer,
+          newFlag: true,
+        },
+        type: "multi-release",
+        address: signer,
+      });
+      setLifecycleStatus("TRANSFER_CONFIRMED");
+      updateLifecycleEscrowStatus(escrowData.contractId, "TRANSFER_CONFIRMED");
+    } catch (err) {
+      setLifecycleError(
+        err instanceof Error
+          ? err.message
+          : "Failed to confirm ticket transfer.",
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleReleaseFunds = async () => {
+    const signer = resolveSignerAddress();
+    if (!signer) {
+      setLifecycleError("Please connect your wallet before releasing funds.");
+      return;
+    }
+
+    setIsProcessing(true);
+    setLifecycleError(null);
+    try {
+      await releaseFunds.mutateAsync({
+        payload: {
+          contractId: escrowData.contractId,
+          releaseSigner: signer,
+          milestoneIndex: "0",
+        },
+        type: "multi-release",
+        address: signer,
+      });
+      setLifecycleStatus("COMPLETED");
+      updateLifecycleEscrowStatus(escrowData.contractId, "COMPLETED");
+    } catch (err) {
+      setLifecycleError(
+        err instanceof Error ? err.message : "Failed to release escrow funds.",
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -267,6 +408,82 @@ export function EscrowConfirmation({
 
       {/* Contract Details */}
       <ContractIdDisplay contractId={escrowData.contractId} />
+
+      {/* Escrow Lifecycle Actions */}
+      <Card data-testid="escrow-lifecycle-panel">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base">Escrow Lifecycle Actions</CardTitle>
+            <CardDescription>
+              Progress your ticket escrow from funding through transfer confirmation and fund release
+            </CardDescription>
+          </div>
+          <Badge
+            data-testid="escrow-lifecycle-status"
+            variant="outline"
+            className="border-emerald-500/50 text-emerald-700 dark:text-emerald-400"
+          >
+            {STATUS_LABELS[lifecycleStatus]}
+          </Badge>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {lifecycleError && (
+            <div
+              role="alert"
+              data-testid="escrow-lifecycle-error"
+              className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300"
+            >
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{lifecycleError}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Button
+              type="button"
+              data-testid="lifecycle-fund-btn"
+              onClick={handleFundEscrow}
+              disabled={lifecycleStatus !== "PENDING" || isProcessing}
+              variant={lifecycleStatus === "PENDING" ? "default" : "outline"}
+            >
+              {isProcessing && lifecycleStatus === "PENDING" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Fund Escrow
+            </Button>
+
+            <Button
+              type="button"
+              data-testid="lifecycle-confirm-transfer-btn"
+              onClick={handleConfirmTransfer}
+              disabled={lifecycleStatus !== "FUNDED" || isProcessing}
+              variant={lifecycleStatus === "FUNDED" ? "default" : "outline"}
+            >
+              {isProcessing && lifecycleStatus === "FUNDED" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Confirm Transfer
+            </Button>
+
+            <Button
+              type="button"
+              data-testid="lifecycle-release-funds-btn"
+              onClick={handleReleaseFunds}
+              disabled={
+                lifecycleStatus !== "TRANSFER_CONFIRMED" || isProcessing
+              }
+              variant={
+                lifecycleStatus === "TRANSFER_CONFIRMED" ? "default" : "outline"
+              }
+            >
+              {isProcessing && lifecycleStatus === "TRANSFER_CONFIRMED" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Release Funds
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Purchase Summary */}
       <Card>

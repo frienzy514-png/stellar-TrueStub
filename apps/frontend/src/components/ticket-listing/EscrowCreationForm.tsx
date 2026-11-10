@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useMemo, useEffect } from "react";
 import { useWallet } from "@/components/auth/wallet/hooks/wallet.hook";
 import { useTicketPurchaseEscrow } from "@/hooks/useTicketPurchaseEscrow";
+import { useEscrowContext } from "@/components/tw-blocks/providers/EscrowProvider";
 import {
   TicketPurchaseData,
   EventData,
@@ -43,7 +43,7 @@ import {
   Info,
 } from "lucide-react";
 
-import { useTrustlineAssets, TrustlineOption } from "@/components/tw-blocks/wallet-kit/trustlines";
+import { useTrustlineAssets } from "@/components/tw-blocks/wallet-kit/trustlines";
 import { Coins } from "lucide-react";
 
 export interface EscrowCreationFormProps {
@@ -350,8 +350,8 @@ export function EscrowCreationForm({
   onCancel,
   className = "",
 }: EscrowCreationFormProps) {
-  const router = useRouter();
   const { address: walletAddress, connectWallet } = useWallet();
+  const { selectedEscrow, clearEscrow } = useEscrowContext();
   const [showForm, setShowForm] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<string>(
     initialAsset || purchaseData.currency || "USDC"
@@ -362,9 +362,7 @@ export function EscrowCreationForm({
   const trustlineAssets = useTrustlineAssets();
 
   const {
-    escrowFormData,
     milestones,
-    totalAmount,
     isValid,
     validationErrors,
   } = useTicketPurchaseEscrow({
@@ -377,17 +375,16 @@ export function EscrowCreationForm({
   // Determine if wallet is connected
   const isWalletConnected = useMemo(() => Boolean(walletAddress), [walletAddress]);
 
-  // Handle escrow creation success
-  const handleSuccess = (data: unknown) => {
-    console.log("✅ Escrow created successfully:", data);
-    onEscrowCreated(data as EscrowResponse);
-  };
-
-  // Handle escrow creation error
-  const handleError = (error: unknown) => {
-    console.error("❌ Escrow creation failed:", error);
-    // Error handling is done by the form component
-  };
+  // Transition to confirmation when the embedded Trustless Work form deploys an escrow
+  useEffect(() => {
+    if (showForm && selectedEscrow?.contractId) {
+      onEscrowCreated({
+        contractId: selectedEscrow.contractId,
+        status: "created",
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }, [showForm, selectedEscrow?.contractId, onEscrowCreated]);
 
   // Wallet not connected state
   if (!isWalletConnected) {
@@ -507,7 +504,10 @@ export function EscrowCreationForm({
           {!showForm ? (
             <div className="text-center py-4">
               <Button
-                onClick={() => setShowForm(true)}
+                onClick={() => {
+                  clearEscrow();
+                  setShowForm(true);
+                }}
                 size="lg"
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
                 disabled={!isValid}

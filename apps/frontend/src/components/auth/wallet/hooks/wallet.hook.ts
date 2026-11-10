@@ -3,12 +3,19 @@ import {
   WalletNetwork,
 } from "@creit.tech/stellar-wallets-kit";
 import { kit } from "../constants/wallet-kit.constant";
-import { useGlobalAuthenticationStore } from "@/core/store/data";
+import {
+  hydrateWalletAuthFromStorage,
+  useGlobalAuthenticationStore,
+} from "@/core/store/data";
 import { useRouter } from "next/navigation";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useMultiWallet } from "./useMultiWallet";
 import { WalletInfo } from "../types/wallet.types";
 import { signTransaction } from "@stellar/freighter-api";
+import {
+  MOCK_SIGNED_XDR_STORAGE_KEY,
+  TestSignTransactionHandler,
+} from "@/components/tw-blocks/wallet-kit/wallet-kit";
 
 export const useWallet = () => {
   const router = useRouter();
@@ -19,6 +26,10 @@ export const useWallet = () => {
   const [showWalletModal, setShowWalletModal] = useState(false);
 
   const multiWallet = useMultiWallet();
+
+  useEffect(() => {
+    hydrateWalletAuthFromStorage();
+  }, []);
 
   const connectWallet = () => {
     setIsModalOpen(true);
@@ -81,10 +92,36 @@ export const useWallet = () => {
     }
   };
 
-  const signXDR = async (unsignedXDR: string, networkPassphrase?: string): Promise<string> => {
+  const signXDR = async (
+    unsignedXDR: string,
+    networkPassphrase?: string,
+  ): Promise<string> => {
     try {
       if (!address) {
         throw new Error("No wallet connected");
+      }
+
+      if (typeof window !== "undefined") {
+        const customSigner = (
+          window as unknown as {
+            __TRUESTUB_SIGN_XDR__?: TestSignTransactionHandler;
+          }
+        ).__TRUESTUB_SIGN_XDR__;
+        if (typeof customSigner === "function") {
+          return await customSigner({
+            unsignedTransaction: unsignedXDR,
+            address,
+          });
+        }
+        const mockSignedPrefix = window.localStorage.getItem(
+          MOCK_SIGNED_XDR_STORAGE_KEY,
+        );
+        if (mockSignedPrefix) {
+          if (mockSignedPrefix === "REJECT") {
+            throw new Error("Wallet transaction signing was rejected");
+          }
+          return `${mockSignedPrefix}:${unsignedXDR}`;
+        }
       }
 
       const { signedTxXdr } = await signTransaction(unsignedXDR, {

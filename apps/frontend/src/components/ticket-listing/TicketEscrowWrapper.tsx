@@ -12,6 +12,7 @@ import {
 import { EscrowCreationForm } from "./EscrowCreationForm";
 import { EscrowConfirmation } from "./EscrowConfirmation";
 import { useRequireVerifiedEmail } from "@/hooks/useRequireVerifiedEmail";
+import { upsertLifecycleEscrow } from "@/lib/escrow-lifecycle-storage";
 
 // Providers
 import { TrustlessWorkProvider } from "@/components/tw-blocks/providers/TrustlessWork";
@@ -88,7 +89,7 @@ function ErrorState({
  * Simulated API functions - Replace with actual API calls
  */
 async function getTicketPurchase(purchaseId: string): Promise<TicketPurchaseData> {
-  // TODO: Replace with actual API call
+  // TODO: Replace with actual API call (#319)
   // const response = await fetch(`/api/purchases/${purchaseId}`);
   // return response.json();
 
@@ -117,7 +118,7 @@ async function getTicketPurchase(purchaseId: string): Promise<TicketPurchaseData
 }
 
 async function getEvent(eventId: string): Promise<EventData> {
-  // TODO: Replace with actual API call
+  // TODO: Replace with actual API call (#319)
   
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -141,7 +142,7 @@ async function updateTicketPurchaseWithEscrow(
     unsignedXDR?: string;
   }
 ): Promise<void> {
-  // TODO: Replace with actual API call
+  // TODO: Replace with actual API call (#319)
   // await fetch(`/api/purchases/${purchaseId}/escrow`, {
   //   method: 'PATCH',
   //   body: JSON.stringify(escrowData),
@@ -223,6 +224,18 @@ export function TicketEscrowWrapper({
 
   // Handle escrow creation success
   const handleEscrowCreated = async (escrowResponse: EscrowResponse) => {
+    const nowIso = new Date().toISOString();
+    upsertLifecycleEscrow({
+      id: escrowResponse.contractId,
+      purchaseId,
+      event: eventData?.name || "Grand Stellar Event",
+      amount: purchaseData?.totalAmount || 450,
+      currency: purchaseData?.currency || "USDC",
+      status: "PENDING",
+      createdAt: escrowResponse.createdAt || nowIso,
+      updatedAt: nowIso,
+    });
+
     try {
       // Update purchase with escrow information
       await updateTicketPurchaseWithEscrow(purchaseId, {
@@ -251,7 +264,7 @@ export function TicketEscrowWrapper({
     if (onComplete) {
       onComplete();
     } else {
-      router.push(`/dashboard`);
+      router.push(`/dashboard/escrow`);
     }
   };
 
@@ -326,7 +339,7 @@ export function TicketEscrowWrapper({
                 escrowData={escrowData}
                 onComplete={handleComplete}
                 onViewDetails={() =>
-                  router.push(`/dashboard?escrowId=${escrowData.contractId}`)
+                  router.push(`/dashboard/escrow/${escrowData.contractId}`)
                 }
               />
             )}
