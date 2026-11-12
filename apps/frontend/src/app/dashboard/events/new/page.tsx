@@ -32,6 +32,7 @@ const EMPTY_FORM: EventFormData = {
 export default function NewEventPage() {
   const router = useRouter();
   const [form, setForm] = useState<EventFormData>(EMPTY_FORM);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const userId = useCurrentUserId();
   const [insertEvent, { loading: isSubmitting }] = useMutation(INSERT_EVENT, {
     refetchQueries: [{ query: GET_EVENTS }],
@@ -42,20 +43,19 @@ export default function NewEventPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
 
-    // TODO: wire to Hasura mutation → INSERT INTO public.events
-    // Mutation payload shape:
-    // {
-    //   name: form.name,                           // VARCHAR(20)
-    //   description: form.description,             // VARCHAR(50)
-    //   address: form.address,                     // VARCHAR(50)
-    //   location_area: form.location_area,         // VARCHAR(20)
-    //   coordinates: `POINT(${form.longitude} ${form.latitude})`
-    //                                              // geometry(Point, 4326)
-    // }
-    //
-    // Note: PostGIS WKT format for coordinates is POINT(lng lat)
-    // Example: POINT(-84.0907 9.9281)
+    const rawLat = form.latitude.trim();
+    const rawLng = form.longitude.trim();
+    const latitude = rawLat === "" ? Number.NaN : Number(rawLat);
+    const longitude = rawLng === "" ? Number.NaN : Number(rawLng);
+    const hasValidCoords =
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude) &&
+      latitude >= -90 &&
+      latitude <= 90 &&
+      longitude >= -180 &&
+      longitude <= 180;
 
     try {
       await insertEvent({
@@ -67,17 +67,18 @@ export default function NewEventPage() {
             location_area: form.location_area || null,
             owner_id: userId,
             // Hasura takes PostGIS geometry as GeoJSON — coordinates are [lng, lat].
-            coordinates:
-              Number.isFinite(latitude) && Number.isFinite(longitude)
-                ? { type: "Point", coordinates: [longitude, latitude] }
-                : null,
+            coordinates: hasValidCoords
+              ? { type: "Point", coordinates: [longitude, latitude] }
+              : null,
           },
         },
       });
       toast.success("Event created");
       router.push("/dashboard/events");
     } catch {
-      toast.error("Failed to create event. Please try again.");
+      const message = "Failed to create event. Please try again.";
+      setSubmitError(message);
+      toast.error(message);
     }
   };
 
@@ -114,6 +115,15 @@ export default function NewEventPage() {
           Register a new event on TrueStub
         </p>
       </div>
+
+      {submitError && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3 text-sm text-red-700 dark:text-red-300"
+        >
+          {submitError}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

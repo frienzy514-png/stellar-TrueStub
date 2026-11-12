@@ -4,35 +4,54 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery } from "@apollo/client/react";
 import { ArrowLeft, Building2, MapPin } from "lucide-react";
-
-// TODO: replace with Hasura query → public.events
-const STUB_EVENTS = [
-  {
-    id: "1",
-    name: "Coldplay Live",
-    address: "Estadio Nacional, La Sabana, San José",
-    location_area: "San José Centro",
-    description: "Music of the Spheres world tour",
-  },
-  {
-    id: "2",
-    name: "Costa Rica vs Mexico",
-    address: "Estadio Nacional, La Sabana, San José",
-    location_area: "San José Centro",
-    description: "International football friendly",
-  },
-  {
-    id: "3",
-    name: "Hamilton",
-    address: "Teatro Popular Melico Salazar, San José",
-    location_area: "San José Centro",
-    description: "Broadway musical, touring production",
-  },
-];
+import { GET_EVENT_BY_ID, type EventRow } from "@/graphql/queries/event-queries";
 
 export default function EventDetailPage() {
-  const params = useParams();
-  const event = STUB_EVENTS.find((e) => e.id === params.id);
+  const params = useParams<{ id: string }>();
+  const eventId = params?.id;
+  const { data, loading, error } = useQuery<{ events_by_pk: EventRow | null }>(
+    GET_EVENT_BY_ID,
+    {
+      variables: { id: eventId },
+      skip: !eventId,
+    },
+  );
+  const event = data?.events_by_pk;
+
+  if (loading && !event) {
+    return (
+      <p className="py-20 text-center text-sm text-muted-foreground">
+        Loading event...
+      </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Link
+          href="/dashboard/events"
+          className="flex items-center gap-2 text-sm
+                     text-gray-400 hover:text-white transition-colors w-fit"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Events
+        </Link>
+        <div
+          role="alert"
+          className="flex flex-col items-center justify-center py-20 text-center"
+        >
+          <Building2 className="h-12 w-12 text-red-400 mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Failed to load event
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            {error.message || "Unable to fetch event details. Please try again."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!event) {
     return (

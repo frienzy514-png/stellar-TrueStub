@@ -3,31 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "@apollo/client/react";
 import { PlusCircle } from "lucide-react";
-
-// TODO: replace with Hasura query → public.events
-const STUB_EVENTS = [
-  {
-    id: "1",
-    name: "Coldplay Live",
-    address: "Estadio Nacional, La Sabana, San José",
-    location_area: "San José Centro",
-    description: "Music of the Spheres world tour",
-  },
-  {
-    id: "2",
-    name: "Costa Rica vs Mexico",
-    address: "Estadio Nacional, La Sabana, San José",
-    location_area: "San José Centro",
-    description: "International football friendly",
-  },
-  {
-    id: "3",
-    name: "Hamilton",
-    address: "Teatro Popular Melico Salazar, San José",
-    location_area: "San José Centro",
-    description: "Broadway musical, touring production",
-  },
-];
+import { GET_EVENTS, type EventRow } from "@/graphql/queries/event-queries";
 
 export default function EventsPage() {
   const { data, loading, error } = useQuery<{ events: EventRow[] }>(GET_EVENTS, {
@@ -77,38 +53,53 @@ export default function EventsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-            {STUB_EVENTS.map((event) => (
-              <tr
-                key={event.id}
-                className="bg-white dark:bg-slate-900
-                           hover:bg-gray-50 dark:hover:bg-slate-800
-                           transition-colors"
-              >
-                <td className="px-4 py-3 font-semibold
-                               text-gray-900 dark:text-white">
-                  {event.name}
-                </td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
-                  {event.address}
-                </td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
-                  {event.location_area}
-                </td>
-                <td className="px-4 py-3 text-gray-500 dark:text-gray-400
-                               max-w-[200px] truncate">
-                  {event.description}
-                </td>
-                <td className="px-4 py-3">
-                  <Link
-                    href={`/dashboard/events/${event.id}`}
-                    className="text-sm font-medium text-orange-500
-                               hover:text-orange-600 transition-colors"
-                  >
-                    View →
-                  </Link>
+            {events.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="px-4 py-10 text-center text-muted-foreground"
+                >
+                  {loading
+                    ? "Loading events..."
+                    : error
+                      ? "Failed to load events."
+                      : "No events yet."}
                 </td>
               </tr>
-            ))}
+            ) : (
+              events.map((event) => (
+                <tr
+                  key={event.id}
+                  className="bg-white dark:bg-slate-900
+                             hover:bg-gray-50 dark:hover:bg-slate-800
+                             transition-colors"
+                >
+                  <td className="px-4 py-3 font-semibold
+                                 text-gray-900 dark:text-white">
+                    {event.name}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                    {event.address}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                    {event.location_area}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400
+                                 max-w-[200px] truncate">
+                    {event.description}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/dashboard/events/${event.id}`}
+                      className="text-sm font-medium text-orange-500
+                                 hover:text-orange-600 transition-colors"
+                    >
+                      View →
+                    </Link>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
