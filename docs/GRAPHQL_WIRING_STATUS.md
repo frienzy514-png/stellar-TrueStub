@@ -38,7 +38,6 @@ running a fresh repo-wide grep.
 | --- | --- | --- | --- |
 | `apps/frontend/src/components/events/TicketEscrowIntegration.tsx` | 🔴 Mocked | 4 | [#319](https://github.com/frienzy514-png/stellar-TrueStub/issues/319) |
 | `apps/frontend/src/components/ticket-listing/TicketEscrowWrapper.tsx` | 🔴 Mocked | 3 | [#319](https://github.com/frienzy514-png/stellar-TrueStub/issues/319) |
-| `apps/frontend/src/app/dashboard/events/new/page.tsx` (create event → `INSERT INTO public.events`) | 🔴 Mocked | 1 (`TODO: wire to Hasura mutation`) | _none filed_ |
 
 ## No longer mocked
 
@@ -48,21 +47,22 @@ below are their current locations.
 
 | File | Notes |
 | --- | --- |
-| `components/auth/NewPassword.tsx` | Uses Firebase `confirmPasswordReset`; no marker. |
-| `components/profile/UserProfileCard.tsx` | Now `components/dashboard/UserProfileCard.tsx`; no marker. |
-| `components/settings/NotificationPreferences.tsx` | Now `components/dashboard/profile/NotificationPreferences.tsx` (calls `/api/graphql`) and `components/notifications/NotificationPreferences.tsx`; no marker in either. |
-| `stores/favorites.store.ts` | Now `core/store/data/favorites.store.ts`. No marker, but it still seeds from `STUB_EVENTS` mock data. |
-| `app/dashboard/earnings` | No marker. |
-| `app/dashboard/escrow/[id]/receipt` | No marker. |
-| `app/dashboard/listings/[id]/offers` | No marker. |
-| `components/escrow/TicketEscrowIntegration.tsx`, `components/escrow/TicketEscrowWrapper.tsx` | These paths don't exist. The real files are the two `TicketEscrow*` rows above. |
+| `apps/frontend/src/app/dashboard/events/new/page.tsx` | Wired to `INSERT_EVENT` (`insert_events_one`) with GeoJSON Point coordinates (#500). |
+| `apps/frontend/src/components/auth/NewPassword.tsx` | Uses Firebase `confirmPasswordReset`; no marker. |
+| `apps/frontend/src/components/dashboard/UserProfileCard.tsx` | Moved from the old `profile/` directory; no marker. |
+| `apps/frontend/src/components/dashboard/profile/NotificationPreferences.tsx` | Calls `/api/graphql`. Moved from the old `settings/` directory. |
+| `apps/frontend/src/components/notifications/NotificationPreferences.tsx` | Live preference toggle; no marker. |
+| `apps/frontend/src/core/store/data/favorites.store.ts` | Moved from the old top-level `stores/` directory. No marker, but it still seeds from `STUB_EVENTS` mock data. |
+| `apps/frontend/src/app/dashboard/earnings` | No marker. |
+| `apps/frontend/src/app/dashboard/escrow/[id]/receipt` | No marker. |
+| `apps/frontend/src/app/dashboard/listings/[id]/offers` | No marker. |
 
 ## Notes
 
 - The `TicketEscrow*` duplicates were consolidated (#364). The canonical
-  copies are `components/events/TicketEscrowIntegration.tsx` and
-  `components/ticket-listing/TicketEscrowWrapper.tsx`.
-- `components/escrow/views/EscrowJustification.tsx` has a
+  copies are `apps/frontend/src/components/events/TicketEscrowIntegration.tsx` and
+  `apps/frontend/src/components/ticket-listing/TicketEscrowWrapper.tsx`.
+- `apps/frontend/src/components/escrow/views/EscrowJustification.tsx` has a
   `TODO: wire PDF generation` marker. That is a feature gap, not a GraphQL
   wiring gap, so it isn't listed.
 - If you find a marker that is missing from this table, add it (and file an
