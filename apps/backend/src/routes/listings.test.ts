@@ -25,10 +25,22 @@ jest.mock('../services/listing-alert.service', () => ({
   },
 }));
 
+jest.mock('../services/hasura.service', () => ({
+  HasuraService: { deleteTicketListing: jest.fn() },
+}));
+
+jest.mock('../services/listing-deletion.service', () => ({
+  cleanupListingDependentDocuments: jest.fn(),
+}));
+
 import { firebaseAuth } from '../lib/firebase-admin';
+import { HasuraService } from '../services/hasura.service';
+import { cleanupListingDependentDocuments } from '../services/listing-deletion.service';
 import { listingsRouter } from './listings';
 
 const mockedVerify = firebaseAuth.verifyIdToken as jest.Mock;
+const mockedDeleteListing = HasuraService.deleteTicketListing as jest.Mock;
+const mockedCleanupListing = cleanupListingDependentDocuments as jest.Mock;
 
 // ── App factory ─────────────────────────────────────────────────────────────
 
@@ -36,6 +48,16 @@ function buildApp() {
   const app = express();
   app.use(express.json());
   app.use('/api/listings', listingsRouter);
+  app.use((
+    err: { statusCode?: number; code?: string; message?: string },
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction,
+  ) => {
+    res.status(err.statusCode ?? 500).json({
+      error: { code: err.code ?? 'INTERNAL_SERVER_ERROR', message: err.message ?? 'Unexpected error' },
+    });
+  });
   return app;
 }
 
@@ -70,6 +92,12 @@ describe('listings route (HTTP layer) — authentication', () => {
     const res = await request(app)
       .patch('/api/listings/l1')
       .send({ eventName: 'Concert', price: 100 });
+
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects unauthenticated DELETE /:id with 401', async () => {
+    const res = await request(app).delete('/api/listings/17');
 
     expect(res.status).toBe(401);
   });
@@ -126,6 +154,49 @@ describe('listings route (HTTP layer) — authenticated', () => {
       .send({});
 
     expect(res.status).toBe(400);
+  });
+
+  it('deletes an owned listing and cleans listing-linked dependents', async () => {
+    mockedDeleteListing.mockResolvedValue(true);
+    mockedCleanupListing.mockResolvedValue(undefined);
+
+    const res = await request(app)
+      .delete('/api/listings/17')
+      .set('Authorization', VALID_TOKEN);
+
+    expect(res.status).toBe(204);
+    expect(mockedDeleteListing).toHaveBeenCalledWith(17, 'user-123');
+    expect(mockedCleanupListing).toHaveBeenCalledWith('17');
+  });
+
+  it('returns 404 and skips cleanup when the listing is missing or not owned', async () => {
+    mockedDeleteListing.mockResolvedValue(false);
+
+    const res = await request(app)
+      .delete('/api/listings/17')
+      .set('Authorization', VALID_TOKEN);
+
+    expect(res.status).toBe(404);
+    expect(mockedCleanupListing).not.toHaveBeenCalled();
+  });
+
+  it('returns a clear conflict when an escrow or dispute blocks deletion', async () => {
+    const error = Object.assign(new Error('This listing cannot be deleted because a dispute references it.'), {
+      statusCode: 409,
+      code: 'LISTING_DELETE_BLOCKED',
+    });
+    mockedDeleteListing.mockRejectedValue(error);
+
+    const res = await request(app)
+      .delete('/api/listings/17')
+      .set('Authorization', VALID_TOKEN);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatchObject({
+      code: 'LISTING_DELETE_BLOCKED',
+      message: expect.stringContaining('dispute references it'),
+    });
+    expect(mockedCleanupListing).not.toHaveBeenCalled();
   });
 
   it('lets an authenticated POST /risk-check pass auth and return 400 for invalid payload', async () => {

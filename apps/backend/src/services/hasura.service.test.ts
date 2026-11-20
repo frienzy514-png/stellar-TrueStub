@@ -115,3 +115,41 @@ describe("HasuraService.getEscrowById", () => {
     });
   });
 });
+
+describe("HasuraService.deleteTicketListing", () => {
+  it("deletes only the requested listing owned by the authenticated user", async () => {
+    hasuraRequest.mockResolvedValue({ delete_ticket_listings: { affected_rows: 1, returning: [{ id: 17 }] } });
+
+    await expect(HasuraService.deleteTicketListing(17, "seller-1")).resolves.toBe(true);
+    expect(hasuraRequest).toHaveBeenCalledWith(
+      expect.stringContaining("owner_id: { _eq: $ownerId }"),
+      { id: 17, ownerId: "seller-1" }
+    );
+  });
+
+  it("returns false when the listing is absent or not owned by the caller", async () => {
+    hasuraRequest.mockResolvedValue({ delete_ticket_listings: { affected_rows: 0, returning: [] } });
+
+    await expect(HasuraService.deleteTicketListing(17, "other-user")).resolves.toBe(false);
+  });
+
+  it("converts an escrow guard failure into a clear conflict", async () => {
+    hasuraRequest.mockRejectedValue(new Error("database rejected: LISTING_DELETE_BLOCKED escrow"));
+
+    await expect(HasuraService.deleteTicketListing(17, "seller-1")).rejects.toMatchObject({
+      statusCode: 409,
+      code: "LISTING_DELETE_BLOCKED",
+      message: expect.stringContaining("escrow references it"),
+    });
+  });
+
+  it("converts a dispute guard failure into a clear conflict", async () => {
+    hasuraRequest.mockRejectedValue(new Error("database rejected: LISTING_DELETE_BLOCKED dispute"));
+
+    await expect(HasuraService.deleteTicketListing(17, "seller-1")).rejects.toMatchObject({
+      statusCode: 409,
+      code: "LISTING_DELETE_BLOCKED",
+      message: expect.stringContaining("dispute references it"),
+    });
+  });
+});
