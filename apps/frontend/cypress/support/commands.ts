@@ -24,6 +24,7 @@ declare global {
        * exists; see the spec file for the exact boundary this covers today.
        */
       blockTrustlessWorkApi(): Chainable<null>;
+      mockEscrowLifecycleApi(): Chainable<null>;
     }
   }
 }
@@ -33,6 +34,16 @@ Cypress.Commands.add("blockTrustlessWorkApi", () => {
     { url: "**://*.trustlesswork.com/**" },
     { statusCode: 503, body: { error: "blocked in e2e — see blockTrustlessWorkApi" } }
   ) as unknown as Cypress.Chainable<null>;
+});
+
+Cypress.Commands.add("mockEscrowLifecycleApi", () => {
+  ["create", "fund", "transfer", "release"].forEach((action) => {
+    cy.intercept("POST", `**/api/trustless-work/${action}`, {
+      statusCode: 200,
+      body: { contractId: "escrow-e2e-001", status: action === "release" ? "completed" : action },
+    }).as(`escrow${action}`);
+  });
+  return cy.wrap(null);
 });
 
 export {};

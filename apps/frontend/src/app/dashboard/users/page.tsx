@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { auth } from "@/lib/firebase";
 import {
   Users,
   UserPlus,
@@ -82,147 +83,29 @@ export interface ManagedUser {
   avatarUrl?: string;
 }
 
-const INITIAL_USERS: ManagedUser[] = [
-  {
-    id: "usr_stb_001",
-    firstName: "Sarah",
-    lastName: "Connor",
-    email: "sarah.c@truestub.io",
-    phoneNumber: "+1 (555) 234-5678",
-    role: "admin",
-    status: "active",
-    kycVerified: true,
-    walletAddress: "GDQP...4X9Z",
-    fullWalletAddress: "GDQP2LMKABCDEF1234567890MNOPQRSTUVWXYZ12345678904X9Z",
-    escrowsCount: 48,
-    completedVolume: "$24,500 USDC",
-    reputationScore: 5.0,
-    totalReviews: 42,
-    joinedDate: "2025-11-12",
-  },
-  {
-    id: "usr_stb_002",
-    firstName: "John",
-    lastName: "Smith",
-    email: "john.smith@gmail.com",
-    phoneNumber: "+506 6489 5321",
-    role: "seller",
-    status: "active",
-    kycVerified: true,
-    walletAddress: "GASK...XN32",
-    fullWalletAddress: "GASKQBX7ABCDEF1234567890MNOPQRSTUVWXYZ1234567890XN32",
-    escrowsCount: 32,
-    completedVolume: "$12,800 USDC",
-    reputationScore: 4.9,
-    totalReviews: 29,
-    joinedDate: "2026-01-08",
-  },
-  {
-    id: "usr_stb_003",
-    firstName: "Elena",
-    lastName: "Rostova",
-    email: "elena.r@blockchain-tickets.com",
-    phoneNumber: "+44 20 7946 0912",
-    role: "seller",
-    status: "active",
-    kycVerified: true,
-    walletAddress: "GBLM...9Y2A",
-    fullWalletAddress: "GBLM9876543210ABCDEF1234567890MNOPQRSTUVWXYZ9Y2A",
-    escrowsCount: 65,
-    completedVolume: "$38,200 USDC",
-    reputationScore: 4.8,
-    totalReviews: 57,
-    joinedDate: "2025-12-03",
-  },
-  {
-    id: "usr_stb_004",
-    firstName: "Marcus",
-    lastName: "Vance",
-    email: "marcus.vance@cryptoevents.org",
-    phoneNumber: "+1 (555) 876-5432",
-    role: "moderator",
-    status: "active",
-    kycVerified: true,
-    walletAddress: "GCKX...7W1B",
-    fullWalletAddress: "GCKX112233445566778899AABBCCDDEEFF00112233447W1B",
-    escrowsCount: 19,
-    completedVolume: "$8,900 USDC",
-    reputationScore: 4.9,
-    totalReviews: 18,
-    joinedDate: "2026-01-19",
-  },
-  {
-    id: "usr_stb_005",
-    firstName: "Amara",
-    lastName: "Diallo",
-    email: "amara.d@stubfan.net",
-    phoneNumber: "+33 1 42 68 55 00",
-    role: "buyer",
-    status: "active",
-    kycVerified: true,
-    walletAddress: "GBVF...3T8K",
-    fullWalletAddress: "GBVF887766554433221100FFEEDDCCBBAA99887766553T8K",
-    escrowsCount: 12,
-    completedVolume: "$3,400 USDC",
-    reputationScore: 4.7,
-    totalReviews: 11,
-    joinedDate: "2026-02-02",
-  },
-  {
-    id: "usr_stb_006",
-    firstName: "Liam",
-    lastName: "Chen",
-    email: "liam.chen@techfest.io",
-    phoneNumber: "+65 6789 0123",
-    role: "buyer",
-    status: "pending",
-    kycVerified: false,
-    walletAddress: "GAZX...6M4P",
-    fullWalletAddress: "GAZX55443322110099887766554433221100998877666M4P",
-    escrowsCount: 2,
-    completedVolume: "$450 USDC",
-    reputationScore: 4.2,
-    totalReviews: 2,
-    joinedDate: "2026-02-21",
-  },
-  {
-    id: "usr_stb_007",
-    firstName: "Victor",
-    lastName: "Novak",
-    email: "v.novak@suspicious-domain.cc",
-    phoneNumber: "+7 495 123-45-67",
-    role: "seller",
-    status: "flagged",
-    kycVerified: false,
-    walletAddress: "GC99...1L88",
-    fullWalletAddress: "GC9900112233445566778899AABBCCDDEEFF001122331L88",
-    escrowsCount: 4,
-    completedVolume: "$1,100 USDC",
-    reputationScore: 2.1,
-    totalReviews: 5,
-    joinedDate: "2026-02-14",
-  },
-  {
-    id: "usr_stb_008",
-    firstName: "Dmitri",
-    lastName: "Kozlov",
-    email: "dmitri.k@banned-tickets.ru",
-    phoneNumber: "+7 812 987-65-43",
-    role: "buyer",
-    status: "suspended",
-    kycVerified: false,
-    walletAddress: "GD88...5Q11",
-    fullWalletAddress: "GD8811223344556677889900AABBCCDDEEFF112233445Q11",
-    escrowsCount: 1,
-    completedVolume: "$200 USDC",
-    reputationScore: 1.0,
-    totalReviews: 3,
-    joinedDate: "2026-01-25",
-  },
-];
-
 export default function UsersManagementPage() {
-  const [users, setUsers] = useState<ManagedUser[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) throw new Error("Administrator sign-in is required.");
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000"}/api/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || "Unable to load users.");
+        if (!cancelled) setUsers((payload.users || []).map((user: any) => ({
+          id: user.id, firstName: user.firstName || "", lastName: user.lastName || "", email: user.email || "—",
+          phoneNumber: "—", role: "buyer", status: "active", kycVerified: false, walletAddress: "—", fullWalletAddress: "",
+          escrowsCount: 0, completedVolume: "$0 USDC", reputationScore: 0, totalReviews: 0, joinedDate: user.joinedDate,
+        })));
+      } catch (error) { if (!cancelled) setLoadError(error instanceof Error ? error.message : "Unable to load users."); }
+      finally { if (!cancelled) setIsLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -262,31 +145,15 @@ export default function UsersManagementPage() {
     }
   };
 
-  // Toggle user status (suspend / activate)
-  const handleToggleStatus = (user: ManagedUser) => {
-    const nextStatus: UserStatus =
-      user.status === "suspended" || user.status === "flagged"
-        ? "active"
-        : "suspended";
-    setUsers((prev) =>
-      prev.map((u) => (u.id === user.id ? { ...u, status: nextStatus } : u))
-    );
-    toast.success(
-      `User ${user.firstName} ${user.lastName} is now ${nextStatus}`
-    );
+  // Status mutations remain disabled until the server endpoint is available.
+  const handleToggleStatus = (_user: ManagedUser) => {
+    toast.error("User status changes are not available until the authorized server mutation is enabled.");
   };
 
   // Save role edit
   const handleSaveRole = () => {
     if (!editingRoleUser) return;
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === editingRoleUser.id ? { ...u, role: newRoleValue } : u
-      )
-    );
-    toast.success(
-      `Role for ${editingRoleUser.firstName} ${editingRoleUser.lastName} updated to ${newRoleValue}`
-    );
+    toast.error("Role changes are not available until the authorized server mutation is enabled.");
     setEditingRoleUser(null);
   };
 

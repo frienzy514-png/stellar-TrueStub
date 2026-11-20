@@ -21,6 +21,7 @@ import { changelogRouter } from "./routes/changelog";
 import { disputesRouter } from "./routes/disputes";
 // Issue #240 — account deletion / anonymization
 import { usersRouter } from "./routes/users";
+import { adminUsersRouter } from "./routes/admin-users";
 import { startDisputeResolverBalanceMonitor } from "./services/dispute-resolver-balance.service";
 
 // Initialise Sentry exactly once, before the app is created (#260). All Sentry
@@ -54,6 +55,7 @@ export function createApp(): Express {
   app.use("/api/disputes", writeRateLimiter, requireAuth, disputesRouter);
   // #240 — Account deletion / anonymization
   app.use("/api/users", writeRateLimiter, usersRouter);
+  app.use("/api/admin/users", authRateLimiter, requireAdmin, adminUsersRouter);
   app.use(errorHandler);
   return app;
 }
