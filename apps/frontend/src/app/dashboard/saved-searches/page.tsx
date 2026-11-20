@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { BellRing, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,11 +18,11 @@ export default function SavedSearchesPage() {
     const name = eventName.trim();
     if (!name) return;
     const price = Number(maxPrice);
-    addSearch({
+    void addSearch({
       eventName: name,
       maxPrice: maxPrice && price > 0 ? price : undefined,
       section: section.trim() || undefined,
-    });
+    }).catch((error) => toast.error(error instanceof Error ? error.message : "Saved search could not be synced."));
     setEventName('');
     setMaxPrice('');
     setSection('');
@@ -78,14 +79,14 @@ export default function SavedSearchesPage() {
                 <p className="text-xs text-muted-foreground">
                   {s.maxPrice ? `Under ${s.maxPrice.toLocaleString()} USDC` : 'Any price'}
                   {' · '}
-                  {s.section || 'Any section'}
+                  {s.section || 'Any section'}{s.syncError ? ` · Sync issue: ${s.syncError}` : ''}
                 </p>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 aria-label={`Delete saved search for ${s.eventName}`}
-                onClick={() => removeSearch(s.id)}
+                onClick={() => void removeSearch(s.id).catch((error) => toast.error(error instanceof Error ? error.message : "Could not delete saved search. It remains active."))}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>

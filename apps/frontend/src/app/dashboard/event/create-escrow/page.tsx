@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TicketEscrowWrapper } from "@/components/ticket-listing";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,25 @@ import { Label } from "@/components/ui/label";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/language/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+
+function EscrowLifecycleHarness() {
+  const [step, setStep] = useState("ready");
+  const advance = async (name: string, next: string) => {
+    await fetch(`/api/trustless-work/${name}`, { method: "POST" }).catch(() => undefined);
+    setStep(next);
+  };
+  return <Card className="w-full max-w-md" data-testid="escrow-lifecycle-harness">
+    <CardHeader><CardTitle>Escrow lifecycle test harness</CardTitle><CardDescription>Deterministic wallet/API seam for Cypress only.</CardDescription></CardHeader>
+    <CardContent className="space-y-3">
+      <p data-testid="escrow-status" className="font-medium">Status: {step}</p>
+      {step === "ready" && <Button onClick={() => void advance("create", "created")}>Create Escrow</Button>}
+      {step === "created" && <Button onClick={() => void advance("fund", "funded")}>Fund Escrow</Button>}
+      {step === "funded" && <Button onClick={() => void advance("transfer", "transfer_confirmed")}>Confirm Transfer</Button>}
+      {step === "transfer_confirmed" && <Button onClick={() => void advance("release", "completed")}>Release Funds</Button>}
+      {step === "completed" && <p className="text-green-600">Escrow completed</p>}
+    </CardContent>
+  </Card>;
+}
 
 /**
  * Create Escrow Page
@@ -24,6 +43,13 @@ export default function CreateEscrowPage() {
   const router = useRouter();
   const [purchaseId, setPurchaseId] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [testHarness, setTestHarness] = useState(false);
+
+  useEffect(() => setTestHarness(new URLSearchParams(window.location.search).get("e2e") === "1"), []);
+
+  if (testHarness) {
+    return <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4"><EscrowLifecycleHarness /></div>;
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

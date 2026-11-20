@@ -42,20 +42,12 @@ export default function NewEventPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // TODO: wire to Hasura mutation → INSERT INTO public.events
-    // Mutation payload shape:
-    // {
-    //   name: form.name,                           // VARCHAR(20)
-    //   description: form.description,             // VARCHAR(50)
-    //   address: form.address,                     // VARCHAR(50)
-    //   location_area: form.location_area,         // VARCHAR(20)
-    //   coordinates: `POINT(${form.longitude} ${form.latitude})`
-    //                                              // geometry(Point, 4326)
-    // }
-    //
-    // Note: PostGIS WKT format for coordinates is POINT(lng lat)
-    // Example: POINT(-84.0907 9.9281)
+    const latitude = Number(form.latitude);
+    const longitude = Number(form.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      toast.error("Enter valid latitude and longitude values.");
+      return;
+    }
 
     try {
       await insertEvent({
