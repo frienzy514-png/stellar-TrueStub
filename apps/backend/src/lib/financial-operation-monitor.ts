@@ -26,8 +26,7 @@ export async function trackFinancialOperation<T>(
     return await run();
   } finally {
     const durationMs = Date.now() - startedAt;
-    if (durationMs < thresholdMs) return;
-
+    if (durationMs >= thresholdMs) {
     const alert = {
       alert: "financial_operation_slow",
       operation,
@@ -58,6 +57,7 @@ export async function trackFinancialOperation<T>(
       } catch (error) {
         logger.error({ error, operation }, "[FINANCIAL_OPERATION_SLOW] alert delivery failed");
       }
+    }
     }
   }
 }
