@@ -11,6 +11,31 @@ export async function createListingAlert(
   userId: string,
   input: CreateListingAlertInput
 ): Promise<ListingAlert> {
+
+export async function deleteListingAlerts(listingId: string): Promise<void> {
+  // Retrieve all alerts associated with the given listing ID.
+  const snapshot = await db
+    .collection(COLLECTION)
+    .where('listingId', '==', listingId)
+    .get();
+
+  if (snapshot.empty) {
+    return;
+  }
+
+  // Use a batch to delete all matching documents efficiently.
+  const batch = db.batch();
+  snapshot.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+
+  await batch.commit();
+}
+
+export async function createListingAlert(
+  userId: string,
+  input: CreateListingAlertInput
+): Promise<ListingAlert> {
   // Guard against duplicate watchlist entries: a user may only watch a given
   // listing once. If an entry already exists for this (userId, listingId)
   // pair, return it as a no-op success instead of inserting a duplicate.
