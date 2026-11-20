@@ -10,11 +10,3 @@ export const INSERT_TICKET_LISTING = gql`
     }
   }
 `;
-
-export const DELETE_TICKET_LISTING = gql`
-  mutation DeleteTicketListing($id: Int!) {
-    delete_ticket_listings_by_pk(id: $id) {
-      id
-    }
-  }
-`;

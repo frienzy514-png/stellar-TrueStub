@@ -73,6 +73,13 @@ interface ListingEscrowLockQueryResult {
   escrow_transactions?: ListingEscrowLockRow[];
 }
 
+interface ListingDeleteResult {
+  delete_ticket_listings?: {
+    affected_rows?: number;
+    returning?: Array<{ id: number }>;
+  };
+}
+
 export class HasuraService {
   /**
    * The single authoritative write path for `escrow_transactions.status`
@@ -348,5 +355,37 @@ export class HasuraService {
       [listingId, [...LOCKED_ESCROW_STATUSES]]
     );
     return result.rows?.[0] ?? null;
+  }
+
+  /**
+   * Delete only the caller's ticket listing. PostgreSQL's BEFORE DELETE trigger
+   * is the authoritative guard, so direct Hasura mutations and concurrent
+   * escrow/dispute inserts cannot bypass the history/dependent-record checks.
+   */
+  static async deleteTicketListing(id: number, ownerId: string): Promise<boolean> {
+    const mutation = `
+      mutation DeleteTicketListing($id: Int!, $ownerId: String!) {
+        delete_ticket_listings(
+          where: { id: { _eq: $id }, owner_id: { _eq: $ownerId } }
+        ) {
+          affected_rows
+          returning { id }
+        }
+      }
+    `;
+
+    try {
+      const data = await hasuraClient.request<ListingDeleteResult>(mutation, { id, ownerId });
+      return (data.delete_ticket_listings?.affected_rows ?? 0) > 0;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "";
+      if (detail.includes("LISTING_DELETE_BLOCKED")) {
+        const message = detail.includes("dispute")
+          ? "This listing cannot be deleted because a dispute references it. Resolve the dispute and retain its history."
+          : "This listing cannot be deleted because an escrow references it. Complete or resolve the escrow and retain its history.";
+        throw new AppError(409, "LISTING_DELETE_BLOCKED", message);
+      }
+      throw new Error("Failed to delete listing from Hasura");
+    }
   }
 }

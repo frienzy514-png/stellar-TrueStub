@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useMutation } from "@apollo/client/react";
 import { MoreHorizontal, Pencil, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
+import { auth } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,7 +21,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DELETE_TICKET_LISTING } from "@/graphql/mutations/ticket-listing-mutations";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
 
 interface ListingActionsMenuProps {
   listingId: number;
@@ -30,26 +31,38 @@ interface ListingActionsMenuProps {
 
 export function ListingActionsMenu({ listingId, onDeleteConfirmed }: ListingActionsMenuProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
-
-  const [deleteListing, { loading: isDeleting }] = useMutation<{
-    delete_ticket_listings_by_pk: { id: number } | null;
-  }>(DELETE_TICKET_LISTING, {
-    refetchQueries: ["GetTicketListings"],
-  });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleConfirmDelete = async () => {
+    setIsDeleting(true);
     try {
-      const { data } = await deleteListing({ variables: { id: listingId } });
-      // Hasura returns null when the row is missing or not owned by the caller.
-      if (!data?.delete_ticket_listings_by_pk) {
-        toast.error("Listing could not be deleted.");
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        toast.error("Please sign in again before deleting this listing.");
         return;
       }
+
+      const response = await fetch(`${BACKEND_URL}/api/listings/${listingId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as
+          | { error?: string | { message?: string } }
+          | null;
+        const error = body?.error;
+        const message = typeof error === "string" ? error : error?.message;
+        toast.error(message || "Listing could not be deleted.");
+        return;
+      }
+
       toast.success(`Listing ${listingId} deleted`);
       onDeleteConfirmed?.(listingId);
       setDeleteOpen(false);
     } catch {
       toast.error("Failed to delete listing. Please try again.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 

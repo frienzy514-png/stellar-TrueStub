@@ -4,6 +4,8 @@ import { assessListingRisk } from "../services/listing-fraud.service";
 import { listingAlertService } from "../services/listing-alert.service";
 import { registerRoute } from "../openapi/registry";
 import { requireAuthForWrites } from "../middleware/auth";
+import { HasuraService } from "../services/hasura.service";
+import { cleanupListingDependentDocuments } from "../services/listing-deletion.service";
 
 export const listingsRouter = Router();
 
@@ -140,6 +142,37 @@ listingsRouter.patch("/:id", async (req, res, next) => {
       previousPrice
     );
     return res.json({ listingId: req.params.id, notified });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+registerRoute({
+  method: "delete",
+  path: "/api/listings/{id}",
+  summary: "Delete a listing when no escrow or dispute references it",
+  request: { params: z.object({ id: z.coerce.number().int().positive() }) },
+});
+
+listingsRouter.delete("/:id", async (req, res, next) => {
+  const parsedId = z.coerce.number().int().positive().safeParse(req.params.id);
+  if (!parsedId.success) {
+    return res.status(400).json({ error: "Invalid listing id" });
+  }
+
+  const user = res.locals.user as { uid?: string } | undefined;
+  if (!user?.uid) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const deleted = await HasuraService.deleteTicketListing(parsedId.data, user.uid);
+    if (!deleted) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    await cleanupListingDependentDocuments(String(parsedId.data));
+    return res.status(204).end();
   } catch (err) {
     return next(err);
   }
