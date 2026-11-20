@@ -43,8 +43,8 @@ Typed metadata for each entry type is exported as `ChangelogEntryMetadata[<type>
   `400 CHANGELOG_UNKNOWN_ENTRY_TYPE`.
 - Internal writers (`DisputeService`, the disputes route, `recordMoneyMovement`) use the
   `CHANGELOG_ENTRY_TYPES` constants. They never use string literals.
-- `ChangelogService.appendEntry` doesn't validate the type itself, so unit tests can
-  still use synthetic actions. Production code must go through the constants.
+- `ChangelogService.appendEntry` validates the type as a final boundary, so every
+  internal writer and API path rejects taxonomy drift with the same error.
 
 ## Adding a new entry type
 
