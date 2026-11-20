@@ -30,6 +30,10 @@ _Last audited: 2026-10-18 (issue #376)._
 | [RUNBOOKS.md](RUNBOOKS.md) | Living | Rewritten against the refund code (issue #375). |
 | [SECRET_SCANNING.md](SECRET_SCANNING.md) | Living | Accurate. Added a note distinguishing the separate bundle-secret check. |
 | [dispute-resolver-key-rotation.md](dispute-resolver-key-rotation.md) | Living | Not re-verified step by step in this pass. |
+| [STATUS_MAP_DOC_CHECK.md](STATUS_MAP_DOC_CHECK.md) | Living | Added 2026-11-20 (#602). Spec for the CI check comparing the README STATUS_MAP table with code. Records current drift. |
+| [PERSISTENCE_CUTOVER_VERIFICATION.md](PERSISTENCE_CUTOVER_VERIFICATION.md) | Living (runbook) | Added 2026-11-20 (#600). Zero-data-loss procedure for the in-memory → Postgres cutover. |
+| [PERSISTENCE_MIGRATION_CI_COVERAGE.md](PERSISTENCE_MIGRATION_CI_COVERAGE.md) | Living (checklist) | Added 2026-11-20 (#599). Confirms new persistence migrations are really exercised by migration CI. |
+| [BACKEND_README_TEST_COVERAGE.md](BACKEND_README_TEST_COVERAGE.md) | Snapshot (2026-11-20) | Added (#601). Every backend README claim mapped to its test, with gaps. |
 | [ACCESSIBILITY_AUDIT.md](ACCESSIBILITY_AUDIT.md) | Snapshot (2026-08-25) | Banner added. Recommendations still open. |
 | [DUPLICATE_BASENAMES.md](DUPLICATE_BASENAMES.md) | Snapshot (generated) | Banner added. The script and CI check are the living source. |
 | [ROLE_ACCESS_CONTROL_AUDIT.md](ROLE_ACCESS_CONTROL_AUDIT.md) | Snapshot (2026-08-27) | Banner added. Findings still hold. |
