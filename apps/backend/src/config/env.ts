@@ -35,6 +35,8 @@ export const envSchema = z.object({
   CORS_ORIGINS: z.string().default("http://localhost:3000"),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+  // Operations exceeding this duration emit a dedicated financial latency alert (#596).
+  FINANCIAL_OPERATION_SLOW_MS: z.coerce.number().int().positive().default(5000),
   EMAIL_PROVIDER: z.string().optional(),
   SENDGRID_API_KEY: z.string().min(1).optional(),
   NOTIFICATION_FROM_EMAIL: z.string().email().default("noreply@truestub.local"),
