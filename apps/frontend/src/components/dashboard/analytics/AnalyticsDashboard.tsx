@@ -34,8 +34,6 @@ export const AnalyticsDashboard: React.FC = () => {
   });
 
   const {
-    data,
-    metrics,
     escrowChartData,
     escrowMetrics,
     platformHealth,
@@ -159,7 +157,7 @@ export const AnalyticsDashboard: React.FC = () => {
         </motion.div>
 
         {/* Platform Health Overview Banner (when in escrow mode) */}
-        {!isLoading && (
+        {!isLoading && hasData && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-800/60 border border-slate-700/80 rounded-xl p-4">
             <div className="space-y-1">
                 <span className="text-xs text-muted-foreground">Active USD / USDC Locked</span>
@@ -208,7 +206,7 @@ export const AnalyticsDashboard: React.FC = () => {
         )}
 
         {/* Metrics Grid */}
-        {!isLoading && (
+        {!isLoading && hasData && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {escrowMetrics.map((metric, index) => (
               <MetricCard
@@ -222,7 +220,7 @@ export const AnalyticsDashboard: React.FC = () => {
         )}
 
         {/* Dispute Resolution Metrics (#273) */}
-        {mode === "escrow" && !isLoading && (
+        {!isLoading && (
           <DisputeMetricsSection
             metrics={disputeMetrics.metrics}
             totalEscrows={totalEscrowsCreated}
@@ -292,6 +290,7 @@ export const AnalyticsDashboard: React.FC = () => {
               </h3>
               <p className="text-muted-foreground mb-6">
                 No platform transactions found for the selected date range.
+                Try selecting a different date range.
               </p>
               <Button onClick={handleRefresh} variant="outline">
                 <RefreshCw className="w-4 h-4 mr-2" />
