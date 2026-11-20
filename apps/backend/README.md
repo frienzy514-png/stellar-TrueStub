@@ -4,6 +4,44 @@ Node/TypeScript backend for the ticket-resale platform.
 
 ## Running with docker-compose
 
+## Scheduled verification job
+
+The SafeTrust‑legacy‑data verification queries described in the **Verification** section of this README are intended to be run periodically to catch any hospitality‑shaped rows that may re‑appear in the `events` table after the initial migration.
+
+### How to enable the job
+
+1. **Create a script** (e.g. `scripts/verify-events.sh`) that runs the three SQL queries against the database and exits with a non‑zero status if any rows are returned. The script should also send a notification (e.g. to the `CRITICAL_ALERT_WEBHOOK_URL` webhook) with the offending rows.
+2. **Add a cron entry** to the backend container (or host) to execute the script at the desired interval, for example daily at 02:00 UTC:
+   ```
+   0 2 * * * /app/scripts/verify-events.sh >> /var/log/verify-events.log 2>&1
+   ```
+   Adjust the path if you place the script elsewhere.
+3. **Ensure environment variables** needed by the script are available:
+   - `DATABASE_URL` – connection string for the Postgres instance.
+   - `CRITICAL_ALERT_WEBHOOK_URL` – optional webhook for alerting when rows are found.
+
+### Example script (bash)
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Query 1: hospitality rows masquerading as events
+if psql "$DATABASE_URL" -t -c "SELECT 1 FROM events WHERE ...;" | grep -q 1; then
+  curl -X POST -H "Content-Type: application/json" -d '{"text":"Hospitality rows detected in events table (query 1)"}' "$CRITICAL_ALERT_WEBHOOK_URL"
+  exit 1
+fi
+
+# Query 2: ... (add the other two queries similarly)
+# ...
+
+exit 0
+```
+
+Make the script executable (`chmod +x scripts/verify-events.sh`) and ensure it is included in the Docker image (add a `COPY scripts/ /app/scripts/` line to `apps/backend/Dockerfile`).
+
+With this setup the verification will run automatically on the defined schedule, alerting the team whenever problematic rows re‑appear.
+
 The root `docker-compose.yml` builds this app (`apps/backend/Dockerfile`) as the
 `backend` service alongside Postgres and Hasura:
 
