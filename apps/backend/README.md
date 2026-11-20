@@ -11,7 +11,15 @@ The root `docker-compose.yml` builds this app (`apps/backend/Dockerfile`) as the
 cp .env.example .env   # at the repo root
 yarn docker:up
 curl http://localhost:4000/health   # → {"status":"ok","service":"truestub-backend"}
+curl http://localhost:4000/health/deep # dependency-aware health for monitoring
 ```
+
+`GET /health` is a lightweight liveness endpoint and does not contact external
+services. `GET /health/deep` checks both Postgres (`SELECT 1`) and Hasura using
+the configured admin secret. It returns `healthy` when both dependencies pass,
+`degraded` with HTTP 200 when the process is alive but one dependency is
+unavailable or misconfigured, and `down` with HTTP 503 when neither dependency
+is available. Error details never include credentials.
 
 Every variable validated by `src/config/env.ts` is passed through by the
 compose file. Empty values are treated as unset.

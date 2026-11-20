@@ -42,7 +42,7 @@ export interface HasuraClient {
 
 function requireHasuraConfig(): { url: string; adminSecret: string } {
   const url = env.HASURA_GRAPHQL_URL;
-  const adminSecret = env.HASURA_ADMIN_SECRET;
+  const adminSecret = env.HASURA_GRAPHQL_ADMIN_SECRET;
 
   if (!url || !adminSecret) {
     throw new Error(

@@ -17,7 +17,7 @@ function makeService() {
 
 const baseEntry = {
   entryId: "entry-001",
-  action: "ownership_transferred",
+  action: "transfer.completed",
   actorId: "user-alice",
   resourceId: "escrow-xyz",
   metadata: { fromOwner: "alice", toOwner: "bob" },
@@ -25,6 +25,15 @@ const baseEntry = {
 
 describe("ChangelogService — write-once immutability (#155)", () => {
   describe("appendEntry", () => {
+    it("rejects actions outside the documented taxonomy", async () => {
+      const { service } = makeService();
+
+      await expect(service.appendEntry({ ...baseEntry, action: "ownership_transferred" })).rejects.toMatchObject({
+        statusCode: 400,
+        code: CHANGELOG_ERROR_CODES.UNKNOWN_ENTRY_TYPE,
+      });
+    });
+
     it("creates a new entry with a server-generated timestamp", async () => {
       const { service } = makeService();
       const before = Date.now();
@@ -141,11 +150,11 @@ describe("ChangelogService — write-once immutability (#155)", () => {
     it("documents: remove + recreate is the documented correction workflow", async () => {
       const { service } = makeService();
 
-      await service.appendEntry({ ...baseEntry, action: "wrong_action" });
+      await service.appendEntry({ ...baseEntry, action: "transfer.completed" });
       await service.removeEntry(baseEntry.entryId);
-      const corrected = await service.appendEntry({ ...baseEntry, action: "correct_action" });
+      const corrected = await service.appendEntry({ ...baseEntry, action: "account.deleted" });
 
-      expect(corrected.action).toBe("correct_action");
+      expect(corrected.action).toBe("account.deleted");
     });
   });
 
@@ -153,14 +162,14 @@ describe("ChangelogService — write-once immutability (#155)", () => {
     it("lists all entries for a resource in chronological order", async () => {
       const { service } = makeService();
 
-      await service.appendEntry({ ...baseEntry, entryId: "e-1", action: "step_1" });
-      await service.appendEntry({ ...baseEntry, entryId: "e-2", action: "step_2" });
+      await service.appendEntry({ ...baseEntry, entryId: "e-1", action: "transfer.completed" });
+      await service.appendEntry({ ...baseEntry, entryId: "e-2", action: "account.deleted" });
 
       const entries = await service.listEntries(baseEntry.resourceId);
 
       expect(entries).toHaveLength(2);
-      expect(entries[0].action).toBe("step_1");
-      expect(entries[1].action).toBe("step_2");
+      expect(entries[0].action).toBe("transfer.completed");
+      expect(entries[1].action).toBe("account.deleted");
     });
 
     it("returns empty array when no entries exist for a resource", async () => {
@@ -175,7 +184,7 @@ describe("ChangelogService — write-once immutability (#155)", () => {
         await service.appendEntry({
           ...baseEntry,
           entryId: `page-${i}`,
-          action: `step_${i}`,
+          action: i % 2 === 0 ? "account.deleted" : "transfer.completed",
         });
       }
 
@@ -183,19 +192,19 @@ describe("ChangelogService — write-once immutability (#155)", () => {
         limit: 2,
         offset: 0,
       });
-      expect(firstPage.map((e) => e.action)).toEqual(["step_1", "step_2"]);
+      expect(firstPage.map((e) => e.action)).toEqual(["transfer.completed", "account.deleted"]);
 
       const secondPage = await service.listEntries(baseEntry.resourceId, {
         limit: 2,
         offset: 2,
       });
-      expect(secondPage.map((e) => e.action)).toEqual(["step_3", "step_4"]);
+      expect(secondPage.map((e) => e.action)).toEqual(["transfer.completed", "account.deleted"]);
 
       const thirdPage = await service.listEntries(baseEntry.resourceId, {
         limit: 2,
         offset: 4,
       });
-      expect(thirdPage.map((e) => e.action)).toEqual(["step_5"]);
+      expect(thirdPage.map((e) => e.action)).toEqual(["transfer.completed"]);
     });
 
     it("caps the page size at the maximum allowed limit", async () => {
@@ -205,7 +214,7 @@ describe("ChangelogService — write-once immutability (#155)", () => {
         await service.appendEntry({
           ...baseEntry,
           entryId: `cap-${i}`,
-          action: `step_${i}`,
+          action: i % 2 === 0 ? "account.deleted" : "transfer.completed",
         });
       }
 

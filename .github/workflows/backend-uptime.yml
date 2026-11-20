@@ -28,12 +28,47 @@ jobs:
           fi
           echo "BACKEND_HEALTH_URL hostname resolved: $HOST"
 
-      - name: Ping backend health endpoint
+      - name: Check backend dependency health
+        env:
+          HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
         run: |
-          curl --fail --silent --show-error \
-            --max-time 30 \
-            "${{ secrets.BACKEND_HEALTH_URL }}" \
-            || (echo "Backend health check failed" && exit 1)
+          if [ -z "$HEALTH_URL" ]; then
+            echo "::error::BACKEND_HEALTH_URL secret is not configured"
+            exit 1
+          fi
+
+          set +e
+          RESPONSE=$(curl --silent --show-error --max-time 30 --write-out '\n%{http_code}' "${HEALTH_URL%/}/health/deep")
+          CURL_STATUS=$?
+          set -e
+
+          if [ "$CURL_STATUS" -ne 0 ]; then
+            echo "::error::Backend process is down or unreachable"
+            exit 1
+          fi
+
+          HTTP_STATUS=$(printf '%s\n' "$RESPONSE" | tail -n 1)
+          BODY=$(printf '%s\n' "$RESPONSE" | sed '$d')
+          HEALTH_STATUS=$(printf '%s' "$BODY" | jq -r '.status // "invalid"' 2>/dev/null)
+
+          case "$HEALTH_STATUS" in
+            healthy)
+              echo "Backend process and dependencies are healthy"
+              ;;
+            degraded)
+              echo "::warning::Backend process is alive but a dependency is degraded (HTTP $HTTP_STATUS)"
+              printf '%s' "$BODY" | jq -c '{status, dependencies}'
+              ;;
+            down)
+              echo "::error::Backend health reports all dependencies down (HTTP $HTTP_STATUS)"
+              printf '%s' "$BODY" | jq -c '{status, dependencies}'
+              exit 1
+              ;;
+            *)
+              echo "::error::Backend returned an invalid deep-health response (HTTP $HTTP_STATUS)"
+              exit 1
+              ;;
+          esac
 
   reconcile-escrow-status:
     runs-on: ubuntu-latest

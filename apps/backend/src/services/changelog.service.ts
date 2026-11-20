@@ -73,7 +73,7 @@
 
 import { AppError } from "../middleware/errorHandler";
 import { getRequestId } from "../middleware/requestLogger";
-import { CHANGELOG_ENTRY_TYPES } from "./changelog-taxonomy";
+import { CHANGELOG_ENTRY_TYPES, isChangelogEntryType } from "./changelog-taxonomy";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -265,6 +265,14 @@ export class ChangelogService {
         400,
         CHANGELOG_ERROR_CODES.INVALID_PAYLOAD,
         "entryId, action, actorId, and resourceId are required"
+      );
+    }
+
+    if (!isChangelogEntryType(action)) {
+      throw new AppError(
+        400,
+        CHANGELOG_ERROR_CODES.UNKNOWN_ENTRY_TYPE,
+        `Unknown changelog entry type. Allowed: ${Object.values(CHANGELOG_ENTRY_TYPES).join(", ")}`
       );
     }
 

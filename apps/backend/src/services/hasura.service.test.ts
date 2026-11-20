@@ -4,7 +4,7 @@ jest.mock("../lib/hasura", () => ({
 
 import { hasuraClient } from "../lib/hasura";
 import { HasuraService } from "./hasura.service";
-import { readFileSync } from "fs";
+import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
 
 const hasuraRequest = hasuraClient.request as jest.Mock;
@@ -12,29 +12,33 @@ const hasuraRequest = hasuraClient.request as jest.Mock;
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 
 describe("migration 006_normalize_events_primary_key", () => {
-  const migrationPath = join(
-    __dirname,
-    "../../migrations/006_normalize_events_primary_key.sql"
-  );
+  const migrationsDir = join(__dirname, "../db/migrations");
 
   (TEST_DATABASE_URL ? it : it.skip)(
-    "is idempotent: running it twice does not error and leaves events_pkey in place",
+    "runs the fresh migration sequence and leaves migration 006 as a true no-op",
     async () => {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { Client } = require("pg");
-      const migrationSql = readFileSync(migrationPath, "utf8");
-
       const client = new Client({ connectionString: TEST_DATABASE_URL });
       await client.connect();
       try {
-        await client.query(migrationSql);
-        await expect(client.query(migrationSql)).resolves.toBeDefined();
+        const migrationFiles = readdirSync(migrationsDir)
+          .filter((file) => /^(00[1-6])_.*\.sql$/.test(file))
+          .sort();
+        for (const file of migrationFiles) {
+          await client.query(readFileSync(join(migrationsDir, file), "utf8"));
+        }
 
-        const { rows } = await client.query(
-          `SELECT conname FROM pg_constraint
-           WHERE conrelid = 'events'::regclass AND contype = 'p'`
+        const { rows: events } = await client.query(
+          `SELECT to_regclass('public.events') AS events_table,
+                  to_regclass('public.hotels') AS hotels_table`
         );
-        expect(rows.map((row: { conname: string }) => row.conname)).toEqual(["events_pkey"]);
+        expect(events[0]).toEqual({ events_table: null, hotels_table: null });
+
+        const { rows: legacyConstraint } = await client.query(
+          `SELECT conname FROM pg_constraint WHERE conname = 'hotels_pkey'`
+        );
+        expect(legacyConstraint).toHaveLength(0);
       } finally {
         await client.end();
       }
