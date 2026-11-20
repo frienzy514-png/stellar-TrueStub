@@ -29,6 +29,7 @@ import * as Sentry from "@sentry/node";
 import { ownershipTransferService } from "../services/ownership-transfer.service";
 import { changelogService } from "../services/changelog.service";
 import { AppError } from "../middleware/errorHandler";
+import { trackFinancialOperation } from "../lib/financial-operation-monitor";
 import { sendCriticalAlert } from "../services/critical-alert.service";
 import { getRequestId } from "../middleware/requestLogger";
 
@@ -72,11 +73,11 @@ transfersRouter.post("/initiate", async (req: Request, res: Response) => {
   const requestId = getRequestId(req);
 
   try {
-    const transfer = await ownershipTransferService.initiateTransfer({
-      ...parsed.data,
-      fromOwner,
-      requestId,
-    });
+    const transfer = await trackFinancialOperation(
+      "transfer.initiate",
+      () => ownershipTransferService.initiateTransfer({ ...parsed.data, fromOwner, requestId }),
+      { transferId: parsed.data.transferId, escrowId: parsed.data.escrowId, requestId },
+    );
     return res.status(201).json({ transfer });
   } catch (err) {
     if (err instanceof AppError) {
@@ -110,10 +111,10 @@ transfersRouter.post("/:transferId/accept", async (req: Request, res: Response) 
   const requestId = getRequestId(req);
 
   try {
-    const transfer = await ownershipTransferService.acceptTransfer(
-      req.params.transferId,
-      actorId,
-      requestId,
+    const transfer = await trackFinancialOperation(
+      "transfer.accept",
+      () => ownershipTransferService.acceptTransfer(req.params.transferId, actorId, requestId),
+      { transferId: req.params.transferId, requestId },
     );
     return res.json({ transfer });
   } catch (err) {
@@ -144,10 +145,10 @@ transfersRouter.post("/:transferId/cancel", async (req: Request, res: Response) 
   const requestId = getRequestId(req);
 
   try {
-    const transfer = await ownershipTransferService.cancelTransfer(
-      req.params.transferId,
-      actorId,
-      requestId,
+    const transfer = await trackFinancialOperation(
+      "transfer.cancel",
+      () => ownershipTransferService.cancelTransfer(req.params.transferId, actorId, requestId),
+      { transferId: req.params.transferId, requestId },
     );
     return res.json({ transfer });
   } catch (err) {

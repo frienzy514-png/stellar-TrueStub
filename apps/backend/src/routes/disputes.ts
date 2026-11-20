@@ -34,6 +34,7 @@ import { disputeService } from "../services/dispute.service";
 import { changelogService } from "../services/changelog.service";
 import { CHANGELOG_ENTRY_TYPES } from "../services/changelog-taxonomy";
 import { AppError } from "../middleware/errorHandler";
+import { trackFinancialOperation } from "../lib/financial-operation-monitor";
 import { getRequestId } from "../middleware/requestLogger";
 import { requireAuth } from "../middleware/auth";
 
@@ -158,7 +159,11 @@ disputesRouter.post("/", async (req: Request, res: Response) => {
   }
 
   try {
-    const dispute = await disputeService.openDispute(parsed.data, { requestId });
+    const dispute = await trackFinancialOperation(
+      "dispute.open",
+      () => disputeService.openDispute(parsed.data, { requestId }),
+      { disputeId: parsed.data.disputeId, escrowId: parsed.data.escrowId, requestId: requestId ?? "" },
+    );
     return res.status(201).json({ dispute });
   } catch (err) {
     return handleAppError(err, res);
@@ -268,7 +273,11 @@ disputesRouter.get("/:disputeId", async (req: Request, res: Response) => {
 disputesRouter.post("/:disputeId/escalate", async (req: Request, res: Response) => {
   const requestId = tagSentryWithRequestId(req);
   try {
-    const dispute = await disputeService.transition(req.params.disputeId, "escalate", { requestId });
+    const dispute = await trackFinancialOperation(
+      "dispute.transition",
+      () => disputeService.transition(req.params.disputeId, "escalate", { requestId }),
+      { disputeId: req.params.disputeId, event: "escalate", requestId: requestId ?? "" },
+    );
     return res.json({ dispute });
   } catch (err) {
     return handleAppError(err, res);
@@ -281,10 +290,11 @@ disputesRouter.post("/:disputeId/resolve", async (req: Request, res: Response) =
   const { resolution } = resolveBodySchema.parse(req.body || {});
 
   try {
-    const dispute = await disputeService.transition(req.params.disputeId, "resolve", {
-      resolution,
-      requestId,
-    });
+    const dispute = await trackFinancialOperation(
+      "dispute.transition",
+      () => disputeService.transition(req.params.disputeId, "resolve", { resolution, requestId }),
+      { disputeId: req.params.disputeId, event: "resolve", requestId: requestId ?? "" },
+    );
     return res.json({ dispute });
   } catch (err) {
     return handleAppError(err, res);
@@ -295,7 +305,11 @@ disputesRouter.post("/:disputeId/resolve", async (req: Request, res: Response) =
 disputesRouter.post("/:disputeId/withdraw", async (req: Request, res: Response) => {
   const requestId = tagSentryWithRequestId(req);
   try {
-    const dispute = await disputeService.transition(req.params.disputeId, "withdraw", { requestId });
+    const dispute = await trackFinancialOperation(
+      "dispute.transition",
+      () => disputeService.transition(req.params.disputeId, "withdraw", { requestId }),
+      { disputeId: req.params.disputeId, event: "withdraw", requestId: requestId ?? "" },
+    );
     return res.json({ dispute });
   } catch (err) {
     return handleAppError(err, res);

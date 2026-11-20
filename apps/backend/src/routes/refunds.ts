@@ -51,6 +51,7 @@ import { refundService } from "../services/refund.service";
 import { changelogService } from "../services/changelog.service";
 import { AppError } from "../middleware/errorHandler";
 import { alertService } from "../services/alert.service";
+import { trackFinancialOperation } from "../lib/financial-operation-monitor";
 
 export const refundsRouter = Router();
 
@@ -147,11 +148,11 @@ refundsRouter.post("/claim", async (req: Request, res: Response, next: NextFunct
     // unique-violation, surfaced here as REFUND_ALREADY_CLAIMED. There is no
     // application-level check-then-write, so two simultaneous requests can
     // never both submit an on-chain transaction.
-    const record = await refundService.claimRefund({
-      ...parsed.data,
-      claimedBy,
-      requestId,
-    });
+    const record = await trackFinancialOperation(
+      "refund.claim",
+      () => refundService.claimRefund({ ...parsed.data, claimedBy, requestId }),
+      { refundId: parsed.data.refundId, escrowId: parsed.data.escrowId, requestId },
+    );
     return res.status(201).json({ success: true, claim: record });
   } catch (err) {
     if (err instanceof AppError && err.code === "REFUND_ALREADY_CLAIMED") {
