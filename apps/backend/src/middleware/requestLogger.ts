@@ -11,6 +11,7 @@
  *   - x-webhook-secret
  */
 import pinoHttp from "pino-http";
+import pino from "pino";
 import { randomUUID } from "crypto";
 import { AsyncLocalStorage } from "async_hooks";
 import type { Request, Response, NextFunction } from "express";
@@ -93,6 +94,18 @@ export const requestLogger = pinoHttp({
       "req.headers['x-webhook-secret']",
     ],
     censor: "[REDACTED]",
+  },
+
+  // HTTP logs are metadata-only. Keep Pino's standard request fields, but
+  // explicitly strip any body property so parsed payloads cannot be emitted.
+  serializers: {
+    req(req) {
+      const serializedReq = pino.stdSerializers.req(req);
+      const { body: _body, ...safeReq } = serializedReq as typeof serializedReq & {
+        body?: unknown;
+      };
+      return safeReq;
+    },
   },
 
   // Custom log-level per status code: 5xx → error, 4xx → warn, rest → info.
