@@ -123,7 +123,7 @@
     "chromatic": "11.28.1",
     "cypress": "^14.3.0",
     "eslint": "^9",
-    "eslint-config-next": "^15.5.14",
+    "eslint-config-next": "^16.4.6",
     "eslint-config-prettier": "^10.1.2",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
