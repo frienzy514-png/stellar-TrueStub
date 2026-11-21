@@ -405,3 +405,45 @@ describe("POST /webhooks/escrow-status under concurrent load", () => {
     }
   }, 30_000);
 });
+
+describe("POST /webhooks/escrow-status dedup key stability", () => {
+  beforeEach(() => {
+    (env as { TRUSTLESS_WORK_WEBHOOK_SECRET?: string }).TRUSTLESS_WORK_WEBHOOK_SECRET =
+      WEBHOOK_SECRET;
+    updateEscrowStatus.mockResolvedValue({ affected_rows: 1 });
+    notifyEscrowStatusChange.mockResolvedValue({
+      emailSent: true,
+      pushSent: false,
+      channel: "email",
+      timestamp: "t",
+    });
+  });
+
+  it("treats a legitimately resent event with a different byte layout as a duplicate", async () => {
+    // Same logical event (no explicit event ID in the payload), delivered
+    // twice with different serialization (compact vs. pretty-printed). The
+    // dedup key must not depend on incidental formatting, or a resend would
+    // be processed and notified a second time.
+    const compact = JSON.stringify({
+      contractId: "contract-560",
+      engagementId: "ENG-560",
+      status: "completed",
+    });
+    const pretty = JSON.stringify(
+      { contractId: "contract-560", engagementId: "ENG-560", status: "completed" },
+      null,
+      2
+    );
+
+    const first = await post(compact, { "x-trustless-work-signature": sign(compact) });
+    expect(first.status).toBe(200);
+    expect(first.body.duplicate).toBeUndefined();
+
+    updateEscrowStatus.mockResolvedValue({ affected_rows: 0 });
+    const resend = await post(pretty, { "x-trustless-work-signature": sign(pretty) });
+
+    expect(resend.status).toBe(200);
+    expect(resend.body.duplicate).toBe(true);
+    expect(notifyEscrowStatusChange).toHaveBeenCalledTimes(1);
+  });
+});
