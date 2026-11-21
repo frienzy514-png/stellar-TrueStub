@@ -22,6 +22,8 @@ import { disputesRouter } from "./routes/disputes";
 // Issue #240 — account deletion / anonymization
 import { usersRouter } from "./routes/users";
 import { adminUsersRouter } from "./routes/admin-users";
+// Issue #630 — platform-wide operator analytics (admin-only by design)
+import { analyticsRouter } from "./routes/analytics";
 import { startDisputeResolverBalanceMonitor } from "./services/dispute-resolver-balance.service";
 
 // Initialise Sentry exactly once, before the app is created (#260). All Sentry
@@ -56,6 +58,10 @@ export function createApp(): Express {
   // #240 — Account deletion / anonymization
   app.use("/api/users", writeRateLimiter, usersRouter);
   app.use("/api/admin/users", authRateLimiter, requireAdmin, adminUsersRouter);
+  // #630 — `/api/analytics` aggregates every escrow on the platform with no
+  // per-user/tenant filter. That is intentional: it is an operator-only view,
+  // so admin gating is the access control. See docs/ANALYTICS_ACCESS_MODEL.md.
+  app.use("/api/analytics", requireAdmin, analyticsRouter);
   app.use(errorHandler);
   return app;
 }
