@@ -73,6 +73,7 @@ compose file. Empty values are treated as unset.
 | `SENTRY_DSN`, `CRITICAL_ALERT_WEBHOOK_URL` | no | Error tracking / refund-transfer failure alerts. |
 | `CORS_ORIGINS`, `LOG_LEVEL`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX` | no | Defaults: `http://localhost:3000`, `info`, `900000`, `100`. |
 | `EMAIL_PROVIDER`, `SENDGRID_API_KEY`, `NOTIFICATION_FROM_EMAIL` | no | Notification delivery. |
+| `BACKEND_REPLICAS`, `ALLOW_UNSAFE_MULTI_INSTANCE` | no | Default `1` / `false`. The backend refuses to start with more than one replica unless the override is set, because state is still in memory (#541, see `docs/DEPLOYMENT.md`). |
 
 When a new required variable is added to `src/config/env.ts`, add it to the
 `backend` service in `docker-compose.yml`, the root `.env.example`, and this
