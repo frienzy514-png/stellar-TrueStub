@@ -57,12 +57,12 @@ jobs:
 
       - name: Lint with Clippy
         working-directory: contracts
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
       - name: Run tests
         working-directory: contracts
-        run: cargo test
+        run: cargo test --locked
 
       - name: Build for wasm32-unknown-unknown
         working-directory: contracts
-        run: cargo build --target wasm32-unknown-unknown --release
+        run: cargo build --locked --target wasm32-unknown-unknown --release
