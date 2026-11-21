@@ -36,8 +36,6 @@ running a fresh repo-wide grep.
 
 | Flow / file | Status | Markers | Tracking issue |
 | --- | --- | --- | --- |
-| `apps/frontend/src/components/events/TicketEscrowIntegration.tsx` | 🔴 Mocked | 4 | [#319](https://github.com/frienzy514-png/stellar-TrueStub/issues/319) |
-| `apps/frontend/src/components/ticket-listing/TicketEscrowWrapper.tsx` | 🔴 Mocked | 3 | [#319](https://github.com/frienzy514-png/stellar-TrueStub/issues/319) |
 | `apps/frontend/src/app/dashboard/events/new/page.tsx` (create event → `INSERT INTO public.events`) | 🔴 Mocked | 1 (`TODO: wire to Hasura mutation`) | _none filed_ |
 
 ## No longer mocked
@@ -55,13 +53,15 @@ below are their current locations.
 | `app/dashboard/earnings` | No marker. |
 | `app/dashboard/escrow/[id]/receipt` | No marker. |
 | `app/dashboard/listings/[id]/offers` | No marker. |
-| `components/escrow/TicketEscrowIntegration.tsx`, `components/escrow/TicketEscrowWrapper.tsx` | These paths don't exist. The real files are the two `TicketEscrow*` rows above. |
+| `components/ticket-listing/TicketEscrowWrapper.tsx` | Loads the purchase, listing and seller payout wallet via `fetchTicketPurchaseEscrowContext` and records the created escrow via `recordTicketPurchaseEscrow` (`lib/booking-escrow-api.ts`) (#533). |
+| `components/events/TicketEscrowIntegration.tsx` | Deleted (#533). It was an unused, fully-mocked duplicate of `TicketEscrowWrapper`. |
 
 ## Notes
 
-- The `TicketEscrow*` duplicates were consolidated (#364). The canonical
-  copies are `components/events/TicketEscrowIntegration.tsx` and
-  `components/ticket-listing/TicketEscrowWrapper.tsx`.
+- The `TicketEscrow*` duplicates were consolidated (#364, #533). The only
+  remaining component is `components/ticket-listing/TicketEscrowWrapper.tsx`;
+  `TicketEscrowIntegration` was an unused duplicate of the same flow and has
+  been removed.
 - `components/escrow/views/EscrowJustification.tsx` has a
   `TODO: wire PDF generation` marker. That is a feature gap, not a GraphQL
   wiring gap, so it isn't listed.
