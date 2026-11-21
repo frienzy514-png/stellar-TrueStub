@@ -60,7 +60,7 @@ canonical location (tracked in the events refactor milestone).**
 | `Map.tsx` | mirror — keep `events/`, delete `ticket-events/` |
 | `ReservationSummary.tsx` | mirror — keep `events/`, delete `ticket-events/` |
 | `SearchFilters.tsx` | mirror — keep `events/`, delete `ticket-events/` |
-| `TicketEscrowIntegration.tsx` | done — `ticket-events/` copy deleted (#364) |
+| `TicketEscrowIntegration.tsx` | done — `ticket-events/` copy deleted (#364); `events/` copy deleted as an unused duplicate of `TicketEscrowWrapper` (#533) |
 | `TicketPurchaseContainer.tsx` | mirror — keep `events/`, delete `ticket-events/` |
 
 ---

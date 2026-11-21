@@ -77,7 +77,7 @@
 | # | Item | Testnet / local | Mainnet |
 |---|------|-----------------|---------|
 | 5.1 | `HASURA_GRAPHQL_URL` | Staging or localhost | Production Hasura Cloud / self-hosted endpoint |
-| 5.2 | `HASURA_ADMIN_SECRET` (or `HASURA_GRAPHQL_ADMIN_SECRET`) | Dev secret | A high-entropy production secret |
+| 5.2 | `HASURA_GRAPHQL_ADMIN_SECRET` (legacy alias: `HASURA_ADMIN_SECRET`) | Dev secret | A high-entropy production secret |
 | 5.3 | `DATABASE_URL` | Local Postgres | Production Postgres (RDS, Supabase, Neon, etc.) |
 
 - [ ] 5.1 `HASURA_GRAPHQL_URL` points to the production Hasura instance

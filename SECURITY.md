@@ -50,7 +50,8 @@ would matter most:
   `src/app/webhooks/escrow-status/route.ts`) verifies Trustless Work webhook
   payloads via HMAC over the raw request body
   (`TRUSTLESS_WORK_WEBHOOK_SECRET`, `crypto.timingSafeEqual`). A bypass here
-  would let an attacker forge escrow status updates.
+  would let an attacker forge escrow status updates. See the IP allowlisting
+  decision below.
 - **Hasura admin secret** — `HASURA_GRAPHQL_ADMIN_SECRET` must never be
   exposed client-side (never in a `NEXT_PUBLIC_*` variable, never shipped
   to the browser). The frontend authenticates to Hasura via a Firebase JWT
@@ -60,6 +61,41 @@ would matter most:
 - **Firebase auth flows** — password reset, session handling, and the
   `sync-user`/`validate-reset-token` endpoints (see `apps/backend/README.md`
   for their current implementation status).
+
+## Decision: IP allowlisting for `/webhooks/escrow-status` (#532)
+
+**Status:** optional allowlist added, off by default. HMAC remains the
+primary and sufficient control.
+
+- **Does Trustless Work publish stable webhook source IPs?** We could not
+  find any documented, stable set of webhook source addresses for Trustless
+  Work. Hard-coding an allowlist of observed IPs would therefore be brittle:
+  an unannounced upstream infrastructure change would silently drop every
+  escrow status update (Trustless Work would retry, then give up).
+- **What IP allowlisting would and wouldn't buy.** An allowlist is a network
+  control, not authentication. It does reduce the blast radius of a leaked
+  `TRUSTLESS_WORK_WEBHOOK_SECRET` — a forged-but-validly-signed request from
+  an arbitrary host would be refused — so it is a worthwhile second layer
+  where a stable peer set exists.
+- **What we did.** `apps/backend` accepts an optional
+  `TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS` (comma-separated IPv4/IPv6 addresses
+  or CIDR ranges). When set, `POST /webhooks/escrow-status` returns `403`
+  for any peer outside the list *before* signature verification and before
+  any write; HMAC is still enforced for allowlisted peers. When unset (the
+  default) behavior is unchanged. Malformed entries fail env validation at
+  startup rather than silently allowing or blocking traffic. Implementation:
+  `apps/backend/src/lib/ipAllowlist.ts`,
+  `apps/backend/src/middleware/webhookIpAllowlist.ts`.
+- **Deployment guidance.** The check matches the immediate peer (`req.ip`).
+  When deliveries arrive through the frontend pass-through
+  (`apps/frontend/src/app/webhooks/escrow-status/route.ts`), list the
+  frontend server's egress address(es) so only it can reach the backend
+  webhook. When the backend sits behind a load balancer, list the balancer
+  or configure Express `trust proxy` accordingly. If Trustless Work later
+  publishes (or confirms via support) stable source IPs, add them here and
+  enable the allowlist at the public edge.
+- **Revisit when:** Trustless Work documents webhook source IPs, or the
+  webhook secret rotation story changes.
 
 ## Supply-chain / malware defenses
 

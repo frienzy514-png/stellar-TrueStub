@@ -405,3 +405,61 @@ describe("POST /webhooks/escrow-status under concurrent load", () => {
     }
   }, 30_000);
 });
+
+describe("POST /webhooks/escrow-status IP allowlist (#532)", () => {
+  type MutableEnv = {
+    TRUSTLESS_WORK_WEBHOOK_SECRET?: string;
+    TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS?: string;
+  };
+
+  beforeEach(() => {
+    (env as MutableEnv).TRUSTLESS_WORK_WEBHOOK_SECRET = WEBHOOK_SECRET;
+    updateEscrowStatus.mockReset();
+    updateEscrowStatus.mockResolvedValue({ affected_rows: 1 });
+    notifyEscrowStatusChange.mockResolvedValue({ emailSent: false, pushSent: false });
+  });
+
+  afterEach(() => {
+    (env as MutableEnv).TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS = undefined;
+  });
+
+  function uniquePayload(tag: string) {
+    return JSON.stringify({ contractId: `contract-allowlist-${tag}`, status: "completed" });
+  }
+
+  it("does not check the source IP when no allowlist is configured", async () => {
+    const body = uniquePayload("unset");
+    const res = await post(body, { "x-trustless-work-signature": sign(body) });
+
+    expect(res.status).toBe(200);
+    expect(updateEscrowStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts a signed delivery from an allowlisted IP", async () => {
+    // supertest connects over loopback (IPv4 or IPv6 depending on the host).
+    (env as MutableEnv).TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS = "127.0.0.0/8, ::1";
+    const body = uniquePayload("allowed");
+    const res = await post(body, { "x-trustless-work-signature": sign(body) });
+
+    expect(res.status).toBe(200);
+    expect(updateEscrowStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a validly signed delivery from a non-allowlisted IP without writing", async () => {
+    (env as MutableEnv).TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS = "203.0.113.10";
+    const body = uniquePayload("blocked");
+    const res = await post(body, { "x-trustless-work-signature": sign(body) });
+
+    expect(res.status).toBe(403);
+    expect(updateEscrowStatus).not.toHaveBeenCalled();
+  });
+
+  it("still enforces HMAC for allowlisted IPs", async () => {
+    (env as MutableEnv).TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS = "127.0.0.0/8, ::1";
+    const body = uniquePayload("bad-sig");
+    const res = await post(body, { "x-trustless-work-signature": "0".repeat(64) });
+
+    expect(res.status).toBe(401);
+    expect(updateEscrowStatus).not.toHaveBeenCalled();
+  });
+});

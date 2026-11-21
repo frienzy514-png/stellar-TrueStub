@@ -12,6 +12,10 @@ import {
 import { EscrowCreationForm } from "./EscrowCreationForm";
 import { EscrowConfirmation } from "./EscrowConfirmation";
 import { useRequireVerifiedEmail } from "@/hooks/useRequireVerifiedEmail";
+import {
+  fetchTicketPurchaseEscrowContext,
+  recordTicketPurchaseEscrow,
+} from "@/lib/booking-escrow-api";
 
 // Providers
 import { TrustlessWorkProvider } from "@/components/tw-blocks/providers/TrustlessWork";
@@ -85,73 +89,6 @@ function ErrorState({
 }
 
 /**
- * Simulated API functions - Replace with actual API calls
- */
-async function getTicketPurchase(purchaseId: string): Promise<TicketPurchaseData> {
-  // TODO: Replace with actual API call
-  // const response = await fetch(`/api/purchases/${purchaseId}`);
-  // return response.json();
-
-  // Simulated response for development
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        id: purchaseId,
-        listingId: "listing-001",
-        eventId: "event-001",
-        totalAmount: 450.00,
-        currency: "USDC",
-        quantity: 1,
-        transferDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        eventDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-        guestEmail: "guest@example.com",
-        guestName: "John Doe",
-        seatSection: "Floor Section A",
-        cancellationPolicy: "Free cancellation until 24 hours before the transfer date",
-        preferences: {
-          milestonePayments: true,
-        },
-      });
-    }, 1000);
-  });
-}
-
-async function getEvent(eventId: string): Promise<EventData> {
-  // TODO: Replace with actual API call
-  
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        id: eventId,
-        name: "Grand Stellar Event",
-        walletAddress: "GBCXK3ZQWFWMQJXLSIMVCAHUKTJVWRJPB5XYGZGQCVBWKWVEPTSYLUHI",
-        rating: 4.8,
-        location: "Downtown, New York City",
-        imageUrl: "/img/event-venue.png",
-      });
-    }, 500);
-  });
-}
-
-async function updateTicketPurchaseWithEscrow(
-  purchaseId: string,
-  escrowData: {
-    contractId: string;
-    escrowStatus: string;
-    unsignedXDR?: string;
-  }
-): Promise<void> {
-  // TODO: Replace with actual API call
-  // await fetch(`/api/purchases/${purchaseId}/escrow`, {
-  //   method: 'PATCH',
-  //   body: JSON.stringify(escrowData),
-  // });
-
-  console.log("Updating purchase with escrow:", { purchaseId, escrowData });
-  return new Promise((resolve) => setTimeout(resolve, 500));
-}
-
-/**
  * TicketEscrowWrapper Component
  * 
  * Main integration component that manages the entire escrow creation flow:
@@ -171,7 +108,9 @@ export function TicketEscrowWrapper({
   const [step, setStep] = useState<Step>(initialPurchaseData ? "form" : "loading");
   const [error, setError] = useState<string | null>(null);
   const [escrowData, setEscrowData] = useState<EscrowResponse | null>(null);
-  
+  // Bumped by "Try Again" so the load effect re-runs after a failure.
+  const [reloadKey, setReloadKey] = useState(0);
+
   // Booking and event data
   const [purchaseData, setPurchaseData] = useState<TicketPurchaseData | null>(
     initialPurchaseData || null
@@ -195,19 +134,22 @@ export function TicketEscrowWrapper({
       return;
     }
 
+    let cancelled = false;
+
     async function loadData() {
       try {
         setStep("loading");
         setError(null);
 
-        const purchase = await getTicketPurchase(purchaseId);
+        const { purchase, event } =
+          await fetchTicketPurchaseEscrowContext(purchaseId);
+        if (cancelled) return;
+
         setPurchaseData(purchase);
-
-        const event = await getEvent(purchase.eventId);
         setEventData(event);
-
         setStep("form");
       } catch (err) {
+        if (cancelled) return;
         console.error("Failed to load purchase data:", err);
         setError(
           err instanceof Error
@@ -219,15 +161,19 @@ export function TicketEscrowWrapper({
     }
 
     loadData();
-  }, [purchaseId, initialPurchaseData, initialEventData]);
+    return () => {
+      cancelled = true;
+    };
+  }, [purchaseId, initialPurchaseData, initialEventData, reloadKey]);
 
   // Handle escrow creation success
   const handleEscrowCreated = async (escrowResponse: EscrowResponse) => {
     try {
       // Update purchase with escrow information
-      await updateTicketPurchaseWithEscrow(purchaseId, {
+      await recordTicketPurchaseEscrow(purchaseId, {
         contractId: escrowResponse.contractId,
         escrowStatus: escrowResponse.status,
+        amount: purchaseData?.totalAmount ?? 0,
         unsignedXDR: escrowResponse.unsignedXDR,
       });
 
@@ -259,6 +205,7 @@ export function TicketEscrowWrapper({
   const handleRetry = () => {
     setError(null);
     setStep("loading");
+    setReloadKey((key) => key + 1);
   };
 
   // Block escrow creation until the signed-in user has a verified email —
