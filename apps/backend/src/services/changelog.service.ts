@@ -72,7 +72,7 @@
  */
 
 import { AppError } from "../middleware/errorHandler";
-import { getRequestId } from "../middleware/requestLogger";
+import { getCorrelationId as getRequestId } from "../middleware/requestLogger";
 import { CHANGELOG_ENTRY_TYPES, isChangelogEntryType } from "./changelog-taxonomy";
 
 // ── Types ──────────────────────────────────────────────────────────────────

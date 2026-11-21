@@ -13,7 +13,7 @@ import { captureRawBody } from "./middleware/rawBody";
 import { healthRouter } from "./routes/health";
 import { listingsRouter } from "./routes/listings";
 import { savedSearchesRouter, watchlistRouter } from "./routes/listing-alerts";
-import { webhookRouter } from "./routes/webhooks";
+import { startProcessedWebhookEventCleanup, webhookRouter } from "./routes/webhooks";
 // Issues #153–#156
 import { refundsRouter } from "./routes/refunds";
 import { transfersRouter } from "./routes/transfers";
@@ -69,6 +69,10 @@ if (require.main === module) {
 
   app.listen(env.PORT, () => {
     logger.info({ port: env.PORT, env: env.NODE_ENV }, "TrueStub backend listening");
+
+    // #518 — prune old webhook delivery dedup rows on a schedule instead of
+    // evicting them from an in-process Map.
+    startProcessedWebhookEventCleanup();
 
     // #420 — Periodically check the dispute-resolver wallet balance so a low
     // balance alerts before it causes a failed refund.

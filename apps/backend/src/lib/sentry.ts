@@ -119,7 +119,7 @@ export async function alertCriticalFailure(
     ...(requestId ? { requestId } : {}),
   };
 
-  logger.error(`[CRITICAL_ALERT] ${kind} failure: ${message}`, payload);
+  logger.error(payload, `[CRITICAL_ALERT] ${kind} failure: ${message}`);
 
   Sentry.captureMessage(`[CRITICAL_ALERT] ${kind} failure: ${message}`, {
     level: "fatal",
@@ -142,7 +142,7 @@ export async function alertCriticalFailure(
       }),
     });
   } catch (err) {
-    logger.error("[CRITICAL_ALERT] failed to deliver alert", { err, payload });
+    logger.error({ err, payload }, "[CRITICAL_ALERT] failed to deliver alert");
   }
 }
 
@@ -171,8 +171,8 @@ export async function alertNotificationDeliveryFailure(
   };
 
   logger.error(
-    `[NOTIFICATION_DELIVERY_FAILURE] ${notificationType} (${reason}): ${message}`,
     payload,
+    `[NOTIFICATION_DELIVERY_FAILURE] ${notificationType} (${reason}): ${message}`,
   );
 
   Sentry.captureMessage(
@@ -204,8 +204,8 @@ export async function alertNotificationDeliveryFailure(
     });
   } catch (err) {
     logger.error(
-      "[NOTIFICATION_DELIVERY_FAILURE] failed to deliver alert",
       { err, payload },
+      "[NOTIFICATION_DELIVERY_FAILURE] failed to deliver alert",
     );
   }
 }

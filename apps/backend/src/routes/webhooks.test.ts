@@ -15,10 +15,19 @@ jest.mock("../lib/logger", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 jest.mock("../lib/sentry", () => ({
-  Sentry: { captureException: jest.fn() },
+  Sentry: {
+    captureException: jest.fn(),
+    captureMessage: jest.fn(),
+    setTag: jest.fn(),
+    setContext: jest.fn(),
+  },
 }));
 jest.mock("../services/hasura.service", () => ({
-  HasuraService: { updateEscrowStatus: jest.fn() },
+  HasuraService: {
+    updateEscrowStatus: jest.fn(),
+    claimProcessedWebhookEvent: jest.fn(),
+    deleteProcessedWebhookEventsBefore: jest.fn(),
+  },
 }));
 jest.mock("../services/notification.service", () => ({
   NotificationService: { notifyEscrowStatusChange: jest.fn() },
@@ -27,12 +36,16 @@ jest.mock("../services/notification.service", () => ({
 import { env } from "../config/env";
 import { captureRawBody } from "../middleware/rawBody";
 import { HasuraService } from "../services/hasura.service";
-import { NotificationService } from "../services/notification.service";
 import { webhookRouter, STATUS_MAP } from "./webhooks";
 import { Sentry } from "../lib/sentry";
 
 const updateEscrowStatus = HasuraService.updateEscrowStatus as jest.Mock;
-const notifyEscrowStatusChange = NotificationService.notifyEscrowStatusChange as jest.Mock;
+const claimProcessedWebhookEvent = HasuraService.claimProcessedWebhookEvent as jest.Mock;
+const notifyEscrowStatusChange = (
+  jest.requireMock("../services/notification.service") as {
+    NotificationService: { notifyEscrowStatusChange: jest.Mock };
+  }
+).NotificationService.notifyEscrowStatusChange;
 
 function buildApp() {
   const app = express();
@@ -86,8 +99,10 @@ const DOCUMENTED_TRUSTLESS_WORK_STATUSES = [
 
 describe("STATUS_MAP coverage", () => {
   it("maps every documented Trustless Work escrow status", () => {
+    // The route lowercases the incoming status before lookup, so coverage is
+    // case-insensitive.
     const missing = DOCUMENTED_TRUSTLESS_WORK_STATUSES.filter(
-      (status) => !(status in STATUS_MAP)
+      (status) => !(status.toLowerCase() in STATUS_MAP)
     );
 
     expect(missing).toEqual([]);
@@ -95,8 +110,9 @@ describe("STATUS_MAP coverage", () => {
 
   it("maps every documented status to a non-empty string", () => {
     for (const status of DOCUMENTED_TRUSTLESS_WORK_STATUSES) {
-      expect(typeof STATUS_MAP[status]).toBe("string");
-      expect(STATUS_MAP[status].length).toBeGreaterThan(0);
+      const mapped = STATUS_MAP[status.toLowerCase()];
+      expect(typeof mapped).toBe("string");
+      expect(mapped.length).toBeGreaterThan(0);
     }
   });
 });
@@ -111,6 +127,7 @@ describe("POST /webhooks/escrow-status", () => {
     (env as { TRUSTLESS_WORK_WEBHOOK_SECRET?: string }).TRUSTLESS_WORK_WEBHOOK_SECRET =
       WEBHOOK_SECRET;
     updateEscrowStatus.mockResolvedValue({ affected_rows: 1 });
+    claimProcessedWebhookEvent.mockResolvedValue(true);
     notifyEscrowStatusChange.mockResolvedValue({
       emailSent: true,
       pushSent: false,
@@ -267,7 +284,7 @@ describe("POST /webhooks/escrow-status", () => {
       expect.any(Error),
       expect.objectContaining({
         tags: expect.objectContaining({ alert: "webhook.delivery_failure", retryable: "true" }),
-        extra: { contractId: "contract-123" },
+        extra: expect.objectContaining({ contractId: "contract-123" }),
       })
     );
   });
@@ -282,6 +299,9 @@ describe("POST /webhooks/escrow-status", () => {
   });
 
   it("is idempotent: replaying the identical signed payload does not duplicate side effects", async () => {
+    // First delivery claims the dedup key; the replay loses the insert race.
+    claimProcessedWebhookEvent.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
     // First delivery: the escrow transitions to the new status and a notification fires.
     const first = await post(payload, { "x-trustless-work-signature": sign(payload) });
     expect(first.status).toBe(200);
@@ -317,7 +337,9 @@ describe("POST /webhooks/escrow-status under concurrent load", () => {
       WEBHOOK_SECRET;
     updateEscrowStatus.mockReset();
     notifyEscrowStatusChange.mockReset();
+    claimProcessedWebhookEvent.mockReset();
     updateEscrowStatus.mockResolvedValue({ affected_rows: 1 });
+    claimProcessedWebhookEvent.mockResolvedValue(true);
     notifyEscrowStatusChange.mockResolvedValue({
       emailSent: true,
       pushSent: false,
