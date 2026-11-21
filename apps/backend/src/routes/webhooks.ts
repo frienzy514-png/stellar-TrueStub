@@ -5,6 +5,7 @@ import { logger } from "../lib/logger";
 import { Sentry } from "../lib/sentry";
 import { NotificationService } from "../services/notification.service";
 import { HasuraService } from "../services/hasura.service";
+import { webhookIpAllowlist } from "../middleware/webhookIpAllowlist";
 
 /**
  * Trustless Work escrow-status webhook — the single authoritative code path
@@ -155,7 +156,14 @@ function captureDeliveryFailure(
   });
 }
 
-webhookRouter.post("/escrow-status", async (req: Request, res: Response) => {
+// Optional defense-in-depth source-IP allowlist (#532). No-op unless
+// TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS is set; HMAC below is always enforced.
+const escrowStatusIpAllowlist = webhookIpAllowlist(
+  () => env.TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS,
+  "escrow-status"
+);
+
+webhookRouter.post("/escrow-status", escrowStatusIpAllowlist, async (req: Request, res: Response) => {
   const secret = env.TRUSTLESS_WORK_WEBHOOK_SECRET;
   if (!secret) {
     logger.error("[webhook:escrow-status] TRUSTLESS_WORK_WEBHOOK_SECRET is not configured");
