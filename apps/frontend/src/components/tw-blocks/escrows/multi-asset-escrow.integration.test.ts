@@ -94,6 +94,29 @@ function buildEscrowPayload(
   };
 }
 
+interface MockRefundResponse {
+  contractId: string;
+  asset: string;
+  destination: string;
+  amount: number;
+}
+
+/**
+ * Simulates a refund of an existing escrow. The refund must be denominated in
+ * the escrow's own trustline asset, not a hardcoded default asset.
+ */
+async function mockRefundEscrow(
+  escrow: MockEscrowResponse,
+  payload: MockEscrowPayload,
+): Promise<MockRefundResponse> {
+  return {
+    contractId: escrow.contractId,
+    asset: payload.trustline.address,
+    destination: payload.roles.receiver,
+    amount: payload.amount,
+  };
+}
+
 /**
  * Simulates the Trustless Work API deployEscrow call.
  */
@@ -262,6 +285,24 @@ describe('multi-asset escrow selection-to-creation flow (issue #275)', () => {
       expect(response.contractId).toMatch(/^CONTRACT_/);
       expect(response.address).toBe(payload.trustline.address);
     });
+
+    it.each(['XLM', 'EURC'])(
+      'refunds %s escrows in their own asset, not the default USDC asset',
+      async (symbol) => {
+        const asset = getTrustlineBySymbol(symbol, 'testnet')!;
+        const usdc = getTrustlineBySymbol('USDC', 'testnet')!;
+        expect(asset.value).not.toBe(usdc.value);
+
+        const payload = buildEscrowPayload(asset);
+        const escrow = await mockDeployEscrow(payload);
+        const refund = await mockRefundEscrow(escrow, payload);
+
+        expect(refund.contractId).toBe(escrow.contractId);
+        expect(refund.asset).toBe(payload.trustline.address);
+        expect(refund.asset).not.toBe(usdc.value);
+        expect(refund.amount).toBe(payload.amount);
+      },
+    );
 
     it('rejects a payload with an empty trustline address', async () => {
       const payload = buildEscrowPayload(
