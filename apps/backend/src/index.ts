@@ -23,6 +23,7 @@ import { disputesRouter } from "./routes/disputes";
 import { usersRouter } from "./routes/users";
 import { adminUsersRouter } from "./routes/admin-users";
 import { startDisputeResolverBalanceMonitor } from "./services/dispute-resolver-balance.service";
+import { runStartupChecks } from "./lib/startup-checks";
 
 // Initialise Sentry exactly once, before the app is created (#260). All Sentry
 // config lives in lib/sentry.ts.
@@ -62,10 +63,18 @@ export function createApp(): Express {
 
 export const app = createApp();
 
-if (require.main === module) {
-  // Fail fast if the frontend and backend are configured for different Stellar
-  // networks (e.g. frontend on testnet, backend refunds on mainnet).
-  assertNetworkConfigMatches();
+/**
+ * Binds the HTTP port only after the fail-fast startup checks pass (#565, #566).
+ * A failed check exits non-zero so the orchestrator restarts or rolls back
+ * instead of serving traffic against a broken database or Hasura setup.
+ */
+async function startServer(): Promise<void> {
+  try {
+    await runStartupChecks();
+  } catch (err) {
+    logger.fatal({ err }, "Startup check failed; refusing to start the backend");
+    process.exit(1);
+  }
 
   app.listen(env.PORT, () => {
     logger.info({ port: env.PORT, env: env.NODE_ENV }, "TrueStub backend listening");
@@ -84,4 +93,12 @@ if (require.main === module) {
       );
     }
   });
+}
+
+if (require.main === module) {
+  // Fail fast if the frontend and backend are configured for different Stellar
+  // networks (e.g. frontend on testnet, backend refunds on mainnet).
+  assertNetworkConfigMatches();
+
+  void startServer();
 }

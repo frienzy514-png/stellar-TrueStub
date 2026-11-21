@@ -122,6 +122,14 @@ the new complexity so contributors are not surprised.
 4. **Open a pull request** against `main` using the PR template — fill it
    out completely; incomplete PRs may be asked to redo it.
 
+### Review checklist: in-memory state in services
+
+Reviewers must check every PR that adds a backend service with its own
+in-memory store for business-critical state. If the PR adds a service with
+its own in-memory store (`new Map(...)`, `new Set(...)`, etc.) for data that
+must survive a restart or be shared across instances, justify why, or use a
+persistent store instead.
+
 The full walkthrough (forking, branch naming, PR expectations) is in
 [`docs/CONTRIBUTORS_GUIDELINE.md`](docs/CONTRIBUTORS_GUIDELINE.md).
 
