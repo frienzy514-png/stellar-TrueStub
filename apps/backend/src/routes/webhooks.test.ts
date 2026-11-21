@@ -447,3 +447,48 @@ describe("POST /webhooks/escrow-status dedup key stability", () => {
     expect(notifyEscrowStatusChange).toHaveBeenCalledTimes(1);
   });
 });
+
+
+describe("POST /webhooks/escrow-status dedup retention window", () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  beforeEach(() => {
+    (env as { TRUSTLESS_WORK_WEBHOOK_SECRET?: string }).TRUSTLESS_WORK_WEBHOOK_SECRET =
+      WEBHOOK_SECRET;
+    updateEscrowStatus.mockResolvedValue({ affected_rows: 1 });
+    notifyEscrowStatusChange.mockResolvedValue({
+      emailSent: true,
+      pushSent: false,
+      channel: "email",
+      timestamp: "t",
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("still dedups a delayed retry arriving just inside the retention window", async () => {
+    const body = JSON.stringify({
+      contractId: "contract-561",
+      engagementId: "ENG-561",
+      status: "funded",
+    });
+    const t0 = 1_800_000_000_000;
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(t0);
+
+    const first = await post(body, { "x-trustless-work-signature": sign(body) });
+    expect(first.status).toBe(200);
+    expect(notifyEscrowStatusChange).toHaveBeenCalledTimes(1);
+
+    // A retry arriving 23h59m later must still be recognised as a duplicate,
+    // not reprocessed as a new event.
+    nowSpy.mockReturnValue(t0 + DAY_MS - 60 * 1000);
+    updateEscrowStatus.mockResolvedValue({ affected_rows: 0 });
+    const retry = await post(body, { "x-trustless-work-signature": sign(body) });
+
+    expect(retry.status).toBe(200);
+    expect(retry.body.duplicate).toBe(true);
+    expect(notifyEscrowStatusChange).toHaveBeenCalledTimes(1);
+  });
+});
