@@ -13,8 +13,10 @@
  *
  * Cleanup / TTL
  * -------------
- * Claimed records are retained in memory until `cleanupBefore(cutoff)` is
- * called (e.g. on a scheduled job or when the process runs out of memory).
+ * The in-memory store is bounded (#538): records older than
+ * REFUND_STORE_TTL_MS are dropped, and the oldest records are evicted once
+ * the store exceeds REFUND_STORE_MAX entries. `cleanupBefore(cutoff)` can
+ * still be called on a schedule for tighter retention.
  * For persistent deployments, a DB-backed store provides its own retention
  * policy.  See the README section "Storage cleanup" for recommended schedules.
  *
@@ -37,12 +39,15 @@ import {
   EscrowType,
   TrustlessWorkClient,
   TrustlessWorkNotConfiguredError,
+  RefundAmountMismatchError,
+  assertRefundAmountMatchesDisputedBalance,
   trustlessWorkClient,
 } from "../lib/trustless-work";
 import { assertMainnetSubmissionAllowed, type NetworkGuardConfig } from "../lib/network-guard";
 import { getRequestId } from "../lib/requestContext";
 import { logger } from "../lib/logger";
 import { captureException } from "../lib/sentry";
+import { HasuraService } from "./hasura.service";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -158,8 +163,33 @@ export interface RefundStore {
 
 // ── In-memory default store ────────────────────────────────────────────────
 
+/** Default bounds for the in-memory store (#538), mirroring the webhook dedup map. */
+export const REFUND_STORE_MAX = 10_000;
+export const REFUND_STORE_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+
 export class InMemoryRefundStore implements RefundStore {
   private readonly store = new Map<string, ClaimedRefund>();
+
+  constructor(
+    private readonly maxSize = REFUND_STORE_MAX,
+    private readonly ttlMs = REFUND_STORE_TTL_MS,
+  ) {}
+
+  /** Drops expired records, then the oldest ones while over `maxSize`. */
+  private prune(): void {
+    const cutoff = Date.now() - this.ttlMs;
+    for (const [id, record] of this.store) {
+      if (new Date(record.claimedAt).getTime() < cutoff) {
+        this.store.delete(id);
+      }
+    }
+    // Map preserves insertion order, so the oldest entries come first.
+    while (this.store.size > this.maxSize) {
+      const oldest = this.store.keys().next().value;
+      if (oldest === undefined) break;
+      this.store.delete(oldest);
+    }
+  }
 
   async has(refundId: string): Promise<boolean> {
     return this.store.has(refundId);
@@ -180,6 +210,7 @@ export class InMemoryRefundStore implements RefundStore {
       return false;
     }
     this.store.set(refundId, record);
+    this.prune();
     return true;
   }
 
@@ -205,6 +236,7 @@ export class InMemoryRefundStore implements RefundStore {
 export const REFUND_ERROR_CODES = {
   ALREADY_CLAIMED: "REFUND_ALREADY_CLAIMED",
   INVALID_PAYLOAD: "REFUND_INVALID_PAYLOAD",
+  AMOUNT_MISMATCH: "REFUND_AMOUNT_MISMATCH",
   EXECUTION_FAILED: "REFUND_EXECUTION_FAILED",
   EXECUTION_UNAVAILABLE: "REFUND_EXECUTION_UNAVAILABLE",
   MAINNET_BLOCKED: "REFUND_MAINNET_SUBMISSION_BLOCKED",
@@ -218,6 +250,12 @@ export class RefundService {
   constructor(
     private readonly store: RefundStore = new InMemoryRefundStore(),
     private readonly executor?: RefundExecutor,
+    /**
+     * Looks up the escrow's disputed balance so a wrong `amount` is rejected
+     * locally before calling Trustless Work (#537). Returns null when the
+     * escrow is unknown, in which case the check is skipped.
+     */
+    private readonly getDisputedBalance?: (escrowId: string) => Promise<number | null>,
   ) {}
 
   /**
@@ -243,6 +281,7 @@ export class RefundService {
     }
     if (this.executor) {
       this.assertExecutable(payload);
+      await this.assertAmountMatchesBalance(payload);
     }
 
     // Insert-first idempotency: the record is written before any on-chain
@@ -348,6 +387,20 @@ export class RefundService {
     }
   }
 
+  private async assertAmountMatchesBalance(payload: RefundPayload): Promise<void> {
+    if (!this.getDisputedBalance) return;
+    const balance = await this.getDisputedBalance(payload.escrowId);
+    if (balance === null) return;
+    try {
+      assertRefundAmountMatchesDisputedBalance(Number(payload.amount), balance);
+    } catch (err) {
+      if (err instanceof RefundAmountMismatchError) {
+        throw new AppError(400, REFUND_ERROR_CODES.AMOUNT_MISMATCH, err.message);
+      }
+      throw err;
+    }
+  }
+
   /**
    * Returns the existing claim for `refundId`, or `undefined` if it has
    * never been claimed.  Useful for idempotent GET endpoints.
@@ -371,4 +424,8 @@ export class RefundService {
 }
 
 // Singleton — routes import this shared instance.  Claims execute on-chain.
-export const refundService = new RefundService(new InMemoryRefundStore(), new TrustlessWorkRefundExecutor());
+export const refundService = new RefundService(
+  new InMemoryRefundStore(),
+  new TrustlessWorkRefundExecutor(),
+  (escrowId) => HasuraService.getEscrowAmountByContractId(escrowId),
+);

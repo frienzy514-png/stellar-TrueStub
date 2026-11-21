@@ -110,16 +110,32 @@ class Lock {
   private queue: Array<() => void> = [];
   private locked = false;
 
+  /** True when nobody holds the lock and nobody is waiting for it. */
+  get idle(): boolean {
+    return !this.locked && this.queue.length === 0;
+  }
+
   async acquire(): Promise<() => void> {
     if (!this.locked) {
       this.locked = true;
-      return () => this.release();
+      return this.releaseOnce();
     }
     return new Promise<() => void>((resolve) => {
       this.queue.push(() => {
-        resolve(() => this.release());
+        resolve(this.releaseOnce());
       });
     });
+  }
+
+  // Each holder gets a release function that only works once, so a double
+  // release on an error path can't hand the lock to two waiters (#539).
+  private releaseOnce(): () => void {
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.release();
+    };
   }
 
   private release(): void {
@@ -147,6 +163,22 @@ export class OwnershipTransferService {
   }
 
   /**
+   * Acquires the per-transfer lock and returns a release function that also
+   * drops the map entry once the lock is idle, so the map doesn't grow
+   * forever. Callers must call it in a `finally` block (#539).
+   */
+  private async acquireLock(transferId: string): Promise<() => void> {
+    const lock = this.getLock(transferId);
+    const release = await lock.acquire();
+    return () => {
+      release();
+      if (lock.idle && this.locks.get(transferId) === lock) {
+        this.locks.delete(transferId);
+      }
+    };
+  }
+
+  /**
    * Initiates a new ownership transfer (PENDING state).
    * Duplicate transferIds are rejected with 409 TRANSFER_CONFLICT.
    */
@@ -168,7 +200,7 @@ export class OwnershipTransferService {
     // unique constraint (via insertIfAbsent) is the authoritative guard: it
     // rejects duplicate transferIds before any ownership mutation or on-chain
     // action, so two concurrent identical requests cannot both apply.
-    const release = await this.getLock(transferId).acquire();
+    const release = await this.acquireLock(transferId);
     try {
       const record: OwnershipTransfer = {
         transferId,
@@ -251,7 +283,7 @@ export class OwnershipTransferService {
 
     const requestId = getRequestId();
 
-    const release = await this.getLock(transferId).acquire();
+    const release = await this.acquireLock(transferId);
     try {
       const transfer = await this.store.get(transferId);
 
