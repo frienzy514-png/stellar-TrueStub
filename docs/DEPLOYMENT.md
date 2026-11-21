@@ -90,3 +90,28 @@ check that platform's docs for the equivalent setting.
 
 Placeholder today — not part of either app's deploy process. See the root
 README for its status.
+
+## Pre-restart checklist
+
+Dispute records are held in memory in the backend process and are lost on
+restart (see [Lost dispute state after a restart](RUNBOOKS.md#lost-dispute-state-after-a-restart)).
+Until dispute persistence ships, complete this checklist before any backend
+deploy, restart, or scale event:
+
+- [ ] Check the number of open disputes on the running backend. There is
+      no dedicated count endpoint yet, so read the open-dispute count from
+      the dispute list for the environment, or from the dispute store logs.
+      Record the number in the deploy ticket.
+- [ ] If the count is **0**, the restart may proceed.
+- [ ] If the count is **greater than 0**, do not restart. Get explicit
+      sign-off from the platform owner before continuing, and record who
+      approved it and why.
+- [ ] If the restart goes ahead with open disputes, follow
+      [Lost dispute state after a restart](RUNBOOKS.md#lost-dispute-state-after-a-restart)
+      once the backend is back up.
+- [ ] Prefer a deploy window with no open disputes. Schedule restarts
+      accordingly.
+
+> **Gap:** an API endpoint that exposes the open-dispute count is needed to
+> make this check automatic. Until it exists, this step is manual.
+
