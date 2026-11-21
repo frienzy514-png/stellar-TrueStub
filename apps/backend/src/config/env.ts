@@ -140,6 +140,17 @@ export function validateEnv(rawEnv: NodeJS.ProcessEnv = process.env): Env {
     throw new Error(fullMessage);
   }
 
+  // #558 — the CORS schema default is the local dev origin. In production that
+  // default must never apply silently, so refuse to boot unless CORS_ORIGINS is
+  // set explicitly.
+  if (result.data.NODE_ENV === "production" && nonEmpty.CORS_ORIGINS === undefined) {
+    const fullMessage =
+      "❌ Invalid environment variables:\n" +
+      "  - CORS_ORIGINS: must be set explicitly when NODE_ENV=production (the localhost default is not allowed in production)";
+    console.error(fullMessage);
+    throw new Error(fullMessage);
+  }
+
   return result.data;
 }
 
