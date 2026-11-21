@@ -134,6 +134,6 @@
     "storybook": "8.6.12",
     "tailwindcss": "^3.4.1",
     "ts-jest": "^29.3.2",
-    "typescript": "5.8.2"
+    "typescript": "7.0.2"
   }
 }
