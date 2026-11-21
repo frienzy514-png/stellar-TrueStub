@@ -6,6 +6,7 @@ no prior context on this codebase should be able to follow it.
 
 - [Stuck or failed refunds](#stuck-or-failed-refunds)
 - [Double refund detected](#double-refund-detected)
+- [Lost dispute state after a restart](#lost-dispute-state-after-a-restart)
 
 _Last checked against the code: 2026-10-18 (`apps/backend/src/routes/refunds.ts`,
 `apps/backend/src/services/refund.service.ts`,
@@ -285,3 +286,48 @@ Choose one per affected escrow, with the parties' agreement:
 - Add a regression test for the race or restart path that caused the
   duplicate before closing the incident.
 - Track the move to a persistent refund idempotency store as the root fix.
+
+---
+
+## Lost dispute state after a restart
+
+Dispute records are held in `InMemoryDisputeStore`
+(`apps/backend/src/services/dispute.service.ts`). A restart or redeploy
+while disputes are open erases them from the backend. The escrows still
+exist on-chain, so the funds are safe, but the platform no longer knows
+which disputes were open.
+
+### 1. Identify affected escrows
+
+- Find the restart time from the deploy log or the process start log.
+- Find every dispute opened before that time whose escrow is still in
+  dispute on-chain. Use the Trustless Work API to read the escrow status,
+  because the backend no longer has the dispute record.
+- Keep the list of `escrowId`s, the parties, and the dispute open time.
+
+### 2. Communicate with affected users
+
+- Contact each buyer and seller on the list through the support channel.
+  Tell them the dispute is still open on-chain, that the platform lost its
+  local record during maintenance, and that their case is not closed.
+- Ask them to confirm the facts of their dispute and any evidence they
+  already submitted, and tell them what to expect next.
+- Do not promise an outcome until the manual remediation below is complete.
+
+### 3. Manual remediation until persistence lands
+
+- Re-create the dispute decision manually from the escrow state on-chain and
+  the parties' confirmed evidence.
+- Resolve each escrow through the normal resolver flow, using the dispute
+  resolver key, and record the transaction hash against the escrow.
+- Log every manual action in the incident log with the operator's name,
+  time, and reason.
+
+### 4. Close out
+
+- Confirm every escrow on the list is either resolved on-chain or back in an
+  agreed state.
+- Tell the affected users the outcome in writing.
+- Track persistence for dispute records as the root fix. Until it ships, use
+  [Pre-restart checklist](DEPLOYMENT.md#pre-restart-checklist) before every
+  restart.
