@@ -39,3 +39,23 @@
 
 # Stellar/Soroban contracts (Rust) — required maintainer review (see note above)
 /contracts/                                     @frienzy514-png
+
+# Supply-chain-sensitive paths — required maintainer review. A malicious or
+# compromised PR almost always has to touch one of these: it needs an
+# install-time hook, a redirected package resolution, a CI secret, or a
+# registry override. The malware-scan.yml workflow flags these automatically;
+# CODEOWNERS makes sure a human also signs off before merge.
+/.github/workflows/                             @frienzy514-png
+/.github/dependabot.yml                         @frienzy514-png
+/package.json                                   @frienzy514-png
+/yarn.lock                                      @frienzy514-png
+/.yarnrc.yml                                     @frienzy514-png
+/apps/frontend/package.json                     @frienzy514-png
+/apps/frontend/yarn.lock                        @frienzy514-png
+/apps/frontend/.npmrc                           @frienzy514-png
+/apps/backend/package.json                      @frienzy514-png
+/apps/backend/yarn.lock                         @frienzy514-png
+/apps/backend/.npmrc                            @frienzy514-png
+/apps/backend/Dockerfile                        @frienzy514-png
+/contracts/Cargo.toml                           @frienzy514-png
+/contracts/Cargo.lock                           @frienzy514-png

@@ -61,6 +61,39 @@ would matter most:
   `sync-user`/`validate-reset-token` endpoints (see `apps/backend/README.md`
   for their current implementation status).
 
+## Supply-chain / malware defenses
+
+Every PR runs `.github/workflows/malware-scan.yml`, which:
+
+- secret-scans the diff ([gitleaks](https://github.com/gitleaks/gitleaks)),
+- runs GitHub's [dependency review](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/about-dependency-review)
+  against the GitHub Advisory Database (fails on newly introduced
+  high/critical-severity or known-malicious packages),
+- hard-fails on added lines matching known malicious-code idioms
+  (`eval`/`new Function` on dynamic input, `child_process`/`exec`/`spawn`,
+  curl/wget-pipe-to-shell, reverse-shell socket patterns, known
+  exfiltration endpoints such as Discord webhooks, Telegram bot API, or
+  pastebin raw fetches, and newly-added npm `preinstall`/`postinstall`/
+  `prepare` hooks), and
+- soft-flags lower-confidence signals (long base64-like blobs, any
+  dependency-manifest or lockfile change, lockfile resolutions pointing
+  outside the official registries, changes to `.github/workflows`,
+  `.npmrc`/`.yarnrc.yml`, or Dockerfiles) in the job summary for a
+  maintainer to read before approving.
+
+`.github/dependabot.yml` keeps dependencies (npm, cargo, and the GitHub
+Actions themselves) patched on a weekly cadence, and `.github/CODEOWNERS`
+requires maintainer review on every path that a supply-chain attack would
+realistically need to touch — manifests, lockfiles, registry config, CI
+workflows, Dockerfiles.
+
+None of this replaces human judgment: a contributor can be acting in good
+faith and still be carrying a compromised dependency they pulled in
+themselves (e.g. a hijacked npm package that shipped a malicious version
+under a legitimate name). If you notice anything like that — in this repo
+or upstream in a package it depends on — report it the same way as any
+other vulnerability.
+
 ## Scope
 
 In scope: this repository's code (`apps/frontend`, `apps/backend`,

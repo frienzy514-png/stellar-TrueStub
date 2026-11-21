@@ -125,6 +125,26 @@ the new complexity so contributors are not surprised.
 The full walkthrough (forking, branch naming, PR expectations) is in
 [`docs/CONTRIBUTORS_GUIDELINE.md`](docs/CONTRIBUTORS_GUIDELINE.md).
 
+## 🛡️ Malware / supply-chain scan on every PR
+
+A `malware-scan.yml` check runs on every PR (see
+[`SECURITY.md`](SECURITY.md#supply-chain--malware-defenses) for the full
+list of what it checks). Two things to know before you push:
+
+- **It's not only about code you wrote.** Most real supply-chain incidents
+  are a contributor acting in good faith who pulled in a dependency that
+  was itself compromised. If the dependency-review check flags a package
+  you added, don't just retry the job — check whether that version was
+  actually published by the real maintainer.
+- **A new `postinstall`/`preinstall`/`prepare` script in any `package.json`
+  always needs a maintainer's eyes**, even if you wrote it yourself and
+  know it's benign. CODEOWNERS will request @frienzy514-png's review
+  automatically on any `package.json`, lockfile, `.npmrc`/`.yarnrc.yml`,
+  Dockerfile, or `.github/workflows/` change.
+
+If the scan fails on something you're confident is a false positive, say so
+in the PR and tag a maintainer — don't change code just to dodge the check.
+
 ## ✅ Verify before closing an issue
 
 This project has a recurring pattern: issues get closed by a PR that addresses part
