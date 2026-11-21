@@ -52,7 +52,7 @@ The frontend can start without the sibling backend. Features that call it,
 including operator analytics, require `NEXT_PUBLIC_BACKEND_URL` to point at a
 running backend. To run that service locally, copy
 `apps/backend/.env.example` to `apps/backend/.env`, then set `DATABASE_URL`,
-`HASURA_GRAPHQL_URL`, `HASURA_ADMIN_SECRET`, and the Firebase Admin service
+`HASURA_GRAPHQL_URL`, `HASURA_GRAPHQL_ADMIN_SECRET`, and the Firebase Admin service
 account values. Sentry is optional. Start it in a second terminal with
 `yarn workspace @truestub/backend dev`. Apply SQL migrations with
 `yarn workspace @truestub/backend migrate:up` only when a local Postgres

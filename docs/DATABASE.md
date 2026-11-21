@@ -121,7 +121,7 @@ enforce those rules.
 
 - The frontend reads and writes through Hasura GraphQL using the signed-in
   Firebase user's JWT. Never put a Hasura admin secret in frontend variables.
-- `apps/backend` uses `HASURA_ADMIN_SECRET` only on the server for privileged
+- `apps/backend` uses `HASURA_GRAPHQL_ADMIN_SECRET` only on the server for privileged
   operations, such as escrow status webhooks and operator analytics. User-facing
   backend routes must verify Firebase ID tokens and enforce authorization before
   using that client.

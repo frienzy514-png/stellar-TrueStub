@@ -43,6 +43,25 @@ describe("Backend Environment Validation", () => {
     expect(parsed.HASURA_GRAPHQL_ADMIN_SECRET).toBe("admin_secret_456");
   });
 
+  it("should accept the legacy HASURA_ADMIN_SECRET name as an alias (#534)", () => {
+    const parsed = validateEnv({ ...REQUIRED, HASURA_ADMIN_SECRET: "legacy_secret" });
+    expect(parsed.HASURA_GRAPHQL_ADMIN_SECRET).toBe("legacy_secret");
+  });
+
+  it("should prefer HASURA_GRAPHQL_ADMIN_SECRET over the legacy alias when both are set", () => {
+    const parsed = validateEnv({
+      ...REQUIRED,
+      HASURA_GRAPHQL_ADMIN_SECRET: "canonical_secret",
+      HASURA_ADMIN_SECRET: "legacy_secret",
+    });
+    expect(parsed.HASURA_GRAPHQL_ADMIN_SECRET).toBe("canonical_secret");
+  });
+
+  it("should ignore an empty legacy HASURA_ADMIN_SECRET", () => {
+    const parsed = validateEnv({ ...REQUIRED, HASURA_ADMIN_SECRET: "  " });
+    expect(parsed.HASURA_GRAPHQL_ADMIN_SECRET).toBeUndefined();
+  });
+
   it("should throw when a required Firebase Admin variable is missing", () => {
     expect(() => validateEnv({})).toThrow(/FIREBASE_ADMIN_PROJECT_ID/);
   });
@@ -60,6 +79,20 @@ describe("Backend Environment Validation", () => {
 
   it("should throw on invalid NODE_ENV", () => {
     expect(() => validateEnv({ ...REQUIRED, NODE_ENV: "invalid_env" as any })).toThrow(/NODE_ENV/);
+  });
+
+  it("should accept a valid TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS list (#532)", () => {
+    const parsed = validateEnv({
+      ...REQUIRED,
+      TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS: "203.0.113.10, 198.51.100.0/24",
+    });
+    expect(parsed.TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS).toBe("203.0.113.10, 198.51.100.0/24");
+  });
+
+  it("should fail fast on a malformed TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS entry", () => {
+    expect(() =>
+      validateEnv({ ...REQUIRED, TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS: "203.0.113.10, nope" }),
+    ).toThrow(/TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS/);
   });
 
   it("should throw on invalid HASURA_GRAPHQL_URL URL format", () => {
