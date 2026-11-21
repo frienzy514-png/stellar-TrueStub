@@ -5,6 +5,7 @@ production incidents. Each runbook is self-contained: an on-call person with
 no prior context on this codebase should be able to follow it.
 
 - [Stuck or failed refunds](#stuck-or-failed-refunds)
+- [Double refund detected](#double-refund-detected)
 
 _Last checked against the code: 2026-10-18 (`apps/backend/src/routes/refunds.ts`,
 `apps/backend/src/services/refund.service.ts`,
@@ -219,3 +220,68 @@ waiting on Trustless Work.
 | `409` with `status: "failed"` | Retry with a **new** `refundId` after step 3 and the step 4 checklist. |
 | Stuck `pending` | Check the chain, wait, check again. Don't retry while the request may still be in flight. |
 | `404` from the status endpoint | Backend restarted or the request reached a different replica. Use the chain. |
+
+---
+
+## Double refund detected
+
+Idempotency for refund claims is held in memory by `InMemoryRefundStore`
+(`apps/backend/src/services/refund.service.ts`). A replica restart, a
+redeploy, or two replicas racing past the check can let the same escrow be
+refunded twice. Treat any suspected double refund as an incident.
+
+### 1. Detect
+
+- **Chain check (authoritative):** list the on-chain `resolve-dispute`
+  transactions for each affected `escrowId` on Stellar Expert. Two
+  successful refund transactions for one escrow, or two transfers to the
+  buyer's `refundTo` address for the same disputed amount, confirm the event.
+- **Backend signal:** two `POST /api/refunds/claim` requests for the same
+  escrow with different `refundId` values in the request logs, both returning
+  `2xx` or `502` with a `txHash`.
+- **Balance check:** the escrow balance is lower than the disputed amount
+  and the buyer's account received more than once.
+
+### 2. Notify
+
+- Page the on-call engineer and the platform owner immediately.
+- Notify the disputing parties (buyer and seller) through the usual support
+  channel once the duplicate is confirmed, with the transaction hashes.
+- Record the incident in the team's incident log with the affected
+  `escrowId`s, `refundId`s and `txHash`es.
+
+### 3. Stop further damage
+
+- Pause new refund claims for the affected escrows. Do not retry any
+  `pending` or `failed` claim until the chain has been checked (see
+  [Stuck or failed refunds](#stuck-or-failed-refunds), step 3).
+- If the problem comes from a replica race, scale to a single replica until
+  a persistent or shared idempotency store is in place.
+
+### 4. Remediate
+
+Choose one per affected escrow, with the parties' agreement:
+
+- **Claw-back request:** ask the buyer to return the duplicate amount to the
+  escrow or platform wallet, and record the agreed transaction hash.
+- **Write-off:** if the buyer cannot or will not return the funds, the
+  platform absorbs the loss. Record the amount and get sign-off from the
+  platform owner.
+- **Insurance:** if platform insurance covers the loss, follow the claim
+  process and keep the evidence (transaction hashes, logs).
+
+### 5. Correct the escrow state
+
+- Confirm on-chain that the escrow balance and status match the agreed
+  outcome. The chain is the source of truth, not the API.
+- Do **not** edit in-memory claim records by hand. Any correction is an
+  on-chain or ledger-backed record, and a backend restart clears the
+  in-memory map anyway.
+- Document the final settled amount and the closing transaction hash in the
+  incident log.
+
+### 6. Follow up
+
+- Add a regression test for the race or restart path that caused the
+  duplicate before closing the incident.
+- Track the move to a persistent refund idempotency store as the root fix.
