@@ -64,6 +64,22 @@
  * the case is *tracked and alerted* so a human resolves it, satisfying the
  * acceptance criteria without changing the OPEN → ESCALATED → RESOLVED|
  * WITHDRAWN behavior.
+ *
+ * Concurrency within a single instance (issue #540)
+ * ─────────────────────────────────────────────────────────────────────────
+ * `DisputeStore` is async, so `transition()` awaits between reading the
+ * current state and writing the new one. Without serialization two
+ * conflicting requests for the same dispute (e.g. a simultaneous `resolve`
+ * and `withdraw`) could both read OPEN, both pass validation, and the last
+ * write would silently win — leaving a state that doesn't match the audit
+ * trail. Every read-check-write on a given `disputeId` (open and transition)
+ * therefore runs under a per-key async lock (`withDisputeLock`). The second
+ * caller re-reads the state written by the first and is rejected with
+ * DISPUTE_ALREADY_FINAL / DISPUTE_INVALID_TRANSITION as appropriate.
+ *
+ * This only serializes calls inside one process. Cross-instance safety still
+ * depends on durable storage with a conditional write, which is why the
+ * backend is capped at one replica (issue #541).
  */
 
 import { AppError } from "../middleware/errorHandler";
@@ -258,10 +274,41 @@ export class InMemoryDisputeStore implements DisputeStore {
 // ── Service ────────────────────────────────────────────────────────────────
 
 export class DisputeService {
+  /**
+   * Tail of the pending-operation chain for each disputeId (issue #540).
+   * Entries are removed once their chain drains so the map doesn't grow with
+   * the number of disputes ever touched.
+   */
+  private readonly locks = new Map<string, Promise<void>>();
+
   constructor(
     private readonly store: DisputeStore = new InMemoryDisputeStore(),
     private readonly changelog: ChangelogService = new ChangelogService()
   ) {}
+
+  /**
+   * Runs `fn` exclusively for `disputeId`: calls for the same id execute one
+   * after another in arrival order, calls for different ids are unaffected.
+   */
+  private async withDisputeLock<T>(disputeId: string, fn: () => Promise<T>): Promise<T> {
+    const previous = this.locks.get(disputeId) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = previous.then(() => current);
+    this.locks.set(disputeId, tail);
+
+    await previous;
+    try {
+      return await fn();
+    } finally {
+      release();
+      if (this.locks.get(disputeId) === tail) {
+        this.locks.delete(disputeId);
+      }
+    }
+  }
 
   /**
    * Opens a new dispute in OPEN state.
@@ -283,6 +330,19 @@ export class DisputeService {
         "disputeId, escrowId, raisedBy, and reason are required"
       );
     }
+
+    return this.withDisputeLock(disputeId, () =>
+      this.openDisputeLocked({ disputeId, escrowId, raisedBy, reason })
+    );
+  }
+
+  private async openDisputeLocked(payload: {
+    disputeId: string;
+    escrowId: string;
+    raisedBy: string;
+    reason: string;
+  }): Promise<Dispute> {
+    const { disputeId, escrowId, raisedBy, reason } = payload;
 
     const existing = await this.store.get(disputeId);
     if (existing) {
@@ -339,6 +399,14 @@ export class DisputeService {
       throw new AppError(400, DISPUTE_ERROR_CODES.INVALID_PAYLOAD, "disputeId is required");
     }
 
+    return this.withDisputeLock(disputeId, () => this.transitionLocked(disputeId, event, opts));
+  }
+
+  private async transitionLocked(
+    disputeId: string,
+    event: DisputeEvent,
+    opts?: { resolution?: string }
+  ): Promise<Dispute> {
     const dispute = await this.store.get(disputeId);
     if (!dispute) {
       throw new AppError(404, DISPUTE_ERROR_CODES.NOT_FOUND, `Dispute ${disputeId} not found`);
