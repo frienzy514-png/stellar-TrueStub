@@ -57,12 +57,102 @@ jobs:
 
       - name: Lint with Clippy
         working-directory: contracts
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
       - name: Run tests
         working-directory: contracts
-        run: cargo test
+        run: cargo test --locked
 
       - name: Build for wasm32-unknown-unknown
         working-directory: contracts
-        run: cargo build --target wasm32-unknown-unknown --release
+        run: cargo build --locked --target wasm32-unknown-unknown --release
+
+  smoke-deploy:
+    name: Deploy and invoke hello-world on a local Soroban sandbox
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # Unit tests and a wasm build do not prove the contract deploys and can be
+    # invoked on a real Soroban network. This job does that end to end on a
+    # local sandbox, so a deploy-time failure is caught before merge.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable + wasm32-unknown-unknown)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo registry, git index, and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            contracts/target
+          key: contracts-smoke-${{ runner.os }}-cargo-${{ hashFiles('contracts/Cargo.lock') }}
+          restore-keys: |
+            contracts-smoke-${{ runner.os }}-cargo-
+
+      - name: Install Stellar CLI
+        run: |
+          if ! command -v stellar >/dev/null 2>&1; then
+            cargo install --locked stellar-cli
+          fi
+          stellar --version
+
+      - name: Build contract for wasm32-unknown-unknown
+        working-directory: contracts
+        run: cargo build --locked --target wasm32-unknown-unknown --release
+
+      - name: Start local Soroban sandbox
+        run: |
+          docker run -d --name soroban-sandbox -p 8000:8000 \
+            stellar/quickstart:latest --local --enable rpc
+          for i in $(seq 1 90); do
+            if curl -sf -X POST http://localhost:8000/soroban/rpc \
+                 -H 'Content-Type: application/json' \
+                 -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}' | grep -q '"healthy"'; then
+              echo "Soroban RPC is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Soroban sandbox did not become healthy in time"
+          docker logs soroban-sandbox || true
+          exit 1
+
+      - name: Configure local network and fund a deployer identity
+        run: |
+          stellar network add local \
+            --rpc-url http://localhost:8000/soroban/rpc \
+            --network-passphrase "Standalone Network ; February 2017"
+          stellar keys generate deployer --network local --fund
+
+      - name: Deploy hello-world to the sandbox
+        run: |
+          CONTRACT_ID=$(stellar contract deploy \
+            --wasm contracts/target/wasm32-unknown-unknown/release/hello_world.wasm \
+            --source deployer --network local --alias hello)
+          echo "Deployed contract: ${CONTRACT_ID}"
+          test -n "${CONTRACT_ID}"
+
+      - name: Invoke hello and assert the response
+        run: |
+          OUTPUT=$(stellar contract invoke --id hello \
+            --source deployer --network local -- hello --to Dev)
+          echo "Invocation output: ${OUTPUT}"
+          echo "${OUTPUT}" | grep -q 'Hello' || {
+            echo "::error::hello() did not return the expected Hello response"
+            exit 1
+          }
+          echo "${OUTPUT}" | grep -q 'Dev' || {
+            echo "::error::hello() did not echo the recipient name"
+            exit 1
+          }
+
+      - name: Stop sandbox
+        if: always()
+        run: docker rm -f soroban-sandbox || true
