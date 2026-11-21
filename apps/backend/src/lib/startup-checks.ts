@@ -5,6 +5,9 @@
  * process exits non-zero with a clear message instead of starting and failing
  * on the first real request.
  *
+ * - Hasura check (#566): one real admin-authenticated request to Hasura, so a
+ *   wrong URL or admin secret fails at boot instead of on the first user request.
+ *
  * - Schema check (#565): every SQL migration file shipped in the image must be
  *   recorded in node-pg-migrate's `pgmigrations` table. The container does NOT
  *   run migrations itself (see Dockerfile); it refuses to serve traffic against
@@ -13,6 +16,7 @@
 import { promises as fs, existsSync } from "fs";
 import path from "path";
 import { Client } from "pg";
+import { hasuraClient } from "./hasura";
 import { env } from "../config/env";
 import { logger } from "./logger";
 
@@ -93,16 +97,65 @@ export async function assertMigrationsUpToDate(
   }
 }
 
+/** Query used for the Hasura startup check; it touches no tables. */
+export const HASURA_STARTUP_QUERY = "query StartupHealthCheck { __typename }";
+
+/** Upper bound on the Hasura startup request so a hung endpoint cannot block boot. */
+export const HASURA_CHECK_TIMEOUT_MS = 5000;
+
 /**
- * Runs every startup check whose configuration is present. Checks are skipped
- * (with a warning) when their dependency is not configured, so local runs
- * without a database keep working.
+ * Makes one real, admin-authenticated Hasura request (#566). Env-var presence
+ * alone does not prove that the URL and admin secret work, so a wrong value
+ * would otherwise only surface on the first user request.
+ *
+ * Skipped with a warning when Hasura is not configured at all. Fails when it is
+ * only half-configured, or when the request errors or times out. The thrown
+ * message never includes the admin secret.
+ */
+export async function assertHasuraReachable(): Promise<void> {
+  const url = env.HASURA_GRAPHQL_URL;
+  const adminSecret = env.HASURA_GRAPHQL_ADMIN_SECRET;
+
+  if (!url && !adminSecret) {
+    logger.warn("Hasura startup check skipped: HASURA_GRAPHQL_URL is not configured");
+    return;
+  }
+  if (!url || !adminSecret) {
+    throw new Error(
+      "Hasura is partially configured: HASURA_GRAPHQL_URL and HASURA_GRAPHQL_ADMIN_SECRET must both be set",
+    );
+  }
+
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`no response within ${HASURA_CHECK_TIMEOUT_MS}ms`)),
+      HASURA_CHECK_TIMEOUT_MS,
+    );
+  });
+
+  try {
+    await Promise.race([hasuraClient.request(HASURA_STARTUP_QUERY), timeout]);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : "unknown error";
+    throw new Error(
+      `Hasura connectivity check failed for ${url}: ${reason}. ` +
+        "Verify HASURA_GRAPHQL_URL and HASURA_GRAPHQL_ADMIN_SECRET.",
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Runs every startup check. Checks whose dependency is not configured are
+ * skipped with a warning so local runs without a database or Hasura still work.
  */
 export async function runStartupChecks(): Promise<void> {
-  const databaseUrl = env.DATABASE_URL;
-  if (databaseUrl) {
-    await assertMigrationsUpToDate(databaseUrl);
+  if (env.DATABASE_URL) {
+    await assertMigrationsUpToDate(env.DATABASE_URL);
   } else {
     logger.warn("Migration startup check skipped: DATABASE_URL is not configured");
   }
+  await assertHasuraReachable();
 }
