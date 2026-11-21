@@ -83,8 +83,8 @@
 - [ ] 5.1 `HASURA_GRAPHQL_URL` points to the production Hasura instance
 - [ ] 5.2 `HASURA_GRAPHQL_ADMIN_SECRET` is rotated from any dev/staging value and stored in secrets manager
 - [ ] 5.3 `DATABASE_URL` connects to the production database — verify it's not the `localhost:5432` docker-compose default
-- [ ] 5.4 All database migrations (`apps/backend/src/db/migrations/`) have been applied to the production schema (`yarn migrate:up` run against `DATABASE_URL`)
-- [ ] 5.5 Production database has automated backups configured and a tested restore procedure
+- [ ] 5.4 All database migrations (`apps/backend/src/db/migrations/`) have been applied to the production schema (`yarn migrate:up:audited` run against `DATABASE_URL`, so the deploy is recorded in `migration_audit_log`; see `docs/DATABASE.md`)
+- [ ] 5.5 Production database has automated backups configured and a tested restore procedure, including an empty `verify-critical-tables-restore.sql` diff for the disputes/refunds/transfers tables (see `docs/DATABASE.md` → Backup and disaster recovery)
 - [ ] 5.6 Hasura metadata / permissions deployed to production (`hasura metadata apply`) and reviewed — no overly permissive public access rules
 
 ---
