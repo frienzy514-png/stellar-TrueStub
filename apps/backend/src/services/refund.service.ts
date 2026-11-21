@@ -40,7 +40,7 @@ import {
   trustlessWorkClient,
 } from "../lib/trustless-work";
 import { assertMainnetSubmissionAllowed, type NetworkGuardConfig } from "../lib/network-guard";
-import { getRequestId } from "../lib/requestContext";
+import { getCorrelationId as getRequestId } from "../middleware/requestLogger";
 import { logger } from "../lib/logger";
 import { captureException } from "../lib/sentry";
 
@@ -113,6 +113,7 @@ export class TrustlessWorkRefundExecutor implements RefundExecutor {
       escrowType: claim.escrowType ?? "single-release",
       milestoneIndex: claim.milestoneIndex,
       distributions: [{ address: claim.refundTo!, amount: Number(claim.amount) }],
+      asset: claim.currency!,
     });
     return { txHash };
   }
@@ -264,7 +265,7 @@ export class RefundService {
       if (!inserted) {
         throw await this.alreadyClaimed(refundId, requestId);
       }
-      logger.info("refund.claimed", { requestId, refundId, escrowId, status: record.status });
+      logger.info({ requestId, refundId, escrowId, status: record.status }, "refund.claimed");
       return record;
     }
 
@@ -278,28 +279,28 @@ export class RefundService {
       throw await this.alreadyClaimed(refundId, requestId);
     }
 
-    logger.info("refund.claim.accepted", {
+    logger.info({
       requestId,
       refundId,
       escrowId,
       status: record.status,
-    });
+    }, "refund.claim.accepted");
 
     try {
       const { txHash } = await this.executor.execute(record);
       const submitted: ClaimedRefund = { ...record, status: "submitted", txHash };
       await this.store.set(refundId, submitted);
-      logger.info("refund.executed", { requestId, refundId, escrowId, txHash });
+      logger.info({ requestId, refundId, escrowId, txHash }, "refund.executed");
       return submitted;
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       await this.store.set(refundId, { ...record, status: "failed", failureReason: reason });
-      logger.error("refund.execution_failed", {
+      logger.error({
         requestId,
         refundId,
         escrowId,
         reason,
-      });
+      }, "refund.execution_failed");
       captureException(err, {
         tags: { requestId, refundId, escrowId, component: "refund.service" },
         extra: { refundId, escrowId, reason },
@@ -323,11 +324,11 @@ export class RefundService {
       // continue by returning a sentinel the caller checks.
       await this.store.set(refundId, existing);
     }
-    logger.warn("refund.already_claimed", {
+    logger.warn({
       requestId,
       refundId,
       claimedAt: existing?.claimedAt,
-    });
+    }, "refund.already_claimed");
     return new AppError(
       409,
       REFUND_ERROR_CODES.ALREADY_CLAIMED,

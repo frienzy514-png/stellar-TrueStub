@@ -24,7 +24,12 @@ describe("Backend Environment Validation", () => {
   });
 
   it("should parse valid custom PORT and NODE_ENV", () => {
-    const parsed = validateEnv({ ...REQUIRED, PORT: "5050", NODE_ENV: "production" });
+    const parsed = validateEnv({
+      ...REQUIRED,
+      PORT: "5050",
+      NODE_ENV: "production",
+      CORS_ORIGINS: "https://app.truestub.example",
+    });
     expect(parsed.PORT).toBe(5050);
     expect(parsed.NODE_ENV).toBe("production");
   });
@@ -66,5 +71,31 @@ describe("Backend Environment Validation", () => {
     expect(() => validateEnv({ ...REQUIRED, HASURA_GRAPHQL_URL: "not-a-valid-url" })).toThrow(
       /HASURA_GRAPHQL_URL/,
     );
+  });
+
+  describe("CORS_ORIGINS in production (#558)", () => {
+    it("refuses to boot in production when CORS_ORIGINS is unset", () => {
+      expect(() => validateEnv({ ...REQUIRED, NODE_ENV: "production" })).toThrow(/CORS_ORIGINS/);
+    });
+
+    it("refuses to boot in production when CORS_ORIGINS is blank", () => {
+      expect(() => validateEnv({ ...REQUIRED, NODE_ENV: "production", CORS_ORIGINS: "   " })).toThrow(
+        /CORS_ORIGINS/,
+      );
+    });
+
+    it("boots in production when CORS_ORIGINS is set explicitly", () => {
+      const parsed = validateEnv({
+        ...REQUIRED,
+        NODE_ENV: "production",
+        CORS_ORIGINS: "https://app.truestub.example",
+      });
+      expect(parsed.CORS_ORIGINS).toBe("https://app.truestub.example");
+    });
+
+    it("keeps the localhost default outside production", () => {
+      const parsed = validateEnv({ ...REQUIRED, NODE_ENV: "development" });
+      expect(parsed.CORS_ORIGINS).toBe("http://localhost:3000");
+    });
   });
 });

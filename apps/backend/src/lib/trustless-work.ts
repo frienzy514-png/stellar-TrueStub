@@ -15,7 +15,7 @@
  */
 import { Keypair, Networks, TransactionBuilder } from "@stellar/stellar-sdk";
 import { env } from "../config/env";
-import { getRequestId } from "./requestLogger";
+import { getCorrelationId as getRequestId } from "../middleware/requestLogger";
 
 export type EscrowType = "single-release" | "multi-release";
 
