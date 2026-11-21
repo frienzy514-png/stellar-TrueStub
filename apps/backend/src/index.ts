@@ -23,6 +23,7 @@ import { disputesRouter } from "./routes/disputes";
 import { usersRouter } from "./routes/users";
 import { adminUsersRouter } from "./routes/admin-users";
 import { startDisputeResolverBalanceMonitor } from "./services/dispute-resolver-balance.service";
+import { assertFirebaseAdminConfigured } from "./config/firebase-startup-check";
 
 // Initialise Sentry exactly once, before the app is created (#260). All Sentry
 // config lives in lib/sentry.ts.
@@ -67,6 +68,9 @@ if (require.main === module) {
   // networks (e.g. frontend on testnet, backend refunds on mainnet).
   assertNetworkConfigMatches();
 
+  // #567 — fail fast when Firebase Admin credentials are present but broken.
+  assertFirebaseAdminConfigured()
+    .then(() => {
   app.listen(env.PORT, () => {
     logger.info({ port: env.PORT, env: env.NODE_ENV }, "TrueStub backend listening");
 
@@ -84,4 +88,9 @@ if (require.main === module) {
       );
     }
   });
+    })
+    .catch((error) => {
+      logger.fatal({ err: error }, "Startup check failed: Firebase Admin SDK");
+      process.exit(1);
+    });
 }
