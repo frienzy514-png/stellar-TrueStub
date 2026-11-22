@@ -76,23 +76,23 @@ async function fetchEscrows(where: Record<string, unknown>): Promise<EscrowRow[]
   return rows;
 }
 
-function currencyOf(row: EscrowRow): string {
+export function currencyOf(row: EscrowRow): string {
   const currency = row.currency?.trim().toUpperCase();
   return currency ? currency : UNKNOWN_CURRENCY;
 }
 
-function amountOf(row: EscrowRow): number {
+export function amountOf(row: EscrowRow): number {
   if (!DOLLAR_DENOMINATED_CURRENCIES.has(row.currency?.toUpperCase() ?? "")) return 0;
   const amount = Number(row.amount);
   return Number.isFinite(amount) ? amount : 0;
 }
 
-function rawAmountOf(row: EscrowRow): number {
+export function rawAmountOf(row: EscrowRow): number {
   const amount = Number(row.amount);
   return Number.isFinite(amount) ? amount : 0;
 }
 
-function releaseDurationHours(row: EscrowRow): number | null {
+export function releaseDurationHours(row: EscrowRow): number | null {
   if (!COMPLETED_STATUSES.has(row.status.toLowerCase()) || !row.released_at) return null;
   const createdAt = new Date(row.created_at).getTime();
   const releasedAt = new Date(row.released_at).getTime();
