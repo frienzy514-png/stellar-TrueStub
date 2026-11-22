@@ -60,6 +60,7 @@ This pull request will **close # [Issue Number]** upon merging.
 - [ ] My branch is up to date with `main` and there are no unresolved conflicts.
 - [ ] I have run the relevant workspace checks (`lint`, `typecheck`, `test`) locally and they pass.
 - [ ] I have filled in the Summary of Changes and linked the related issue above.
+- [ ] If this PR adds a service with its own in-memory store (`new Map(...)`, `new Set(...)`, etc.) for data that must survive a restart or be shared across instances, I have justified why, or used a persistent store instead.
 
 ### 🗄️ Database Migration Check
 

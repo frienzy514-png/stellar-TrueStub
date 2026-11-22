@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseIpAllowlist } from "../lib/ipAllowlist";
 
 /**
  * Environment validation schema for TrueStub backend.
@@ -28,6 +29,22 @@ export const envSchema = z.object({
 
   // Roadmap variables for upcoming route migrations (optional until routes land)
   TRUSTLESS_WORK_WEBHOOK_SECRET: z.string().min(1).optional(),
+  // Optional comma-separated IPs/CIDRs allowed to call /webhooks/escrow-status
+  // (#532). Defense-in-depth only — HMAC is always enforced. Unset = no IP check.
+  TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS: z
+    .string()
+    .optional()
+    .superRefine((val, ctx) => {
+      if (val === undefined) return;
+      try {
+        parseIpAllowlist(val);
+      } catch (err) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: err instanceof Error ? err.message : "Invalid IP allowlist",
+        });
+      }
+    }),
   FIREBASE_PROJECT_ID: z.string().min(1).optional(),
   FIREBASE_CLIENT_EMAIL: z.string().email().optional(),
   FIREBASE_PRIVATE_KEY: z.string().min(1).optional(),
@@ -114,9 +131,20 @@ export type Env = z.infer<typeof envSchema>;
  * default behaviour instead of failing URL/min-length validation.
  */
 export function validateEnv(rawEnv: NodeJS.ProcessEnv = process.env): Env {
-  const nonEmpty = Object.fromEntries(
+  const nonEmpty: Record<string, string | undefined> = Object.fromEntries(
     Object.entries(rawEnv).filter(([, value]) => value !== undefined && value.trim() !== "")
   );
+
+  // Legacy alias (#534): CONTRIBUTING.md, docs/DATABASE.md and the mainnet
+  // checklist historically told contributors to set `HASURA_ADMIN_SECRET`,
+  // but the Hasura client only reads `HASURA_GRAPHQL_ADMIN_SECRET` (the name
+  // Hasura and docker-compose use). Without this, a backend configured from
+  // those docs boots fine and then fails every Hasura request. The canonical
+  // name always wins when both are set.
+  if (!nonEmpty.HASURA_GRAPHQL_ADMIN_SECRET && nonEmpty.HASURA_ADMIN_SECRET) {
+    nonEmpty.HASURA_GRAPHQL_ADMIN_SECRET = nonEmpty.HASURA_ADMIN_SECRET;
+  }
+
   const result = envSchema.safeParse(nonEmpty);
 
   if (!result.success) {
@@ -125,6 +153,17 @@ export function validateEnv(rawEnv: NodeJS.ProcessEnv = process.env): Env {
       .join("\n");
 
     const fullMessage = `❌ Invalid environment variables:\n${errorMessages}`;
+    console.error(fullMessage);
+    throw new Error(fullMessage);
+  }
+
+  // #558 — the CORS schema default is the local dev origin. In production that
+  // default must never apply silently, so refuse to boot unless CORS_ORIGINS is
+  // set explicitly.
+  if (result.data.NODE_ENV === "production" && nonEmpty.CORS_ORIGINS === undefined) {
+    const fullMessage =
+      "❌ Invalid environment variables:\n" +
+      "  - CORS_ORIGINS: must be set explicitly when NODE_ENV=production (the localhost default is not allowed in production)";
     console.error(fullMessage);
     throw new Error(fullMessage);
   }

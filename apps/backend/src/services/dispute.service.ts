@@ -84,7 +84,9 @@
 
 import { AppError } from "../middleware/errorHandler";
 import { ChangelogService } from "./changelog.service";
-import { getRequestId } from "../middleware/requestLogger";
+import { DISPUTE_EVENT_ENTRY_TYPES } from "./changelog-taxonomy";
+import { getCorrelationId as getRequestId } from "../middleware/requestLogger";
+import { HasuraService, type DisputeRow } from "./hasura.service";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -241,33 +243,72 @@ export interface DisputeStore {
   set(disputeId: string, dispute: Dispute): Promise<void>;
   listByEscrow(escrowId: string): Promise<Dispute[]>;
   listAll?(): Promise<Dispute[]>;
+  /**
+   * Atomically inserts a dispute, returning `false` when it already exists.
+   * Database-backed stores rely on the primary-key constraint; the optional
+   * method keeps the interface usable by simple test doubles.
+   */
+  insertIfAbsent?(disputeId: string, dispute: Dispute): Promise<boolean>;
 }
 
-export class InMemoryDisputeStore implements DisputeStore {
-  private readonly store = new Map<string, Dispute>();
+/** Maps a Postgres/Hasura `disputes` row to the domain shape (#515). */
+function rowToDispute(row: DisputeRow): Dispute {
+  return {
+    disputeId: row.dispute_id,
+    escrowId: row.escrow_id,
+    raisedBy: row.raised_by,
+    reason: row.reason,
+    state: row.state as DisputeState,
+    openedAt: row.opened_at,
+    updatedAt: row.updated_at,
+    ...(row.escalated_at ? { escalatedAt: row.escalated_at } : {}),
+    ...(row.resolved_at ? { resolvedAt: row.resolved_at } : {}),
+    ...(row.resolution ? { resolution: row.resolution } : {}),
+  };
+}
 
+function disputeToRow(dispute: Dispute): DisputeRow {
+  return {
+    dispute_id: dispute.disputeId,
+    escrow_id: dispute.escrowId,
+    raised_by: dispute.raisedBy,
+    reason: dispute.reason,
+    state: dispute.state,
+    opened_at: dispute.openedAt,
+    updated_at: dispute.updatedAt,
+    escalated_at: dispute.escalatedAt ?? null,
+    resolved_at: dispute.resolvedAt ?? null,
+    resolution: dispute.resolution ?? null,
+  };
+}
+
+/**
+ * Postgres-backed dispute store. Every read and write goes through
+ * `HasuraService` → `lib/hasura.ts` → Postgres, so dispute state survives a
+ * restart and is shared by every backend instance (#515).
+ */
+export class PostgresDisputeStore implements DisputeStore {
   async get(disputeId: string): Promise<Dispute | undefined> {
-    return this.store.get(disputeId);
+    const row = await HasuraService.getDispute(disputeId);
+    return row ? rowToDispute(row) : undefined;
   }
 
-  async set(disputeId: string, dispute: Dispute): Promise<void> {
-    this.store.set(disputeId, dispute);
+  async set(_disputeId: string, dispute: Dispute): Promise<void> {
+    await HasuraService.upsertDispute(disputeToRow(dispute));
+  }
+
+  async insertIfAbsent(_disputeId: string, dispute: Dispute): Promise<boolean> {
+    return HasuraService.insertDisputeIfAbsent(disputeToRow(dispute));
   }
 
   async listByEscrow(escrowId: string): Promise<Dispute[]> {
-    const results: Dispute[] = [];
-    for (const d of this.store.values()) {
-      if (d.escrowId === escrowId) results.push(d);
-    }
-    return results;
+    const rows = await HasuraService.listDisputesByEscrow(escrowId);
+    return rows.map(rowToDispute);
   }
 
   async listAll(): Promise<Dispute[]> {
-    return Array.from(this.store.values());
-  }
-
-  get size(): number {
-    return this.store.size;
+    const rows = await HasuraService.listDisputes();
+    return rows.map(rowToDispute);
   }
 }
 
@@ -282,7 +323,7 @@ export class DisputeService {
   private readonly locks = new Map<string, Promise<void>>();
 
   constructor(
-    private readonly store: DisputeStore = new InMemoryDisputeStore(),
+    private readonly store: DisputeStore = new PostgresDisputeStore(),
     private readonly changelog: ChangelogService = new ChangelogService()
   ) {}
 
@@ -315,12 +356,15 @@ export class DisputeService {
    *
    * Duplicate `disputeId` values are rejected with DISPUTE_ALREADY_EXISTS (409).
    */
-  async openDispute(payload: {
-    disputeId: string;
-    escrowId: string;
-    raisedBy: string;
-    reason: string;
-  }): Promise<Dispute> {
+  async openDispute(
+    payload: {
+      disputeId: string;
+      escrowId: string;
+      raisedBy: string;
+      reason: string;
+    },
+    _options: { requestId?: string } = {}
+  ): Promise<Dispute> {
     const { disputeId, escrowId, raisedBy, reason } = payload;
 
     if (!disputeId || !escrowId || !raisedBy || !reason) {
@@ -344,15 +388,6 @@ export class DisputeService {
   }): Promise<Dispute> {
     const { disputeId, escrowId, raisedBy, reason } = payload;
 
-    const existing = await this.store.get(disputeId);
-    if (existing) {
-      throw new AppError(
-        409,
-        DISPUTE_ERROR_CODES.ALREADY_EXISTS,
-        `Dispute ${disputeId} already exists with state: ${existing.state}`
-      );
-    }
-
     const now = new Date().toISOString();
     const dispute: Dispute = {
       disputeId,
@@ -364,7 +399,29 @@ export class DisputeService {
       updatedAt: now,
     };
 
-    await this.store.set(disputeId, dispute);
+    if (this.store.insertIfAbsent) {
+      // Insert-first: the primary key is the authoritative duplicate guard,
+      // so two instances cannot both open the same dispute.
+      const inserted = await this.store.insertIfAbsent(disputeId, dispute);
+      if (!inserted) {
+        const existing = await this.store.get(disputeId);
+        throw new AppError(
+          409,
+          DISPUTE_ERROR_CODES.ALREADY_EXISTS,
+          `Dispute ${disputeId} already exists with state: ${existing?.state ?? "unknown"}`
+        );
+      }
+    } else {
+      const existing = await this.store.get(disputeId);
+      if (existing) {
+        throw new AppError(
+          409,
+          DISPUTE_ERROR_CODES.ALREADY_EXISTS,
+          `Dispute ${disputeId} already exists with state: ${existing.state}`
+        );
+      }
+      await this.store.set(disputeId, dispute);
+    }
 
     // Correlation: every log line / changelog entry produced while handling
     // this request carries the originating request ID (issue #425).
@@ -393,7 +450,7 @@ export class DisputeService {
   async transition(
     disputeId: string,
     event: DisputeEvent,
-    opts?: { resolution?: string }
+    opts?: { resolution?: string; requestId?: string }
   ): Promise<Dispute> {
     if (!disputeId) {
       throw new AppError(400, DISPUTE_ERROR_CODES.INVALID_PAYLOAD, "disputeId is required");
@@ -491,12 +548,18 @@ export class DisputeService {
   }
 
   /** Returns the current state without side effects. */
-  async getDispute(disputeId: string): Promise<Dispute | undefined> {
+  async getDispute(
+    disputeId: string,
+    _options: { requestId?: string } = {}
+  ): Promise<Dispute | undefined> {
     return this.store.get(disputeId);
   }
 
   /** Lists all disputes for an escrow. */
-  async listDisputesByEscrow(escrowId: string): Promise<Dispute[]> {
+  async listDisputesByEscrow(
+    escrowId: string,
+    _options: { requestId?: string } = {}
+  ): Promise<Dispute[]> {
     return this.store.listByEscrow(escrowId);
   }
 
@@ -532,7 +595,10 @@ export class DisputeService {
   }
 
   /** Lists every dispute currently in `state`. */
-  async listDisputesByState(state: DisputeState): Promise<Dispute[]> {
+  async listDisputesByState(
+    state: DisputeState,
+    _options: { requestId?: string } = {}
+  ): Promise<Dispute[]> {
     const all = this.store.listAll ? await this.store.listAll() : await this.collectAll();
     return all.filter((d) => d.state === state);
   }
@@ -545,7 +611,10 @@ export class DisputeService {
    * transition — `resolvedAt` for RESOLVED, `updatedAt` for WITHDRAWN (the
    * only transition out of a final state is the one that entered it).
    */
-  async getMetrics(range: { from?: Date; to?: Date } = {}): Promise<DisputeMetrics> {
+  async getMetrics(
+    range: { from?: Date; to?: Date } = {},
+    _options: { requestId?: string } = {}
+  ): Promise<DisputeMetrics> {
     const all = this.store.listAll ? await this.store.listAll() : await this.collectAll();
     const fromMs = range.from?.getTime() ?? -Infinity;
     const toMs = range.to?.getTime() ?? Infinity;

@@ -5,6 +5,8 @@ production incidents. Each runbook is self-contained: an on-call person with
 no prior context on this codebase should be able to follow it.
 
 - [Stuck or failed refunds](#stuck-or-failed-refunds)
+- [Double refund detected](#double-refund-detected)
+- [Lost dispute state after a restart](#lost-dispute-state-after-a-restart)
 
 _Last checked against the code: 2026-10-18 (`apps/backend/src/routes/refunds.ts`,
 `apps/backend/src/services/refund.service.ts`,
@@ -219,3 +221,113 @@ waiting on Trustless Work.
 | `409` with `status: "failed"` | Retry with a **new** `refundId` after step 3 and the step 4 checklist. |
 | Stuck `pending` | Check the chain, wait, check again. Don't retry while the request may still be in flight. |
 | `404` from the status endpoint | Backend restarted or the request reached a different replica. Use the chain. |
+
+---
+
+## Double refund detected
+
+Idempotency for refund claims is held in memory by `InMemoryRefundStore`
+(`apps/backend/src/services/refund.service.ts`). A replica restart, a
+redeploy, or two replicas racing past the check can let the same escrow be
+refunded twice. Treat any suspected double refund as an incident.
+
+### 1. Detect
+
+- **Chain check (authoritative):** list the on-chain `resolve-dispute`
+  transactions for each affected `escrowId` on Stellar Expert. Two
+  successful refund transactions for one escrow, or two transfers to the
+  buyer's `refundTo` address for the same disputed amount, confirm the event.
+- **Backend signal:** two `POST /api/refunds/claim` requests for the same
+  escrow with different `refundId` values in the request logs, both returning
+  `2xx` or `502` with a `txHash`.
+- **Balance check:** the escrow balance is lower than the disputed amount
+  and the buyer's account received more than once.
+
+### 2. Notify
+
+- Page the on-call engineer and the platform owner immediately.
+- Notify the disputing parties (buyer and seller) through the usual support
+  channel once the duplicate is confirmed, with the transaction hashes.
+- Record the incident in the team's incident log with the affected
+  `escrowId`s, `refundId`s and `txHash`es.
+
+### 3. Stop further damage
+
+- Pause new refund claims for the affected escrows. Do not retry any
+  `pending` or `failed` claim until the chain has been checked (see
+  [Stuck or failed refunds](#stuck-or-failed-refunds), step 3).
+- If the problem comes from a replica race, scale to a single replica until
+  a persistent or shared idempotency store is in place.
+
+### 4. Remediate
+
+Choose one per affected escrow, with the parties' agreement:
+
+- **Claw-back request:** ask the buyer to return the duplicate amount to the
+  escrow or platform wallet, and record the agreed transaction hash.
+- **Write-off:** if the buyer cannot or will not return the funds, the
+  platform absorbs the loss. Record the amount and get sign-off from the
+  platform owner.
+- **Insurance:** if platform insurance covers the loss, follow the claim
+  process and keep the evidence (transaction hashes, logs).
+
+### 5. Correct the escrow state
+
+- Confirm on-chain that the escrow balance and status match the agreed
+  outcome. The chain is the source of truth, not the API.
+- Do **not** edit in-memory claim records by hand. Any correction is an
+  on-chain or ledger-backed record, and a backend restart clears the
+  in-memory map anyway.
+- Document the final settled amount and the closing transaction hash in the
+  incident log.
+
+### 6. Follow up
+
+- Add a regression test for the race or restart path that caused the
+  duplicate before closing the incident.
+- Track the move to a persistent refund idempotency store as the root fix.
+
+---
+
+## Lost dispute state after a restart
+
+Dispute records are held in `InMemoryDisputeStore`
+(`apps/backend/src/services/dispute.service.ts`). A restart or redeploy
+while disputes are open erases them from the backend. The escrows still
+exist on-chain, so the funds are safe, but the platform no longer knows
+which disputes were open.
+
+### 1. Identify affected escrows
+
+- Find the restart time from the deploy log or the process start log.
+- Find every dispute opened before that time whose escrow is still in
+  dispute on-chain. Use the Trustless Work API to read the escrow status,
+  because the backend no longer has the dispute record.
+- Keep the list of `escrowId`s, the parties, and the dispute open time.
+
+### 2. Communicate with affected users
+
+- Contact each buyer and seller on the list through the support channel.
+  Tell them the dispute is still open on-chain, that the platform lost its
+  local record during maintenance, and that their case is not closed.
+- Ask them to confirm the facts of their dispute and any evidence they
+  already submitted, and tell them what to expect next.
+- Do not promise an outcome until the manual remediation below is complete.
+
+### 3. Manual remediation until persistence lands
+
+- Re-create the dispute decision manually from the escrow state on-chain and
+  the parties' confirmed evidence.
+- Resolve each escrow through the normal resolver flow, using the dispute
+  resolver key, and record the transaction hash against the escrow.
+- Log every manual action in the incident log with the operator's name,
+  time, and reason.
+
+### 4. Close out
+
+- Confirm every escrow on the list is either resolved on-chain or back in an
+  agreed state.
+- Tell the affected users the outcome in writing.
+- Track persistence for dispute records as the root fix. Until it ships, use
+  [Pre-restart checklist](DEPLOYMENT.md#pre-restart-checklist) before every
+  restart.
