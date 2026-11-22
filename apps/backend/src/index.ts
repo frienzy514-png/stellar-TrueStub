@@ -25,6 +25,9 @@ import { adminUsersRouter } from "./routes/admin-users";
 // Issue #630 — platform-wide operator analytics (admin-only by design)
 import { analyticsRouter } from "./routes/analytics";
 import { startDisputeResolverBalanceMonitor } from "./services/dispute-resolver-balance.service";
+import { assertFirebaseAdminConfigured } from "./config/firebase-startup-check";
+import { assertDatabaseReachable } from "./config/database-startup-check";
+import { warnIfTrustlessWorkUnconfigured } from "./config/trustless-work-startup-check";
 import { runStartupChecks } from "./lib/startup-checks";
 
 // Initialise Sentry exactly once, before the app is created (#260). All Sentry
@@ -82,27 +85,37 @@ async function startServer(): Promise<void> {
     process.exit(1);
   }
 
-  app.listen(env.PORT, () => {
-    logger.info({ port: env.PORT, env: env.NODE_ENV }, "TrueStub backend listening");
+  // #567 — fail fast when Firebase Admin credentials are present but broken.
+  assertFirebaseAdminConfigured()
+    .then(() => assertDatabaseReachable())
+    .then(() => {
+      warnIfTrustlessWorkUnconfigured();
+      app.listen(env.PORT, () => {
+        logger.info({ port: env.PORT, env: env.NODE_ENV }, "TrueStub backend listening");
 
-    // #518 — prune old webhook delivery dedup rows on a schedule instead of
-    // evicting them from an in-process Map.
-    startProcessedWebhookEventCleanup();
+        // #518 — prune old webhook delivery dedup rows on a schedule instead of
+        // evicting them from an in-process Map.
+        startProcessedWebhookEventCleanup();
 
-    // #420 — Periodically check the dispute-resolver wallet balance so a low
-    // balance alerts before it causes a failed refund.
-    if (env.DISPUTE_RESOLVER_WALLET_ADDRESS) {
-      startDisputeResolverBalanceMonitor();
-      logger.info(
-        { walletAddress: env.DISPUTE_RESOLVER_WALLET_ADDRESS },
-        "Dispute-resolver balance monitor started",
-      );
-    } else {
-      logger.warn(
-        "Dispute-resolver balance monitor not started: DISPUTE_RESOLVER_WALLET_ADDRESS is not configured",
-      );
-    }
-  });
+        // #420 — Periodically check the dispute-resolver wallet balance so a low
+        // balance alerts before it causes a failed refund.
+        if (env.DISPUTE_RESOLVER_WALLET_ADDRESS) {
+          startDisputeResolverBalanceMonitor();
+          logger.info(
+            { walletAddress: env.DISPUTE_RESOLVER_WALLET_ADDRESS },
+            "Dispute-resolver balance monitor started",
+          );
+        } else {
+          logger.warn(
+            "Dispute-resolver balance monitor not started: DISPUTE_RESOLVER_WALLET_ADDRESS is not configured",
+          );
+        }
+      });
+    })
+    .catch((error) => {
+      logger.fatal({ err: error }, "Startup connectivity check failed");
+      process.exit(1);
+    });
 }
 
 if (require.main === module) {
