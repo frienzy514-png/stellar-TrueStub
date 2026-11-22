@@ -58,3 +58,6 @@ deploy-migrations.log
 
 # additional snapshot formats (e.g. Vitest inline snapshots)
 *.snap
+
+**/__snapshots__/
+**/*.snap
