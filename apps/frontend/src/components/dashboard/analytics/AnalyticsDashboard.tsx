@@ -86,7 +86,10 @@ export const AnalyticsDashboard: React.FC = () => {
 
   if (error) {
     return (
-      <Card className="p-8 border-destructive/20 bg-destructive/5">
+      <Card
+        data-testid="analytics-error-state"
+        className="p-8 border-destructive/20 bg-destructive/5"
+      >
         <div className="text-center">
           <h2 className="text-xl font-semibold text-destructive mb-2">
             Error Loading Analytics
