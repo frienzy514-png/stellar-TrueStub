@@ -9,18 +9,46 @@
 
 import {
   DisputeService,
-  InMemoryDisputeStore,
   DISPUTE_ERROR_CODES,
   DISPUTE_TRANSITIONS,
   FINAL_STATES,
   resolveTransition,
-  type DisputeState,
+  type Dispute,
   type DisputeEvent,
+  type DisputeState,
+  type DisputeStore,
 } from "./dispute.service";
 import { AppError } from "../middleware/errorHandler";
 
+/** Test-only store; production uses PostgresDisputeStore. */
+class TestDisputeStore implements DisputeStore {
+  private readonly store = new Map<string, Dispute>();
+
+  async get(disputeId: string): Promise<Dispute | undefined> {
+    return this.store.get(disputeId);
+  }
+
+  async set(disputeId: string, dispute: Dispute): Promise<void> {
+    this.store.set(disputeId, dispute);
+  }
+
+  async insertIfAbsent(disputeId: string, dispute: Dispute): Promise<boolean> {
+    if (this.store.has(disputeId)) return false;
+    this.store.set(disputeId, dispute);
+    return true;
+  }
+
+  async listByEscrow(escrowId: string): Promise<Dispute[]> {
+    return [...this.store.values()].filter((d) => d.escrowId === escrowId);
+  }
+
+  async listAll(): Promise<Dispute[]> {
+    return [...this.store.values()];
+  }
+}
+
 function makeService() {
-  const store = new InMemoryDisputeStore();
+  const store = new TestDisputeStore();
   return { service: new DisputeService(store), store };
 }
 
@@ -343,7 +371,7 @@ describe("dispute-to-refund end-to-end flow (#340)", () => {
   }
 
   function makeFlow() {
-    const disputeStore = new InMemoryDisputeStore();
+    const disputeStore = new TestDisputeStore();
     const disputeService = new DisputeService(disputeStore);
     const escrowStore = new InMemoryEscrowStore();
     const refundStore = new InMemoryRefundStore();
