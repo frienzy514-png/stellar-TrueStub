@@ -43,8 +43,10 @@ different in this way.
 Both are also exposed at the repo root (`yarn migrate:up`,
 `yarn migrate:up:audited`).
 
-> **Migration file count**: There are **8 migration files** covering version
-> numbers 001–007. Two files share the `007` prefix
+> **Migration file count**: There are **13 migration files** covering version
+> numbers 001–012 (010 and 012 persist dispute/transfer/webhook-dedup state
+> and audit row changes respectively; 011 verifies `events` key integrity).
+> Two files share the `007` prefix
 > (`007_add_idempotency_unique_constraints.sql` and
 > `007_create_notification_dead_letters.sql`). `node-pg-migrate` applies them
 > in filename-alphabetical order, so `007_add_idempotency…` runs before
@@ -70,6 +72,9 @@ Both are also exposed at the repo root (`yarn migrate:up`,
 
 Migration `006_normalize_events_primary_key.sql` renames the legacy primary-key
 constraint to `events_pkey` where required; it does not create a table.
+Migration `011_verify_events_key_integrity.sql` re-checks the `events` primary
+key and every foreign key that references `events` or a legacy `hotels` table;
+see [Events key and foreign-key integrity](#events-key-and-foreign-key-integrity).
 
 ### Rolling back
 
@@ -122,6 +127,97 @@ has been checked yet, so every row starts as pending.
 CI's Postgres service starts empty on every run, so it applies `006` every
 time and doesn't need a row.
 
+### Events key and foreign-key integrity
+
+The rename history (`002`, the now no-op `003`, and the corrective `006`)
+means an environment could, in principle, have ended up with a missing or
+misnamed `events` primary key, an unvalidated foreign key into `events`, or a
+foreign key still pointing at a leftover `hotels` table (issue #542).
+
+`011_verify_events_key_integrity.sql` runs as part of `migrate:up` and:
+
+- **fails** if `events` has no primary key, or if any foreign key into
+  `events` has dangling rows (it runs `VALIDATE CONSTRAINT` on every
+  unvalidated FK, so orphaned rows abort the migration with the constraint
+  name);
+- **fixes** a leftover `hotels_pkey` name (same fix as `006`, applied again in
+  case `006` was recorded without effect);
+- **reports** a leftover `hotels` table, FKs that still target `hotels`, and
+  FK names that still contain "hotel", by writing a row to
+  `migration_verification_reports` (`migration =
+  '011_verify_events_key_integrity'`) and a `NOTICE` in the migrate output.
+
+`ticket_listings` does **not** have a foreign key to `events`. Migration `004`
+gives listings their own `name` / `location` columns and never declares
+`event_id`. `011` records whether an `event_id` column has appeared since
+then. If it has and isn't constrained, the status is `needs_review`.
+
+To check an environment without migrating it, use sections 6–9 of the
+read-only script (`integrity_verdict` should be `INTACT`):
+
+```bash
+psql "$DATABASE_URL" -f apps/backend/scripts/check-migration-state.sql
+```
+
+After `migrate:up`, the stored result is:
+
+```sql
+SELECT checked_at, details
+FROM migration_verification_reports
+WHERE migration = '011_verify_events_key_integrity'
+ORDER BY checked_at DESC LIMIT 1;
+```
+
+Record each environment below. On a fresh CI database, `events` either
+doesn't exist (`skipped`) or has no inbound FKs (`consistent`).
+
+| Environment | Checked on | `events` PK | FKs into `events` (all validated?) | FKs into `hotels` | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| Staging | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| Deployed previews (each one that has its own database) | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| Shared local/dev databases used for testing | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| Production (if any) | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+
+### Cross-environment migration history audit
+
+Because of earlier migration-number collisions and the divergent rename
+migrations, don't assume every environment has run the same migrations in
+the same order (issue #543). Compare them directly:
+
+```bash
+OUT_DIR=./migration-audit apps/backend/scripts/compare-migration-history.sh \
+  staging="$STAGING_DATABASE_URL" \
+  production="$PRODUCTION_DATABASE_URL"
+  # add one NAME=URL per deployed preview / shared dev database
+```
+
+The script only needs `psql` and only reads data. For each environment, it
+reads `pgmigrations` in the order the migrations were applied. Then it
+reports:
+
+- **not applied**: a file is in the repository but missing from `pgmigrations`.
+  Fix it with `migrate:up`.
+- **unknown**: a row is in `pgmigrations` but no file matches it, usually a
+  migration that was renamed or removed. Reconcile the row by hand.
+- **recorded more than once**
+- **out of order**: the applied sequence doesn't follow repository order
+  (`--check-order` would refuse to migrate this environment).
+- **pairwise differences** between environments.
+
+It ends with `VERDICT: CONSISTENT` (exit 0) or `VERDICT: DISCREPANCIES FOUND`
+(exit 1). Keep the per-environment dumps in `OUT_DIR` with the audit record.
+
+| Environment | Audited on | Migrations applied | Last applied | Discrepancies | Resolved by |
+| --- | --- | --- | --- | --- | --- |
+| Staging | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| Deployed previews (each one that has its own database) | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| Shared local/dev databases used for testing | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| Production (if any) | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+
+**Overall result:** _pending_. Set this to "consistent" once every row above
+is filled in and the script exits 0 across all environments in a single
+run.
+
 ## Row-level change auditing
 
 The write-once changelog only records events the application chooses to write.
@@ -131,8 +227,11 @@ that record every change to the money-critical tables at the database level,
 whatever made the change (issue #546).
 
 - **Covered tables:** `disputes`, `ownership_transfers`, `transfers`, `refunds`.
-  The trigger is attached only to the ones that exist when `012` runs. Disputes
-  and transfers are still in memory, and `refunds` is Hasura-managed.
+  The trigger is attached only to the ones that exist when `012` runs.
+  `disputes` and `ownership_transfers` are created by migration `010` (which
+  runs first), so both are audited from a fresh `migrate:up`. `transfers` has
+  no persistence migration yet, and `refunds` is Hasura-managed, so neither
+  gets a trigger until a migration creates the table.
 - **When a persistence migration creates one of these tables, it must attach
   the audit** in the same migration:
 

@@ -81,6 +81,40 @@ choice) since the workspace is a plain `tsc`-built Express app:
    `BACKEND_HEALTH_URL` repository variable so
    `.github/workflows/backend-uptime.yml` can monitor it.
 
+### Replica count
+
+Run **exactly one** backend instance until the persistence work lands.
+`DisputeService`, `ChangelogService` and the refund/transfer idempotency
+caches still keep their state in per-process memory, so a second replica
+would see a different set of disputes and audit entries, and two requests
+for the same dispute could be accepted by different replicas (issues #540,
+#541).
+
+This is enforced, not just documented:
+
+- `docker-compose.yml` sets `deploy.replicas` from `BACKEND_REPLICAS`, which
+  defaults to `1`.
+- The backend validates `BACKEND_REPLICAS` at startup
+  (`apps/backend/src/config/env.ts`). Any value above `1` makes it exit with
+  an error unless `ALLOW_UNSAFE_MULTI_INSTANCE=true` is also set.
+
+On any other platform (Render, Railway, Fly.io, Kubernetes, …), keep the
+platform's instance/replica count at 1, turn off autoscaling, and set
+`BACKEND_REPLICAS` to the same value as the platform's instance count so the
+startup guard sees it.
+
+To scale out anyway, set **both** variables and accept that in-memory state
+will diverge between replicas:
+
+```bash
+BACKEND_REPLICAS=2 ALLOW_UNSAFE_MULTI_INSTANCE=true docker compose up
+```
+
+(With compose you also need to remove the fixed `4000:4000` host port
+mapping, because two containers can't bind the same host port.) Remove this
+section and the guard once dispute, changelog and idempotency state are
+backed by Postgres.
+
 Because most Node hosts build from a subdirectory the same way Vercel does,
 whichever platform you pick will need the same "root directory /
 monorepo-aware install" configuration described for the frontend above —
