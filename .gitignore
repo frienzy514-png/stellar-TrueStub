@@ -58,3 +58,9 @@ deploy-migrations.log
 
 # additional snapshot formats (e.g. Vitest inline snapshots)
 *.snap
+
+# additional build / test artefacts (shared across workspaces)
+*.tsbuildinfo
+*.log
+storybook-static/
+.firebase/

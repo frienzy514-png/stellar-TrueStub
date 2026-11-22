@@ -22,6 +22,7 @@ import { disputesRouter } from "./routes/disputes";
 // Issue #240 — account deletion / anonymization
 import { usersRouter } from "./routes/users";
 import { adminUsersRouter } from "./routes/admin-users";
+import { recoveryCodesRouter } from "./routes/recovery-codes";
 import { startDisputeResolverBalanceMonitor } from "./services/dispute-resolver-balance.service";
 
 // Initialise Sentry exactly once, before the app is created (#260). All Sentry
