@@ -23,13 +23,19 @@ import { logger } from '../lib/logger';
  *   2. As a standalone script that diffs `pgmigrations` before/after, or that
  *      accepts an explicit list of applied migrations:
  *
- *        ts-node migrationAudit.ts --before
- *        ts-node migrationAudit.ts --after
- *        ts-node migrationAudit.ts --applied 1700000000000_name,1700000000001_other
+ *        tsx src/db/migrationAudit.ts --before
+ *        tsx src/db/migrationAudit.ts --after
+ *        tsx src/db/migrationAudit.ts --applied 1700000000000_name,1700000000001_other
  */
 
 const AUDIT_TABLE = 'migration_audit_log';
 const DEFAULT_LOG_FILE = 'deploy-migrations.log';
+/**
+ * Baseline written by `--before` and consumed (then removed) by `--after`, so
+ * the audited migration script (`yarn migrate:up:audited`) records exactly the
+ * migrations applied by that run rather than every migration ever applied.
+ */
+export const BASELINE_FILE = '.migration-audit-before.json';
 
 export interface MigrationAuditRecord {
   /** Release/deploy identifier, e.g. "1.4.2" or a CI build number. */
@@ -405,7 +411,9 @@ function parseArgs(argv: string[]): {
  * Standalone entry point. Intended to be invoked alongside node-pg-migrate,
  * e.g.:
  *
- *   node-pg-migrate up && ts-node migrationAudit.ts --after
+ *   yarn migrate:up:audited
+ *
+ * which runs `--before`, `node-pg-migrate up`, then `--after`.
  */
 export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
   const { mode, applied, options } = parseArgs(argv);
@@ -423,15 +431,24 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
       return;
     }
 
+    const baselineFile = path.resolve(process.cwd(), BASELINE_FILE);
+
     if (mode === 'before') {
       const before = await readAppliedMigrations(pool);
-      logger.info('migration audit baseline', { before, count: before.length });
+      // Persist the baseline so the matching `--after` run can diff against it
+      // (issue #544: without this, `--after` always fell back to recording
+      // every migration ever applied).
+      await fs.writeFile(
+        baselineFile,
+        JSON.stringify({ capturedAt: new Date().toISOString(), migrations: before }, null, 2),
+        'utf8',
+      );
+      logger.info('migration audit baseline', { before, count: before.length, baselineFile });
       return;
     }
 
     // mode === 'after' or 'record': diff against the baseline file if present,
     // otherwise record the full current set of applied migrations.
-    const baselineFile = path.resolve(process.cwd(), '.migration-audit-before.json');
     let before: string[] = [];
     try {
       const raw = await fs.readFile(baselineFile, 'utf8');
@@ -445,6 +462,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     const newlyApplied = diffMigrations(before, after);
     const record = buildAuditRecord(newlyApplied, options);
     await writeMigrationAudit(record, options, pool);
+    // Remove the consumed baseline so a stale one can't skew the next run.
+    await fs.rm(baselineFile, { force: true });
   } finally {
     await pool.end();
   }

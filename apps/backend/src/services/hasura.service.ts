@@ -352,6 +352,32 @@ export class HasuraService {
     return data.escrow_transactions ?? [];
   }
 
+  /**
+   * Returns the recorded escrow amount for a Trustless Work contract id, or
+   * null if no escrow row exists. Used to validate refund amounts locally
+   * before calling Trustless Work (#537).
+   */
+  static async getEscrowAmountByContractId(
+    contractId: string,
+    options: HasuraRequestOptions = {}
+  ): Promise<number | null> {
+    const query = `
+      query EscrowAmountByContractId($contractId: String!) {
+        escrow_transactions(where: { contract_id: { _eq: $contractId } }, limit: 1) {
+          amount
+        }
+      }
+    `;
+
+    const data = await hasuraClient.request<{ escrow_transactions?: Array<{ amount: number | string }> }>(
+      query,
+      { contractId },
+      { requestId: options.requestId ?? getRequestId() }
+    );
+    const row = data.escrow_transactions?.[0];
+    return row ? Number(row.amount) : null;
+  }
+
   static async findLockingEscrowForListing(
     listingId: string,
     options: HasuraRequestOptions = {}
