@@ -13,7 +13,7 @@ import { captureRawBody } from "./middleware/rawBody";
 import { healthRouter } from "./routes/health";
 import { listingsRouter } from "./routes/listings";
 import { savedSearchesRouter, watchlistRouter } from "./routes/listing-alerts";
-import { webhookRouter } from "./routes/webhooks";
+import { startProcessedWebhookEventCleanup, webhookRouter } from "./routes/webhooks";
 // Issues #153–#156
 import { refundsRouter } from "./routes/refunds";
 import { transfersRouter } from "./routes/transfers";
@@ -22,10 +22,13 @@ import { disputesRouter } from "./routes/disputes";
 // Issue #240 — account deletion / anonymization
 import { usersRouter } from "./routes/users";
 import { adminUsersRouter } from "./routes/admin-users";
+// Issue #630 — platform-wide operator analytics (admin-only by design)
+import { analyticsRouter } from "./routes/analytics";
 import { startDisputeResolverBalanceMonitor } from "./services/dispute-resolver-balance.service";
 import { assertFirebaseAdminConfigured } from "./config/firebase-startup-check";
 import { assertDatabaseReachable } from "./config/database-startup-check";
 import { warnIfTrustlessWorkUnconfigured } from "./config/trustless-work-startup-check";
+import { runStartupChecks } from "./lib/startup-checks";
 
 // Initialise Sentry exactly once, before the app is created (#260). All Sentry
 // config lives in lib/sentry.ts.
@@ -59,42 +62,66 @@ export function createApp(): Express {
   // #240 — Account deletion / anonymization
   app.use("/api/users", writeRateLimiter, usersRouter);
   app.use("/api/admin/users", authRateLimiter, requireAdmin, adminUsersRouter);
+  // #630 — `/api/analytics` aggregates every escrow on the platform with no
+  // per-user/tenant filter. That is intentional: it is an operator-only view,
+  // so admin gating is the access control. See docs/ANALYTICS_ACCESS_MODEL.md.
+  app.use("/api/analytics", requireAdmin, analyticsRouter);
   app.use(errorHandler);
   return app;
 }
 
 export const app = createApp();
 
-if (require.main === module) {
-  // Fail fast if the frontend and backend are configured for different Stellar
-  // networks (e.g. frontend on testnet, backend refunds on mainnet).
-  assertNetworkConfigMatches();
+/**
+ * Binds the HTTP port only after the fail-fast startup checks pass (#565, #566).
+ * A failed check exits non-zero so the orchestrator restarts or rolls back
+ * instead of serving traffic against a broken database or Hasura setup.
+ */
+async function startServer(): Promise<void> {
+  try {
+    await runStartupChecks();
+  } catch (err) {
+    logger.fatal({ err }, "Startup check failed; refusing to start the backend");
+    process.exit(1);
+  }
 
   // #567 — fail fast when Firebase Admin credentials are present but broken.
   assertFirebaseAdminConfigured()
     .then(() => assertDatabaseReachable())
     .then(() => {
-  warnIfTrustlessWorkUnconfigured();
-  app.listen(env.PORT, () => {
-    logger.info({ port: env.PORT, env: env.NODE_ENV }, "TrueStub backend listening");
+      warnIfTrustlessWorkUnconfigured();
+      app.listen(env.PORT, () => {
+        logger.info({ port: env.PORT, env: env.NODE_ENV }, "TrueStub backend listening");
 
-    // #420 — Periodically check the dispute-resolver wallet balance so a low
-    // balance alerts before it causes a failed refund.
-    if (env.DISPUTE_RESOLVER_WALLET_ADDRESS) {
-      startDisputeResolverBalanceMonitor();
-      logger.info(
-        { walletAddress: env.DISPUTE_RESOLVER_WALLET_ADDRESS },
-        "Dispute-resolver balance monitor started",
-      );
-    } else {
-      logger.warn(
-        "Dispute-resolver balance monitor not started: DISPUTE_RESOLVER_WALLET_ADDRESS is not configured",
-      );
-    }
-  });
+        // #518 — prune old webhook delivery dedup rows on a schedule instead of
+        // evicting them from an in-process Map.
+        startProcessedWebhookEventCleanup();
+
+        // #420 — Periodically check the dispute-resolver wallet balance so a low
+        // balance alerts before it causes a failed refund.
+        if (env.DISPUTE_RESOLVER_WALLET_ADDRESS) {
+          startDisputeResolverBalanceMonitor();
+          logger.info(
+            { walletAddress: env.DISPUTE_RESOLVER_WALLET_ADDRESS },
+            "Dispute-resolver balance monitor started",
+          );
+        } else {
+          logger.warn(
+            "Dispute-resolver balance monitor not started: DISPUTE_RESOLVER_WALLET_ADDRESS is not configured",
+          );
+        }
+      });
     })
     .catch((error) => {
       logger.fatal({ err: error }, "Startup connectivity check failed");
       process.exit(1);
     });
+}
+
+if (require.main === module) {
+  // Fail fast if the frontend and backend are configured for different Stellar
+  // networks (e.g. frontend on testnet, backend refunds on mainnet).
+  assertNetworkConfigMatches();
+
+  void startServer();
 }

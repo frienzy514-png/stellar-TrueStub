@@ -1,0 +1,64 @@
+name: branch-protection-check
+
+on:
+  schedule:
+    # Every Monday at 07:00 UTC
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-branch-protection:
+    name: Verify main branch protection has not drifted
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Expected settings are documented in docs/branch-protection.md.
+
+    steps:
+      - name: Fetch branch protection for main
+        env:
+          GH_TOKEN: ${{ secrets.BRANCH_PROTECTION_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::BRANCH_PROTECTION_TOKEN secret is not set; cannot verify settings"
+            exit 1
+          fi
+          if ! gh api "repos/${REPO}/branches/main/protection" > protection.json; then
+            echo "::error::Branch protection for main is missing or unreadable"
+            exit 1
+          fi
+
+      - name: Assert expected rules are in place
+        run: |
+          set -euo pipefail
+          FAILED=0
+
+          check() {
+            if [ "$2" != "true" ]; then
+              echo "::error::Drift detected: $1"
+              FAILED=1
+            else
+              echo "OK: $1"
+            fi
+          }
+
+          check "pull requests required before merging" \
+            "$(jq -r 'has("required_pull_request_reviews")' protection.json)"
+          check "required status checks configured" \
+            "$(jq -r '(.required_status_checks.contexts // []) | length > 0' protection.json)"
+          check "branches must be up to date before merging" \
+            "$(jq -r '.required_status_checks.strict // false' protection.json)"
+          check "force pushes blocked" \
+            "$(jq -r '.allow_force_pushes.enabled | not' protection.json)"
+
+          {
+            echo "### Branch protection on main"
+            echo '```json'
+            cat protection.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit "${FAILED}"
