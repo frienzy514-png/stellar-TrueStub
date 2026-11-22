@@ -3,6 +3,8 @@ import {
   assessListingRisk,
   ticketListingFingerprint,
   isActiveListing,
+  evaluateSellerFraudEscalation,
+  SELLER_FRAUD_ESCALATION_THRESHOLDS,
   type TicketListingRiskInput,
 } from "./listing-fraud.service";
 
@@ -196,5 +198,81 @@ describe("listing fraud risk checks", () => {
 
     expect(result.duplicate).toBe(false);
     expect(result.matches).toHaveLength(0);
+  });
+});
+
+describe("evaluateSellerFraudEscalation (#555)", () => {
+  const NOW = new Date("2026-06-01T00:00:00.000Z");
+  const DAY = 24 * 60 * 60 * 1000;
+
+  function high(sellerId: string, daysAgo: number) {
+    return {
+      sellerId,
+      riskLevel: "high" as const,
+      detectedAt: new Date(NOW.getTime() - daysAgo * DAY).toISOString(),
+    };
+  }
+
+  it("takes no action for a seller with no high-risk detections", () => {
+    const result = evaluateSellerFraudEscalation("seller-a", [], NOW);
+    expect(result).toMatchObject({ action: "none", highRiskCount: 0 });
+  });
+
+  it("does not escalate below the review threshold", () => {
+    const detections = [high("seller-a", 1), high("seller-a", 2)];
+    expect(evaluateSellerFraudEscalation("seller-a", detections, NOW).action).toBe("none");
+  });
+
+  it("flags for review at the review threshold", () => {
+    const detections = [high("seller-a", 1), high("seller-a", 2), high("seller-a", 3)];
+    expect(evaluateSellerFraudEscalation("seller-a", detections, NOW)).toMatchObject({
+      action: "flag_for_review",
+      highRiskCount: 3,
+    });
+  });
+
+  it("holds new listings at the suspend threshold", () => {
+    const detections = [1, 2, 3, 4, 5].map((d) => high("seller-a", d));
+    expect(evaluateSellerFraudEscalation("seller-a", detections, NOW)).toMatchObject({
+      action: "suspend_pending_review",
+      highRiskCount: 5,
+    });
+  });
+
+  it("ignores detections for other sellers", () => {
+    const detections = [high("seller-b", 1), high("seller-b", 2), high("seller-b", 3), high("seller-b", 4), high("seller-b", 5)];
+    expect(evaluateSellerFraudEscalation("seller-a", detections, NOW)).toMatchObject({
+      action: "none",
+      highRiskCount: 0,
+    });
+  });
+
+  it("ignores detections outside the rolling window", () => {
+    const window = SELLER_FRAUD_ESCALATION_THRESHOLDS.windowDays;
+    const detections = [high("seller-a", 1), high("seller-a", 2), high("seller-a", window + 1)];
+    expect(evaluateSellerFraudEscalation("seller-a", detections, NOW)).toMatchObject({
+      action: "none",
+      highRiskCount: 2,
+    });
+  });
+
+  it("counts only high-risk detections", () => {
+    const detections = [
+      high("seller-a", 1),
+      high("seller-a", 2),
+      { sellerId: "seller-a", riskLevel: "medium" as const, detectedAt: NOW.toISOString() },
+      { sellerId: "seller-a", riskLevel: "low" as const, detectedAt: NOW.toISOString() },
+    ];
+    expect(evaluateSellerFraudEscalation("seller-a", detections, NOW).highRiskCount).toBe(2);
+  });
+
+  it("respects custom thresholds", () => {
+    const detections = [high("seller-a", 1)];
+    const result = evaluateSellerFraudEscalation("seller-a", detections, NOW, {
+      review: 1,
+      suspend: 2,
+      windowDays: 30,
+    });
+    expect(result.action).toBe("flag_for_review");
   });
 });

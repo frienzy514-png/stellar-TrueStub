@@ -38,6 +38,9 @@ const STUB_ESCROWS = [
   },
 ];
 
+/** Supported escrow creation entry point (see #495 / #535). */
+const NEW_ESCROW_ROUTE = "/dashboard/event/create-escrow";
+
 const FILTER_TABS = [
   "All",
   "Pending",
@@ -56,8 +59,7 @@ export default function EscrowPage() {
   };
 
   const handleNewEscrow = () => {
-    // TODO: Navigate to new escrow creation page
-    console.log("Navigate to new escrow creation");
+    router.push(NEW_ESCROW_ROUTE);
   };
 
   const formatCurrency = (amount: number) => {

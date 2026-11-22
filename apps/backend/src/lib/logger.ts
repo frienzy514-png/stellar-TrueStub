@@ -17,7 +17,7 @@
  */
 import pino from "pino";
 import { env } from "../config/env";
-import { getRequestId } from "./requestLogger";
+import { getCorrelationId as getRequestId } from "../middleware/requestLogger";
 
 const isDev = env.NODE_ENV === "development";
 

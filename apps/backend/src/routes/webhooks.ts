@@ -5,6 +5,7 @@ import { logger } from "../lib/logger";
 import { Sentry } from "../lib/sentry";
 import { NotificationService } from "../services/notification.service";
 import { HasuraService } from "../services/hasura.service";
+import { webhookIpAllowlist } from "../middleware/webhookIpAllowlist";
 
 /**
  * Trustless Work escrow-status webhook — the single authoritative code path
@@ -16,6 +17,28 @@ import { HasuraService } from "../services/hasura.service";
  * payload here unchanged; nothing else writes escrow status.
  */
 export const webhookRouter = Router();
+
+/**
+ * Out-of-app notification adapter. Kept as a narrow interface because
+ * notification delivery is a best-effort side effect of the webhook; the
+ * authoritative work is the Postgres status write above it.
+ */
+interface EscrowStatusNotifier {
+  notifyEscrowStatusChange(payload: {
+    escrowId: string;
+    contractId: string;
+    engagementId: string;
+    status: string;
+    amount?: unknown;
+    currency?: unknown;
+    recipientEmail?: unknown;
+    recipientName?: unknown;
+    recipientPushToken?: unknown;
+    role?: unknown;
+  }): Promise<unknown>;
+}
+
+const escrowStatusNotifier = NotificationService as unknown as EscrowStatusNotifier;
 
 /**
  * Trustless Work status → stored status.
@@ -46,6 +69,7 @@ export const STATUS_MAP: Record<string, string> = {
   refunded: "refunded",
   // Documented aliases / historical payload variants.
   pending: "pending",
+  complete: "completed",
   in_progress: "funded",
   in_review: "disputed",
   failed: "cancelled",
@@ -62,27 +86,57 @@ export const STATUS_MAP: Record<string, string> = {
  * effect is not: replaying the same event would send the recipient a duplicate
  * notification.
  *
- * We therefore track processed event IDs in-memory and short-circuit any
- * delivery whose event ID we have already handled. The cache is bounded and
- * entries expire so it cannot grow without limit.
+ * We therefore record processed event IDs in Postgres (table
+ * `processed_webhook_events`, migration 010) and short-circuit any delivery
+ * whose event ID has already been claimed. The unique primary key makes the
+ * check atomic across backend instances; old rows are pruned by the scheduled
+ * cleanup job below instead of an in-process eviction loop.
  */
-const PROCESSED_EVENT_TTL_MS = 24 * 60 * 60 * 1000; // 24h
-const PROCESSED_EVENT_MAX = 10_000;
+export const PROCESSED_EVENT_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
-const processedEvents = new Map<string, number>();
+let cleanupRunning = false;
 
-function pruneProcessedEvents(now: number): void {
-  for (const [id, seenAt] of processedEvents) {
-    if (now - seenAt > PROCESSED_EVENT_TTL_MS) {
-      processedEvents.delete(id);
+/**
+ * Deletes dedup rows older than the TTL. Returns the number of rows removed.
+ * Failures are logged and swallowed: cleanup must never break webhook
+ * processing.
+ */
+export async function cleanupProcessedWebhookEvents(
+  retentionMs: number = PROCESSED_EVENT_TTL_MS
+): Promise<number> {
+  if (cleanupRunning) return 0;
+  cleanupRunning = true;
+  try {
+    const cutoff = new Date(Date.now() - retentionMs).toISOString();
+    const deleted = await HasuraService.deleteProcessedWebhookEventsBefore(cutoff);
+    if (deleted > 0) {
+      logger.info(
+        { deleted, cutoff },
+        "[webhook:escrow-status] Pruned old delivery dedup rows"
+      );
     }
+    return deleted;
+  } catch (err) {
+    logger.error({ err }, "[webhook:escrow-status] Dedup cleanup failed");
+    return 0;
+  } finally {
+    cleanupRunning = false;
   }
-  // Map preserves insertion order, so the oldest entries come first.
-  while (processedEvents.size > PROCESSED_EVENT_MAX) {
-    const oldest = processedEvents.keys().next().value;
-    if (oldest === undefined) break;
-    processedEvents.delete(oldest);
-  }
+}
+
+/**
+ * Starts the scheduled dedup cleanup (hourly by default). Returns the timer
+ * so the caller can stop it during shutdown/tests.
+ */
+export function startProcessedWebhookEventCleanup(
+  intervalMs: number = 60 * 60 * 1000
+): NodeJS.Timeout {
+  const timer = setInterval(() => {
+    void cleanupProcessedWebhookEvents();
+  }, intervalMs);
+  // Never keep the process alive solely for cleanup.
+  timer.unref();
+  return timer;
 }
 
 /**
@@ -155,7 +209,14 @@ function captureDeliveryFailure(
   });
 }
 
-webhookRouter.post("/escrow-status", async (req: Request, res: Response) => {
+// Optional defense-in-depth source-IP allowlist (#532). No-op unless
+// TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS is set; HMAC below is always enforced.
+const escrowStatusIpAllowlist = webhookIpAllowlist(
+  () => env.TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS,
+  "escrow-status"
+);
+
+webhookRouter.post("/escrow-status", escrowStatusIpAllowlist, async (req: Request, res: Response) => {
   const secret = env.TRUSTLESS_WORK_WEBHOOK_SECRET;
   if (!secret) {
     logger.error("[webhook:escrow-status] TRUSTLESS_WORK_WEBHOOK_SECRET is not configured");
@@ -227,23 +288,10 @@ webhookRouter.post("/escrow-status", async (req: Request, res: Response) => {
     return res.status(400).json({ error: `Unknown status: ${status}` });
   }
 
-  // Replay/dedup guard: a delivery we have already processed is acknowledged
-  // with 200 (so Trustless Work stops retrying) but produces no side effects.
-  const now = Date.now();
-  pruneProcessedEvents(now);
+  // Stable dedup key for this delivery. Claimed atomically in Postgres after
+  // the status write below, so a replay is acknowledged without repeating the
+  // notification side effect.
   const eventId = getEventId(body, req.rawBody);
-  if (processedEvents.has(eventId)) {
-    logger.info(
-      { contractId, eventId },
-      "[webhook:escrow-status] Duplicate delivery ignored"
-    );
-    return res.status(200).json({
-      success: true,
-      duplicate: true,
-      contractId,
-      status: normalizedStatus,
-    });
-  }
 
   const resolvedEngagementId =
     typeof engagementId === "string" && engagementId ? engagementId : contractId;
@@ -273,17 +321,44 @@ webhookRouter.post("/escrow-status", async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Failed to sync escrow status" });
   }
 
-  // Mark the event as processed before the notification side effect so a
-  // concurrent replay cannot slip through and send a duplicate notification.
-  processedEvents.set(eventId, now);
+  // Claim the event before the notification side effect so a concurrent or
+  // replayed delivery cannot send a duplicate notification. The unique key in
+  // `processed_webhook_events` is the cross-instance guard (#518).
+  let firstDelivery: boolean;
+  try {
+    firstDelivery = await HasuraService.claimProcessedWebhookEvent(
+      eventId,
+      new Date().toISOString()
+    );
+  } catch (err) {
+    // Non-2xx so Trustless Work retries; the status write is idempotent.
+    logger.error(
+      { err, contractId, eventId },
+      "[webhook:escrow-status] Failed to record delivery dedup key"
+    );
+    captureDeliveryFailure(err, contractId, "escrow_status.dedup", resolvedEngagementId);
+    return res.status(500).json({ error: "Failed to process webhook delivery" });
+  }
+
+  if (!firstDelivery) {
+    logger.info(
+      { contractId, eventId },
+      "[webhook:escrow-status] Duplicate delivery ignored"
+    );
+    return res.status(200).json({
+      success: true,
+      duplicate: true,
+      contractId,
+      status: normalizedStatus,
+      rowsUpdated,
+    });
+  }
 
   // The status write is what matters; a notification failure must not make
   // Trustless Work retry (and re-apply) an update that already landed.
-  let notifications: Awaited<
-    ReturnType<typeof NotificationService.notifyEscrowStatusChange>
-  > | null = null;
+  let notifications: unknown = null;
   try {
-    notifications = await NotificationService.notifyEscrowStatusChange({
+    notifications = await escrowStatusNotifier.notifyEscrowStatusChange({
       escrowId: resolvedEngagementId,
       contractId,
       engagementId: resolvedEngagementId,
