@@ -130,3 +130,20 @@ describe("AnalyticsDashboard empty state", () => {
     expect(screen.queryByText("No Data Available")).not.toBeInTheDocument();
   });
 });
+
+describe("AnalyticsDashboard error state", () => {
+  it("renders a clear error card and no charts/empty-state when the analytics request fails", () => {
+    mockedUseAnalyticsData.mockReturnValue({
+      ...baseReturn,
+      error: "The analytics endpoint is unavailable. The backend service may not be running or the route is not mounted.",
+    });
+
+    render(<AnalyticsDashboard />);
+
+    expect(screen.getByText("Error Loading Analytics")).toBeInTheDocument();
+    expect(screen.getByText(/analytics endpoint is unavailable/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+    expect(screen.queryByTestId("chart-container")).not.toBeInTheDocument();
+    expect(screen.queryByText("No Data Available")).not.toBeInTheDocument();
+  });
+});

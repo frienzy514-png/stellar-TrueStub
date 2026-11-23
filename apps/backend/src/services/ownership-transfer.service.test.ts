@@ -4,13 +4,84 @@
 
 import {
   OwnershipTransferService,
-  InMemoryOwnershipStore,
   TRANSFER_ERROR_CODES,
+  type OwnershipStore,
+  type OwnershipTransfer,
 } from "./ownership-transfer.service";
 import { AppError } from "../middleware/errorHandler";
 
+/** Test-only store; production uses PostgresOwnershipStore row locking. */
+class TestOwnershipStore implements OwnershipStore {
+  private readonly store = new Map<string, OwnershipTransfer>();
+  private readonly locks = new Map<string, Promise<void>>();
+
+  async get(transferId: string): Promise<OwnershipTransfer | undefined> {
+    return this.store.get(transferId);
+  }
+
+  async set(transferId: string, record: OwnershipTransfer): Promise<void> {
+    this.store.set(transferId, record);
+  }
+
+  async insertIfAbsent(transferId: string, record: OwnershipTransfer): Promise<void> {
+    if (this.store.has(transferId)) {
+      throw new AppError(
+        409,
+        TRANSFER_ERROR_CODES.CONFLICT,
+        `Transfer ${transferId} already exists with state: ${this.store.get(transferId)!.state}`
+      );
+    }
+    this.store.set(transferId, record);
+  }
+
+  async finalize(
+    transferId: string,
+    nextState: "ACCEPTED" | "CANCELLED"
+  ): Promise<OwnershipTransfer> {
+    return this.withLock(transferId, async () => {
+      const transfer = this.store.get(transferId);
+      if (!transfer) {
+        throw new AppError(404, TRANSFER_ERROR_CODES.NOT_FOUND, `Transfer ${transferId} not found`);
+      }
+      if (transfer.state !== "PENDING") {
+        throw new AppError(
+          409,
+          TRANSFER_ERROR_CODES.ALREADY_FINALIZED,
+          `Transfer ${transferId} is already in state ${transfer.state}`
+        );
+      }
+      const updated: OwnershipTransfer = {
+        ...transfer,
+        state: nextState,
+        finalizedAt: new Date().toISOString(),
+      };
+      this.store.set(transferId, updated);
+      return updated;
+    });
+  }
+
+  private async withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const previous = this.locks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.locks.set(key, previous.then(() => current));
+    await previous;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }
+
+  get size(): number {
+    return this.store.size;
+  }
+}
+
 function makeService() {
-  const store = new InMemoryOwnershipStore();
+  const store = new TestOwnershipStore();
   return { service: new OwnershipTransferService(store), store };
 }
 
@@ -173,7 +244,7 @@ describe("OwnershipTransferService — atomic workflow (#154)", () => {
       expect(stored!.state).toBe("PENDING");
       expect(stored!.fromOwner).toBe("alice");
       expect(stored!.toOwner).toBe("bob");
-      expect(store.size()).toBe(1);
+      expect(store.size).toBe(1);
     });
   });
 

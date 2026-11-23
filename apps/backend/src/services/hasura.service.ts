@@ -80,6 +80,39 @@ interface ListingDeleteResult {
   };
 }
 
+export interface DisputeRow {
+  dispute_id: string;
+  escrow_id: string;
+  raised_by: string;
+  reason: string;
+  state: string;
+  opened_at: string;
+  updated_at: string;
+  escalated_at: string | null;
+  resolved_at: string | null;
+  resolution: string | null;
+}
+
+interface DisputeByIdData {
+  disputes_by_pk?: DisputeRow | null;
+}
+
+interface DisputeListData {
+  disputes?: DisputeRow[];
+}
+
+interface DisputeInsertData {
+  insert_disputes?: { affected_rows?: number };
+}
+
+interface ProcessedWebhookEventInsertData {
+  insert_processed_webhook_events?: { affected_rows?: number };
+}
+
+interface ProcessedWebhookEventDeleteData {
+  delete_processed_webhook_events?: { affected_rows?: number };
+}
+
 export class HasuraService {
   /**
    * The single authoritative write path for `escrow_transactions.status`
@@ -319,6 +352,32 @@ export class HasuraService {
     return data.escrow_transactions ?? [];
   }
 
+  /**
+   * Returns the recorded escrow amount for a Trustless Work contract id, or
+   * null if no escrow row exists. Used to validate refund amounts locally
+   * before calling Trustless Work (#537).
+   */
+  static async getEscrowAmountByContractId(
+    contractId: string,
+    options: HasuraRequestOptions = {}
+  ): Promise<number | null> {
+    const query = `
+      query EscrowAmountByContractId($contractId: String!) {
+        escrow_transactions(where: { contract_id: { _eq: $contractId } }, limit: 1) {
+          amount
+        }
+      }
+    `;
+
+    const data = await hasuraClient.request<{ escrow_transactions?: Array<{ amount: number | string }> }>(
+      query,
+      { contractId },
+      { requestId: options.requestId ?? getRequestId() }
+    );
+    const row = data.escrow_transactions?.[0];
+    return row ? Number(row.amount) : null;
+  }
+
   static async findLockingEscrowForListing(
     listingId: string,
     options: HasuraRequestOptions = {}
@@ -355,6 +414,214 @@ export class HasuraService {
       [listingId, [...LOCKED_ESCROW_STATUSES]]
     );
     return result.rows?.[0] ?? null;
+  }
+
+  // ── Disputes (#515) ──────────────────────────────────────────────────────
+
+  static async getDispute(disputeId: string): Promise<DisputeRow | null> {
+    const query = `
+      query GetDispute($disputeId: String!) {
+        disputes_by_pk(dispute_id: $disputeId) {
+          dispute_id
+          escrow_id
+          raised_by
+          reason
+          state
+          opened_at
+          updated_at
+          escalated_at
+          resolved_at
+          resolution
+        }
+      }
+    `;
+
+    const data = await hasuraClient.request<DisputeByIdData>(query, { disputeId });
+    return data.disputes_by_pk ?? null;
+  }
+
+  static async listDisputesByEscrow(escrowId: string): Promise<DisputeRow[]> {
+    const query = `
+      query ListDisputesByEscrow($escrowId: String!) {
+        disputes(where: { escrow_id: { _eq: $escrowId } }, order_by: { opened_at: desc }) {
+          dispute_id
+          escrow_id
+          raised_by
+          reason
+          state
+          opened_at
+          updated_at
+          escalated_at
+          resolved_at
+          resolution
+        }
+      }
+    `;
+
+    const data = await hasuraClient.request<DisputeListData>(query, { escrowId });
+    return data.disputes ?? [];
+  }
+
+  static async listDisputes(): Promise<DisputeRow[]> {
+    const query = `
+      query ListDisputes {
+        disputes(order_by: { opened_at: desc }) {
+          dispute_id
+          escrow_id
+          raised_by
+          reason
+          state
+          opened_at
+          updated_at
+          escalated_at
+          resolved_at
+          resolution
+        }
+      }
+    `;
+
+    const data = await hasuraClient.request<DisputeListData>(query);
+    return data.disputes ?? [];
+  }
+
+  static async upsertDispute(row: DisputeRow): Promise<void> {
+    const mutation = `
+      mutation UpsertDispute(
+        $disputeId: String!
+        $escrowId: String!
+        $raisedBy: String!
+        $reason: String!
+        $state: String!
+        $openedAt: timestamptz!
+        $updatedAt: timestamptz!
+        $escalatedAt: timestamptz
+        $resolvedAt: timestamptz
+        $resolution: String
+      ) {
+        insert_disputes_one(
+          object: {
+            dispute_id: $disputeId
+            escrow_id: $escrowId
+            raised_by: $raisedBy
+            reason: $reason
+            state: $state
+            opened_at: $openedAt
+            updated_at: $updatedAt
+            escalated_at: $escalatedAt
+            resolved_at: $resolvedAt
+            resolution: $resolution
+          }
+          on_conflict: {
+            constraint: disputes_pkey
+            update_columns: [escrow_id, raised_by, reason, state, opened_at, updated_at, escalated_at, resolved_at, resolution]
+          }
+        ) {
+          dispute_id
+        }
+      }
+    `;
+
+    await hasuraClient.request(mutation, {
+      disputeId: row.dispute_id,
+      escrowId: row.escrow_id,
+      raisedBy: row.raised_by,
+      reason: row.reason,
+      state: row.state,
+      openedAt: row.opened_at,
+      updatedAt: row.updated_at,
+      escalatedAt: row.escalated_at,
+      resolvedAt: row.resolved_at,
+      resolution: row.resolution,
+    });
+  }
+
+  /**
+   * Atomically inserts a dispute, relying on the primary key to reject a
+   * duplicate. Returns `false` when the dispute already exists.
+   */
+  static async insertDisputeIfAbsent(row: DisputeRow): Promise<boolean> {
+    const mutation = `
+      mutation InsertDisputeIfAbsent(
+        $disputeId: String!
+        $escrowId: String!
+        $raisedBy: String!
+        $reason: String!
+        $state: String!
+        $openedAt: timestamptz!
+        $updatedAt: timestamptz!
+      ) {
+        insert_disputes(
+          objects: [{
+            dispute_id: $disputeId
+            escrow_id: $escrowId
+            raised_by: $raisedBy
+            reason: $reason
+            state: $state
+            opened_at: $openedAt
+            updated_at: $updatedAt
+          }]
+          on_conflict: { constraint: disputes_pkey, update_columns: [] }
+        ) {
+          affected_rows
+        }
+      }
+    `;
+
+    const data = await hasuraClient.request<DisputeInsertData>(mutation, {
+      disputeId: row.dispute_id,
+      escrowId: row.escrow_id,
+      raisedBy: row.raised_by,
+      reason: row.reason,
+      state: row.state,
+      openedAt: row.opened_at,
+      updatedAt: row.updated_at,
+    });
+    return (data.insert_disputes?.affected_rows ?? 0) > 0;
+  }
+
+  // ── Webhook delivery dedup (#518) ───────────────────────────────────────
+
+  /**
+   * Atomically records a webhook delivery. Returns `true` when this caller
+   * inserted the dedup key (first delivery) and `false` when another delivery
+   * already claimed it (replay), across every backend instance.
+   */
+  static async claimProcessedWebhookEvent(
+    dedupKey: string,
+    processedAt: string = new Date().toISOString()
+  ): Promise<boolean> {
+    const mutation = `
+      mutation ClaimProcessedWebhookEvent($dedupKey: String!, $processedAt: timestamptz!) {
+        insert_processed_webhook_events(
+          objects: [{ dedup_key: $dedupKey, processed_at: $processedAt }]
+          on_conflict: { constraint: processed_webhook_events_pkey, update_columns: [] }
+        ) {
+          affected_rows
+        }
+      }
+    `;
+
+    const data = await hasuraClient.request<ProcessedWebhookEventInsertData>(mutation, {
+      dedupKey,
+      processedAt,
+    });
+    return (data.insert_processed_webhook_events?.affected_rows ?? 0) > 0;
+  }
+
+  /** Deletes dedup rows processed before `cutoff` and returns the count. */
+  static async deleteProcessedWebhookEventsBefore(cutoff: string): Promise<number> {
+    const mutation = `
+      mutation DeleteProcessedWebhookEvents($cutoff: timestamptz!) {
+        delete_processed_webhook_events(where: { processed_at: { _lt: $cutoff } }) {
+          affected_rows
+        }
+      }
+    `;
+
+    const data = await hasuraClient.request<ProcessedWebhookEventDeleteData>(mutation, {
+      cutoff,
+    });
+    return data.delete_processed_webhook_events?.affected_rows ?? 0;
   }
 
   /**

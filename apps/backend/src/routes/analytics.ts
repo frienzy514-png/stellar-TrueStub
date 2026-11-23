@@ -40,6 +40,15 @@ const COMPLETED_STATUSES = new Set(["completed", "released", "resolved"]);
 const DOLLAR_DENOMINATED_CURRENCIES = new Set(["USD", "USDC"]);
 const UNKNOWN_CURRENCY = "UNKNOWN";
 
+/**
+ * Fetches escrows across the WHOLE platform. There is deliberately no
+ * `user_id`/owner/tenant filter here (issue #630): `/api/analytics` is a
+ * platform-operator view and is mounted behind `requireAdmin` in `index.ts`.
+ * Do not expose this router without admin gating, and do not reuse this helper
+ * for anything user-facing. If per-operator scoping is ever needed, add a new
+ * scoped endpoint rather than loosening this one — see
+ * docs/ANALYTICS_ACCESS_MODEL.md.
+ */
 async function fetchEscrows(where: Record<string, unknown>): Promise<EscrowRow[]> {
   const query = `
     query AnalyticsEscrows(

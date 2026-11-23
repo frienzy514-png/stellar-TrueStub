@@ -157,3 +157,81 @@ export function assessListingRisk(
     matches: [],
   };
 }
+
+// ── Seller-level escalation (#555) ─────────────────────────────────────────
+//
+// Single listings are assessed by `assessListingRisk`. A seller whose listings
+// keep tripping high-risk detection needs an account-level response, so this
+// layer turns a seller's recent detection history into a recommended action:
+//
+//   count of high-risk detections in the window  →  action
+//   >= SELLER_FRAUD_ESCALATION_THRESHOLDS.review    →  "flag_for_review"
+//   >= SELLER_FRAUD_ESCALATION_THRESHOLDS.suspend   →  "suspend_pending_review"
+//   otherwise                                       →  "none"
+//
+// The function is pure: it does not read or write storage and does not change
+// any account. Callers record each high-risk detection, call this function with
+// that seller's history, and act on the result. "suspend_pending_review" means
+// the seller's new listings should be held until an admin reviews the account;
+// it is not a final ban. Final account action stays a manual admin decision.
+
+export interface SellerFraudEscalationThresholds {
+  /** High-risk detections within the window before a seller is flagged for review. */
+  review: number;
+  /** High-risk detections within the window before new listings are held. */
+  suspend: number;
+  /** Rolling window, in days, over which detections are counted. */
+  windowDays: number;
+}
+
+export const SELLER_FRAUD_ESCALATION_THRESHOLDS: SellerFraudEscalationThresholds = {
+  review: 3,
+  suspend: 5,
+  windowDays: 30,
+};
+
+export type SellerEscalationAction = "none" | "flag_for_review" | "suspend_pending_review";
+
+export interface SellerFraudDetection {
+  sellerId: string;
+  riskLevel: ListingRiskResult["riskLevel"];
+  /** ISO timestamp or Date of when the detection happened. */
+  detectedAt: string | Date;
+}
+
+export interface SellerFraudEscalation {
+  sellerId: string;
+  action: SellerEscalationAction;
+  /** High-risk detections counted inside the window. */
+  highRiskCount: number;
+  windowDays: number;
+}
+
+/**
+ * Decides whether a seller's recent detection history needs escalation.
+ * Only `riskLevel: "high"` detections count. Detections for other sellers, and
+ * detections older than the window, are ignored.
+ */
+export function evaluateSellerFraudEscalation(
+  sellerId: string,
+  detections: SellerFraudDetection[],
+  now: Date = new Date(),
+  thresholds: SellerFraudEscalationThresholds = SELLER_FRAUD_ESCALATION_THRESHOLDS,
+): SellerFraudEscalation {
+  const windowStart = now.getTime() - thresholds.windowDays * 24 * 60 * 60 * 1000;
+
+  const highRiskCount = detections.filter((d) => {
+    if (d.sellerId !== sellerId || d.riskLevel !== "high") return false;
+    const at = new Date(d.detectedAt).getTime();
+    return Number.isFinite(at) && at >= windowStart && at <= now.getTime();
+  }).length;
+
+  let action: SellerEscalationAction = "none";
+  if (highRiskCount >= thresholds.suspend) {
+    action = "suspend_pending_review";
+  } else if (highRiskCount >= thresholds.review) {
+    action = "flag_for_review";
+  }
+
+  return { sellerId, action, highRiskCount, windowDays: thresholds.windowDays };
+}

@@ -52,7 +52,7 @@ The frontend can start without the sibling backend. Features that call it,
 including operator analytics, require `NEXT_PUBLIC_BACKEND_URL` to point at a
 running backend. To run that service locally, copy
 `apps/backend/.env.example` to `apps/backend/.env`, then set `DATABASE_URL`,
-`HASURA_GRAPHQL_URL`, `HASURA_ADMIN_SECRET`, and the Firebase Admin service
+`HASURA_GRAPHQL_URL`, `HASURA_GRAPHQL_ADMIN_SECRET`, and the Firebase Admin service
 account values. Sentry is optional. Start it in a second terminal with
 `yarn workspace @truestub/backend dev`. Apply SQL migrations with
 `yarn workspace @truestub/backend migrate:up` only when a local Postgres
@@ -121,6 +121,14 @@ the new complexity so contributors are not surprised.
    touched).
 4. **Open a pull request** against `main` using the PR template — fill it
    out completely; incomplete PRs may be asked to redo it.
+
+### Review checklist: in-memory state in services
+
+Reviewers must check every PR that adds a backend service with its own
+in-memory store for business-critical state. If the PR adds a service with
+its own in-memory store (`new Map(...)`, `new Set(...)`, etc.) for data that
+must survive a restart or be shared across instances, justify why, or use a
+persistent store instead.
 
 The full walkthrough (forking, branch naming, PR expectations) is in
 [`docs/CONTRIBUTORS_GUIDELINE.md`](docs/CONTRIBUTORS_GUIDELINE.md).

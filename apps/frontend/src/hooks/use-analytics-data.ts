@@ -37,6 +37,17 @@ interface AnalyticsResponse {
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
 
+const DEFAULT_PLATFORM_HEALTH: PlatformHealthSummary = {
+  totalVolume: 0,
+  activeEscrows: 0,
+  totalCreated: 0,
+  totalCompleted: 0,
+  totalDisputes: 0,
+  completionRate: 0,
+  avgReleaseHours: 0,
+  totalValueLocked: 0,
+};
+
 interface UseAnalyticsDataReturn {
   escrowChartData: EscrowAnalyticsData[];
   escrowMetrics: MetricData[];
@@ -59,16 +70,9 @@ export const useAnalyticsData = ({
   const [escrowMetrics, setEscrowMetrics] = useState<MetricData[]>([]);
   const [hasData, setHasData] = useState(false);
   const [authReady, setAuthReady] = useState(false);
-  const [platformHealth, setPlatformHealth] = useState<PlatformHealthSummary>({
-    totalVolume: 0,
-    activeEscrows: 0,
-    totalCreated: 0,
-    totalCompleted: 0,
-    totalDisputes: 0,
-    completionRate: 0,
-    avgReleaseHours: 0,
-    totalValueLocked: 0,
-  });
+  const [platformHealth, setPlatformHealth] = useState<PlatformHealthSummary>(
+    DEFAULT_PLATFORM_HEALTH
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -163,16 +167,38 @@ export const useAnalyticsData = ({
         setError("Administrator access is required to view platform analytics.");
         return false;
       }
-      if (!response.ok) throw new Error("Analytics service is unavailable");
+      if (response.status === 404) {
+        setError(
+          "The analytics endpoint is unavailable. The backend service may not be running or the route is not mounted.",
+        );
+        return false;
+      }
+      if (!response.ok) {
+        setError(`Analytics service is unavailable (HTTP ${response.status}). Please try again.`);
+        return false;
+      }
 
-      const result = (await response.json()) as AnalyticsResponse;
-      setEscrowChartData(result.escrowChartData);
-      setPlatformHealth(result.platformHealth);
-      setHasData(result.hasData);
-      setEscrowMetrics(generateEscrowMetrics(result.escrowChartData, result.platformHealth));
+      let result: AnalyticsResponse;
+      try {
+        result = (await response.json()) as AnalyticsResponse;
+      } catch {
+        setError("The analytics service returned an invalid response. Please try again.");
+        return false;
+      }
+
+      const safeChartData = Array.isArray(result.escrowChartData) ? result.escrowChartData : [];
+      const safePlatformHealth = result.platformHealth ?? DEFAULT_PLATFORM_HEALTH;
+      const safeHasData = Boolean(result.hasData);
+
+      setEscrowChartData(safeChartData);
+      setPlatformHealth(safePlatformHealth);
+      setHasData(safeHasData);
+      setEscrowMetrics(generateEscrowMetrics(safeChartData, safePlatformHealth));
       return true;
     } catch {
-      setError("Failed to load live platform analytics. Please try again.");
+      setError(
+        "Could not reach the analytics service. Please check your connection and try again.",
+      );
       return false;
     } finally {
       setIsLoading(false);
