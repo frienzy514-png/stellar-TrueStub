@@ -69,10 +69,12 @@ compose file. Empty values are treated as unset.
 | `DATABASE_URL`, `HASURA_GRAPHQL_URL` | set by compose | Point at the in-network `postgres` / `hasura` services. |
 | `TRUSTLESS_WORK_API_KEY`, `TRUSTLESS_WORK_DISPUTE_RESOLVER_SECRET` | no | Refund execution and dispute resolution return 503 until set. |
 | `TRUSTLESS_WORK_WEBHOOK_SECRET` | no | `POST /webhooks/escrow-status` rejects every delivery until set. |
+| `TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS` | no | Optional comma-separated IPs/CIDRs allowed to call `POST /webhooks/escrow-status` (defense-in-depth on top of HMAC; unset = no IP check). Malformed entries fail startup. See `SECURITY.md`. |
 | `TRUSTLESS_WORK_API_URL`, `STELLAR_NETWORK` | no | Default to testnet. |
 | `SENTRY_DSN`, `CRITICAL_ALERT_WEBHOOK_URL` | no | Error tracking / refund-transfer failure alerts. |
 | `CORS_ORIGINS`, `LOG_LEVEL`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX` | no | Defaults: `http://localhost:3000`, `info`, `900000`, `100`. |
 | `EMAIL_PROVIDER`, `SENDGRID_API_KEY`, `NOTIFICATION_FROM_EMAIL` | no | Notification delivery. |
+| `BACKEND_REPLICAS`, `ALLOW_UNSAFE_MULTI_INSTANCE` | no | Default `1` / `false`. The backend refuses to start with more than one replica unless the override is set, because state is still in memory (#541, see `docs/DEPLOYMENT.md`). |
 
 When a new required variable is added to `src/config/env.ts`, add it to the
 `backend` service in `docker-compose.yml`, the root `.env.example`, and this

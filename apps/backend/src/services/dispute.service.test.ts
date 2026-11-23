@@ -9,18 +9,46 @@
 
 import {
   DisputeService,
-  InMemoryDisputeStore,
   DISPUTE_ERROR_CODES,
   DISPUTE_TRANSITIONS,
   FINAL_STATES,
   resolveTransition,
-  type DisputeState,
+  type Dispute,
   type DisputeEvent,
+  type DisputeState,
+  type DisputeStore,
 } from "./dispute.service";
 import { AppError } from "../middleware/errorHandler";
 
+/** Test-only store; production uses PostgresDisputeStore. */
+class TestDisputeStore implements DisputeStore {
+  private readonly store = new Map<string, Dispute>();
+
+  async get(disputeId: string): Promise<Dispute | undefined> {
+    return this.store.get(disputeId);
+  }
+
+  async set(disputeId: string, dispute: Dispute): Promise<void> {
+    this.store.set(disputeId, dispute);
+  }
+
+  async insertIfAbsent(disputeId: string, dispute: Dispute): Promise<boolean> {
+    if (this.store.has(disputeId)) return false;
+    this.store.set(disputeId, dispute);
+    return true;
+  }
+
+  async listByEscrow(escrowId: string): Promise<Dispute[]> {
+    return [...this.store.values()].filter((d) => d.escrowId === escrowId);
+  }
+
+  async listAll(): Promise<Dispute[]> {
+    return [...this.store.values()];
+  }
+}
+
 function makeService() {
-  const store = new InMemoryDisputeStore();
+  const store = new TestDisputeStore();
   return { service: new DisputeService(store), store };
 }
 
@@ -343,7 +371,7 @@ describe("dispute-to-refund end-to-end flow (#340)", () => {
   }
 
   function makeFlow() {
-    const disputeStore = new InMemoryDisputeStore();
+    const disputeStore = new TestDisputeStore();
     const disputeService = new DisputeService(disputeStore);
     const escrowStore = new InMemoryEscrowStore();
     const refundStore = new InMemoryRefundStore();
@@ -429,5 +457,84 @@ describe("dispute-to-refund end-to-end flow (#340)", () => {
     const refund = await refundService.claimRefund({ escrowId, disputeId, amount: 1000 });
     expect(refund.status).toBe("COMPLETED");
     expect(escrowStore.get(escrowId)?.status).toBe("REFUNDED");
+  });
+});
+
+// ── Single-instance concurrency (issue #540) ──────────────────────────────
+describe("DisputeService — concurrent transitions (#540)", () => {
+  /** Store whose reads/writes yield to the event loop, widening any race window. */
+  class SlowStore extends InMemoryDisputeStore {
+    async get(disputeId: string) {
+      await new Promise((r) => setTimeout(r, 5));
+      return super.get(disputeId);
+    }
+    async set(disputeId: string, dispute: Parameters<InMemoryDisputeStore["set"]>[1]) {
+      await new Promise((r) => setTimeout(r, 5));
+      return super.set(disputeId, dispute);
+    }
+  }
+
+  it("lets only one of two concurrent conflicting transitions succeed", async () => {
+    const store = new SlowStore();
+    const service = new DisputeService(store);
+    await openDispute(service);
+
+    const results = await Promise.allSettled([
+      service.transition(base.disputeId, "resolve", { resolution: "refund buyer" }),
+      service.transition(base.disputeId, "withdraw"),
+    ]);
+
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+
+    const err = rejected[0].reason as AppError;
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.code).toBe(DISPUTE_ERROR_CODES.ALREADY_FINAL);
+
+    // The stored state matches the winning transition — no corrupted end state.
+    const winner = (fulfilled[0] as PromiseFulfilledResult<{ state: DisputeState }>).value;
+    const stored = await service.getDispute(base.disputeId);
+    expect(stored?.state).toBe(winner.state);
+    expect(["RESOLVED", "WITHDRAWN"]).toContain(stored?.state);
+  });
+
+  it("applies concurrent transitions in arrival order", async () => {
+    const service = new DisputeService(new SlowStore());
+    await openDispute(service);
+
+    const [escalated, resolved] = await Promise.all([
+      service.transition(base.disputeId, "escalate"),
+      service.transition(base.disputeId, "resolve"),
+    ]);
+
+    expect(escalated.state).toBe("ESCALATED");
+    expect(resolved.state).toBe("RESOLVED");
+    expect(resolved.escalatedAt).toBe(escalated.escalatedAt);
+  });
+
+  it("rejects a concurrent duplicate openDispute", async () => {
+    const service = new DisputeService(new SlowStore());
+
+    const results = await Promise.allSettled([openDispute(service), openDispute(service)]);
+
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    expect((rejected.reason as AppError).code).toBe(DISPUTE_ERROR_CODES.ALREADY_EXISTS);
+  });
+
+  it("does not serialize transitions on different disputes", async () => {
+    const service = new DisputeService(new SlowStore());
+    await openDispute(service, { disputeId: "d-a" });
+    await openDispute(service, { disputeId: "d-b" });
+
+    const [a, b] = await Promise.all([
+      service.transition("d-a", "resolve"),
+      service.transition("d-b", "withdraw"),
+    ]);
+
+    expect(a.state).toBe("RESOLVED");
+    expect(b.state).toBe("WITHDRAWN");
   });
 });

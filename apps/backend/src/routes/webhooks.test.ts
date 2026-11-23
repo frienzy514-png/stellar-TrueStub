@@ -15,10 +15,19 @@ jest.mock("../lib/logger", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 jest.mock("../lib/sentry", () => ({
-  Sentry: { captureException: jest.fn() },
+  Sentry: {
+    captureException: jest.fn(),
+    captureMessage: jest.fn(),
+    setTag: jest.fn(),
+    setContext: jest.fn(),
+  },
 }));
 jest.mock("../services/hasura.service", () => ({
-  HasuraService: { updateEscrowStatus: jest.fn() },
+  HasuraService: {
+    updateEscrowStatus: jest.fn(),
+    claimProcessedWebhookEvent: jest.fn(),
+    deleteProcessedWebhookEventsBefore: jest.fn(),
+  },
 }));
 jest.mock("../services/notification.service", () => ({
   NotificationService: { notifyEscrowStatusChange: jest.fn() },
@@ -27,12 +36,16 @@ jest.mock("../services/notification.service", () => ({
 import { env } from "../config/env";
 import { captureRawBody } from "../middleware/rawBody";
 import { HasuraService } from "../services/hasura.service";
-import { NotificationService } from "../services/notification.service";
 import { webhookRouter, STATUS_MAP } from "./webhooks";
 import { Sentry } from "../lib/sentry";
 
 const updateEscrowStatus = HasuraService.updateEscrowStatus as jest.Mock;
-const notifyEscrowStatusChange = NotificationService.notifyEscrowStatusChange as jest.Mock;
+const claimProcessedWebhookEvent = HasuraService.claimProcessedWebhookEvent as jest.Mock;
+const notifyEscrowStatusChange = (
+  jest.requireMock("../services/notification.service") as {
+    NotificationService: { notifyEscrowStatusChange: jest.Mock };
+  }
+).NotificationService.notifyEscrowStatusChange;
 
 function buildApp() {
   const app = express();
@@ -86,8 +99,10 @@ const DOCUMENTED_TRUSTLESS_WORK_STATUSES = [
 
 describe("STATUS_MAP coverage", () => {
   it("maps every documented Trustless Work escrow status", () => {
+    // The route lowercases the incoming status before lookup, so coverage is
+    // case-insensitive.
     const missing = DOCUMENTED_TRUSTLESS_WORK_STATUSES.filter(
-      (status) => !(status in STATUS_MAP)
+      (status) => !(status.toLowerCase() in STATUS_MAP)
     );
 
     expect(missing).toEqual([]);
@@ -95,8 +110,9 @@ describe("STATUS_MAP coverage", () => {
 
   it("maps every documented status to a non-empty string", () => {
     for (const status of DOCUMENTED_TRUSTLESS_WORK_STATUSES) {
-      expect(typeof STATUS_MAP[status]).toBe("string");
-      expect(STATUS_MAP[status].length).toBeGreaterThan(0);
+      const mapped = STATUS_MAP[status.toLowerCase()];
+      expect(typeof mapped).toBe("string");
+      expect(mapped.length).toBeGreaterThan(0);
     }
   });
 });
@@ -111,6 +127,7 @@ describe("POST /webhooks/escrow-status", () => {
     (env as { TRUSTLESS_WORK_WEBHOOK_SECRET?: string }).TRUSTLESS_WORK_WEBHOOK_SECRET =
       WEBHOOK_SECRET;
     updateEscrowStatus.mockResolvedValue({ affected_rows: 1 });
+    claimProcessedWebhookEvent.mockResolvedValue(true);
     notifyEscrowStatusChange.mockResolvedValue({
       emailSent: true,
       pushSent: false,
@@ -267,7 +284,7 @@ describe("POST /webhooks/escrow-status", () => {
       expect.any(Error),
       expect.objectContaining({
         tags: expect.objectContaining({ alert: "webhook.delivery_failure", retryable: "true" }),
-        extra: { contractId: "contract-123" },
+        extra: expect.objectContaining({ contractId: "contract-123" }),
       })
     );
   });
@@ -282,6 +299,9 @@ describe("POST /webhooks/escrow-status", () => {
   });
 
   it("is idempotent: replaying the identical signed payload does not duplicate side effects", async () => {
+    // First delivery claims the dedup key; the replay loses the insert race.
+    claimProcessedWebhookEvent.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
     // First delivery: the escrow transitions to the new status and a notification fires.
     const first = await post(payload, { "x-trustless-work-signature": sign(payload) });
     expect(first.status).toBe(200);
@@ -317,7 +337,9 @@ describe("POST /webhooks/escrow-status under concurrent load", () => {
       WEBHOOK_SECRET;
     updateEscrowStatus.mockReset();
     notifyEscrowStatusChange.mockReset();
+    claimProcessedWebhookEvent.mockReset();
     updateEscrowStatus.mockResolvedValue({ affected_rows: 1 });
+    claimProcessedWebhookEvent.mockResolvedValue(true);
     notifyEscrowStatusChange.mockResolvedValue({
       emailSent: true,
       pushSent: false,
@@ -404,4 +426,149 @@ describe("POST /webhooks/escrow-status under concurrent load", () => {
       expect(call).toEqual([contractId, "completed"]);
     }
   }, 30_000);
+});
+
+describe("POST /webhooks/escrow-status dedup key stability", () => {
+  beforeEach(() => {
+    (env as { TRUSTLESS_WORK_WEBHOOK_SECRET?: string }).TRUSTLESS_WORK_WEBHOOK_SECRET =
+      WEBHOOK_SECRET;
+    updateEscrowStatus.mockResolvedValue({ affected_rows: 1 });
+    notifyEscrowStatusChange.mockResolvedValue({
+      emailSent: true,
+      pushSent: false,
+      channel: "email",
+      timestamp: "t",
+    });
+  });
+
+  it("treats a legitimately resent event with a different byte layout as a duplicate", async () => {
+    // Same logical event (no explicit event ID in the payload), delivered
+    // twice with different serialization (compact vs. pretty-printed). The
+    // dedup key must not depend on incidental formatting, or a resend would
+    // be processed and notified a second time.
+    const compact = JSON.stringify({
+      contractId: "contract-560",
+      engagementId: "ENG-560",
+      status: "completed",
+    });
+    const pretty = JSON.stringify(
+      { contractId: "contract-560", engagementId: "ENG-560", status: "completed" },
+      null,
+      2
+    );
+
+    const first = await post(compact, { "x-trustless-work-signature": sign(compact) });
+    expect(first.status).toBe(200);
+    expect(first.body.duplicate).toBeUndefined();
+
+    updateEscrowStatus.mockResolvedValue({ affected_rows: 0 });
+    const resend = await post(pretty, { "x-trustless-work-signature": sign(pretty) });
+
+    expect(resend.status).toBe(200);
+    expect(resend.body.duplicate).toBe(true);
+    expect(notifyEscrowStatusChange).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe("POST /webhooks/escrow-status dedup retention window", () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  beforeEach(() => {
+    (env as { TRUSTLESS_WORK_WEBHOOK_SECRET?: string }).TRUSTLESS_WORK_WEBHOOK_SECRET =
+      WEBHOOK_SECRET;
+    updateEscrowStatus.mockResolvedValue({ affected_rows: 1 });
+    notifyEscrowStatusChange.mockResolvedValue({
+      emailSent: true,
+      pushSent: false,
+      channel: "email",
+      timestamp: "t",
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("still dedups a delayed retry arriving just inside the retention window", async () => {
+    const body = JSON.stringify({
+      contractId: "contract-561",
+      engagementId: "ENG-561",
+      status: "funded",
+    });
+    const t0 = 1_800_000_000_000;
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(t0);
+
+    const first = await post(body, { "x-trustless-work-signature": sign(body) });
+    expect(first.status).toBe(200);
+    expect(notifyEscrowStatusChange).toHaveBeenCalledTimes(1);
+
+    // A retry arriving 23h59m later must still be recognised as a duplicate,
+    // not reprocessed as a new event.
+    nowSpy.mockReturnValue(t0 + DAY_MS - 60 * 1000);
+    updateEscrowStatus.mockResolvedValue({ affected_rows: 0 });
+    const retry = await post(body, { "x-trustless-work-signature": sign(body) });
+
+    expect(retry.status).toBe(200);
+    expect(retry.body.duplicate).toBe(true);
+    expect(notifyEscrowStatusChange).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("POST /webhooks/escrow-status IP allowlist (#532)", () => {
+  type MutableEnv = {
+    TRUSTLESS_WORK_WEBHOOK_SECRET?: string;
+    TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS?: string;
+  };
+
+  beforeEach(() => {
+    (env as MutableEnv).TRUSTLESS_WORK_WEBHOOK_SECRET = WEBHOOK_SECRET;
+    updateEscrowStatus.mockReset();
+    updateEscrowStatus.mockResolvedValue({ affected_rows: 1 });
+    notifyEscrowStatusChange.mockResolvedValue({ emailSent: false, pushSent: false });
+  });
+
+  afterEach(() => {
+    (env as MutableEnv).TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS = undefined;
+  });
+
+  function uniquePayload(tag: string) {
+    return JSON.stringify({ contractId: `contract-allowlist-${tag}`, status: "completed" });
+  }
+
+  it("does not check the source IP when no allowlist is configured", async () => {
+    const body = uniquePayload("unset");
+    const res = await post(body, { "x-trustless-work-signature": sign(body) });
+
+    expect(res.status).toBe(200);
+    expect(updateEscrowStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts a signed delivery from an allowlisted IP", async () => {
+    // supertest connects over loopback (IPv4 or IPv6 depending on the host).
+    (env as MutableEnv).TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS = "127.0.0.0/8, ::1";
+    const body = uniquePayload("allowed");
+    const res = await post(body, { "x-trustless-work-signature": sign(body) });
+
+    expect(res.status).toBe(200);
+    expect(updateEscrowStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a validly signed delivery from a non-allowlisted IP without writing", async () => {
+    (env as MutableEnv).TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS = "203.0.113.10";
+    const body = uniquePayload("blocked");
+    const res = await post(body, { "x-trustless-work-signature": sign(body) });
+
+    expect(res.status).toBe(403);
+    expect(updateEscrowStatus).not.toHaveBeenCalled();
+  });
+
+  it("still enforces HMAC for allowlisted IPs", async () => {
+    (env as MutableEnv).TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS = "127.0.0.0/8, ::1";
+    const body = uniquePayload("bad-sig");
+    const res = await post(body, { "x-trustless-work-signature": "0".repeat(64) });
+
+    expect(res.status).toBe(401);
+    expect(updateEscrowStatus).not.toHaveBeenCalled();
+  });
 });

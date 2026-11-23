@@ -64,3 +64,6 @@ deploy-migrations.log
 *.log
 storybook-static/
 .firebase/
+
+**/__snapshots__/
+**/*.snap

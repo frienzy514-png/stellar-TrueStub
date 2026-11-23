@@ -29,7 +29,15 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   return next();
 }
 
-/** Verifies a Firebase token and requires its server-issued admin role claim. */
+/**
+ * Verifies a Firebase token and requires its server-issued admin role claim.
+ *
+ * The role is read only from the decoded token returned by `verifyIdToken`,
+ * so it is covered by Firebase's signature. Those claims can only be written
+ * with Admin SDK credentials; no backend endpoint sets them, and nothing in
+ * the request body, query or headers is consulted (#530, see
+ * auth.admin-claims.test.ts).
+ */
 export async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!(await authenticate(req, res))) return;
 

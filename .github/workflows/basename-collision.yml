@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
 
@@ -36,7 +36,7 @@ jobs:
 
       - name: Post PR comment if collisions found
         if: steps.collision.outcome == 'failure' && steps.collision.outputs.collision_count != '0'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

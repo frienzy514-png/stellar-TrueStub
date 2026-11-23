@@ -2,6 +2,7 @@ import { Notification } from '../types/notification';
 import { NotificationRepository } from '../repositories/notification.repository';
 import { logger } from '../utils/logger';
 import { captureException } from '../lib/sentry';
+import { env } from '../config/env';
 
 const MAX_DELIVERY_ATTEMPTS = 5;
 const BASE_BACKOFF_MS = 200;
@@ -52,6 +53,15 @@ export class NotificationService {
 
     try {
       await this.notificationRepository.create(notification);
+      // #570 — with no email provider configured, the notification is still
+      // recorded but delivery is skipped. Never throw here, so the caller's
+      // primary operation (e.g. a webhook status update) still completes.
+      if (!env.EMAIL_PROVIDER) {
+        logger.warn(
+          `EMAIL_PROVIDER is not configured; skipping delivery for event ${eventId ?? 'unknown'}`,
+        );
+        return;
+      }
       await this.dispatchWithRetry(notification);
     } catch (error) {
       logger.error(`Failed to send notification: ${error}`);

@@ -17,5 +17,3 @@ export * from './types';
 // Event escrow & payment forms (merged from ticket-events/)
 export { default as EventEscrowForm, EventEscrowForm as EventEscrowFormNamed } from './EventEscrowForm';
 export type { EventTicketEscrowProps } from './EventEscrowForm';
-export { default as TicketEscrowIntegration, TicketEscrowIntegration as TicketEscrowIntegrationNamed } from './TicketEscrowIntegration';
-export type { TicketEscrowIntegrationProps } from './TicketEscrowIntegration';
