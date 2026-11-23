@@ -21,6 +21,7 @@ import { changelogRouter } from "./routes/changelog";
 import { disputesRouter } from "./routes/disputes";
 // Issue #240 — account deletion / anonymization
 import { usersRouter } from "./routes/users";
+import { recoveryCodesRouter } from "./routes/recovery-codes";
 import { adminUsersRouter } from "./routes/admin-users";
 // Issue #630 — platform-wide operator analytics (admin-only by design)
 import { analyticsRouter } from "./routes/analytics";
@@ -56,11 +57,13 @@ export function createApp(): Express {
   // #154 — Atomic ownership transfers
   app.use("/api/transfers", writeRateLimiter, requireAuth, transfersRouter);
   // #155 — Immutable changelog
-  app.use("/api/changelog", requireAuth, changelogRouter);
+  app.use("/api/changelog", writeRateLimiter, requireAuth, changelogRouter);
   // #156 — Dispute state machine
   app.use("/api/disputes", writeRateLimiter, requireAuth, disputesRouter);
   // #240 — Account deletion / anonymization
-  app.use("/api/users", writeRateLimiter, usersRouter);
+  // #528 — auth is enforced at the mount like every other sensitive route, so a
+  // handler added to users.ts later cannot ship without a token check.
+  app.use("/api/users", writeRateLimiter, requireAuth, usersRouter);
   app.use("/api/admin/users", authRateLimiter, requireAdmin, adminUsersRouter);
   // #630 — `/api/analytics` aggregates every escrow on the platform with no
   // per-user/tenant filter. That is intentional: it is an operator-only view,

@@ -1,5 +1,6 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
+import type { DecodedIdToken } from "firebase-admin/auth";
 import { firebaseAuth } from "../lib/firebase-admin";
 import { hasuraRequest } from "../lib/hasura";
 import { registerRoute } from "../lib/openapi";
@@ -16,7 +17,8 @@ export const usersRouter = Router();
  * is never exposed to the browser.
  *
  * What this does:
- *   1. Verifies the caller's Firebase ID token.
+ *   1. Verifies the caller's Firebase ID token (via `requireAuth` at the
+ *      mount in index.ts, with `resolveUser` below as a fallback).
  *   2. Looks up the Hasura user row by email.
  *   3. Anonymizes PII columns (email, first_name, last_name, phone_number,
  *      profile_image_url, summary, location) and marks the row deleted.
@@ -234,22 +236,41 @@ registerRoute({
   },
 });
 
-usersRouter.post("/reviews", async (req, res) => {
+/**
+ * Returns the caller's decoded Firebase token.
+ *
+ * `/api/users` is mounted behind `requireAuth` in index.ts (#528), which puts
+ * the verified token on `res.locals.user`. When that is present we reuse it.
+ * Otherwise (e.g. the router mounted on its own in a test) the token is
+ * verified here, so a handler is never reachable without authentication.
+ * Sends the 401 itself and returns `null` when the caller is not authenticated.
+ */
+async function resolveUser(
+  req: Request,
+  res: Response,
+  context: string
+): Promise<DecodedIdToken | null> {
+  if (res.locals.user) return res.locals.user as DecodedIdToken;
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader?.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Authorization header is required" });
+    res.status(401).json({ error: "Authorization header is required" });
+    return null;
   }
 
-  const token = authHeader.slice("Bearer ".length);
-
-  let decoded;
   try {
-    decoded = await firebaseAuth.verifyIdToken(token);
+    return await firebaseAuth.verifyIdToken(authHeader.slice("Bearer ".length));
   } catch (error) {
-    console.error("create-review: token verification failed", error);
-    return res.status(401).json({ error: "Invalid or expired token" });
+    console.error(`${context}: token verification failed`, error);
+    res.status(401).json({ error: "Invalid or expired token" });
+    return null;
   }
+}
+
+usersRouter.post("/reviews", async (req, res) => {
+  const decoded = await resolveUser(req, res, "create-review");
+  if (!decoded) return;
 
   const parsed = createReviewBodySchema.safeParse(req.body);
   if (!parsed.success) {
@@ -282,21 +303,8 @@ usersRouter.post("/reviews", async (req, res) => {
 });
 
 usersRouter.delete("/me", async (req, res) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader?.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Authorization header is required" });
-  }
-
-  const token = authHeader.slice("Bearer ".length);
-
-  let decoded;
-  try {
-    decoded = await firebaseAuth.verifyIdToken(token);
-  } catch (error) {
-    console.error("delete-user: token verification failed", error);
-    return res.status(401).json({ error: "Invalid or expired token" });
-  }
+  const decoded = await resolveUser(req, res, "delete-user");
+  if (!decoded) return;
 
   if (!decoded.email) {
     return res.status(400).json({ error: "Firebase account has no email" });
