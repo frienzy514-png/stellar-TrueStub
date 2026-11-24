@@ -296,15 +296,64 @@ describe('GET /api/analytics (mounted route)', () => {
       expect(eur.escrowsCompleted).toBe(0);
 
       const health = res.body.platformHealth;
-      expect(health.totalVolume).toBe(150);
+      expect(health.totalVolumeUsd).toBe(150);
       expect(health.activeEscrows).toBe(2);
       expect(health.totalCreated).toBe(3);
       expect(health.totalCompleted).toBe(1);
       expect(health.totalDisputes).toBe(1);
-      expect(health.totalValueLocked).toBe(15); // USD 10 + USDC 5
+      expect(health.totalValueLockedUsd).toBe(15); // USD 10 + USDC 5
       expect(health.avgReleaseHours).toBe(2);
       expect(health.completionRate).toBeGreaterThan(33);
       expect(health.completionRate).toBeLessThan(34);
+    });
+  });
+
+  describe('USD/USDC-denominated headline totals (mixed-asset labelling)', () => {
+    // The headline volume/TVL figures are deliberately USD/USDC-scoped
+    // (#627): non-dollar escrows must NOT silently inflate them. This test
+    // pins that contract with mixed-asset data — a non-dollar escrow is
+    // excluded from totalVolumeUsd/totalValueLockedUsd while its real amount
+    // is preserved in the per-asset breakdown.
+    it('excludes non-USD/USDC escrows from the headline totals but keeps them in the asset breakdown', async () => {
+      // periodRows — created in range, across three currencies.
+      const periodRows = [
+        { amount: '100', currency: 'USD', status: 'completed', created_at: '2026-01-01T10:00:00Z', released_at: '2026-01-01T12:00:00Z' },
+        { amount: '1000', currency: 'XLM', status: 'pending', created_at: '2026-01-01T11:00:00Z', released_at: null },
+        { amount: '5000', currency: 'EURC', status: 'pending', created_at: '2026-01-01T11:30:00Z', released_at: null },
+      ];
+      // activeRows — include a non-dollar active escrow so TVL excludes it.
+      const activeRows = [
+        { amount: '10', currency: 'USDC', status: 'pending', created_at: '2026-01-01T00:00:00Z', released_at: null },
+        { amount: '2000', currency: 'XLM', status: 'active', created_at: '2026-01-01T00:00:00Z', released_at: null },
+      ];
+
+      requestMock
+        .mockResolvedValueOnce({ escrow_transactions: periodRows }) // period (created_at range) call first
+        .mockResolvedValueOnce({ escrow_transactions: activeRows }); // active (status _in) call second
+      requestMock.mockResolvedValue({ escrow_transactions: [] }); // safety: any extra call returns empty
+
+      const res = await request(app).get('/api/analytics').query({
+        start: '2026-01-01T00:00:00.000Z',
+        end: '2026-01-01T23:59:59.999Z',
+      });
+
+      expect(res.status).toBe(200);
+
+      // Headline USD/USDC totals: XLM 1000 and EURC 5000 are NOT summed in,
+      // and the XLM 2000 active escrow does NOT count toward TVL.
+      expect(res.body.platformHealth.totalVolumeUsd).toBe(100); // USD only
+      expect(res.body.platformHealth.totalValueLockedUsd).toBe(10); // USDC only; XLM active excluded
+      expect(res.body.platformHealth.activeEscrows).toBe(2);
+
+      // The per-asset breakdown preserves every currency's real amount.
+      const byCurrency = Object.fromEntries(
+        res.body.assetBreakdown.map(
+          (entry: { currency: string; volume: number }) => [entry.currency, entry.volume],
+        ),
+      );
+      expect(byCurrency.USD).toBe(100);
+      expect(byCurrency.XLM).toBe(1000);
+      expect(byCurrency.EURC).toBe(5000);
     });
   });
 

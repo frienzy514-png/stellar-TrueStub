@@ -57,14 +57,14 @@ const mockedUseAnalyticsData = useAnalyticsData as jest.MockedFunction<
 >;
 
 const health = {
-  totalVolume: 0,
+  totalVolumeUsd: 0,
   activeEscrows: 0,
   totalCreated: 0,
   totalCompleted: 0,
   totalDisputes: 0,
   completionRate: 0,
   avgReleaseHours: 0,
-  totalValueLocked: 0,
+  totalValueLockedUsd: 0,
 };
 
 const baseReturn = {

@@ -218,7 +218,14 @@ analyticsRouter.get("/", async (req, res) => {
         a.currency.localeCompare(b.currency),
       ),
       platformHealth: {
-        totalVolume: chartData.reduce((sum, bucket) => sum + bucket.volume, 0),
+        // These headline totals are USD/USDC-denominated only: `bucket.volume`
+        // and `amountOf(row)` both zero out non-dollar currencies (see #627,
+        // and the amountOf/rawAmountOf distinction documented above). No
+        // price-conversion source exists to normalize XLM/EURC/etc. into a
+        // common unit, so they are intentionally excluded from the rollup
+        // rather than summed incorrectly. The full, per-currency picture
+        // lives in `assetBreakdown` (which uses `rawAmountOf`).
+        totalVolumeUsd: chartData.reduce((sum, bucket) => sum + bucket.volume, 0),
         activeEscrows: activeRows.length,
         totalCreated,
         totalCompleted,
@@ -227,7 +234,7 @@ analyticsRouter.get("/", async (req, res) => {
         avgReleaseHours: completedDurationCount
           ? completedDurationTotal / completedDurationCount
           : 0,
-        totalValueLocked: activeRows.reduce((sum, row) => sum + amountOf(row), 0),
+        totalValueLockedUsd: activeRows.reduce((sum, row) => sum + amountOf(row), 0),
       },
       hasData: periodRows.length > 0,
     });

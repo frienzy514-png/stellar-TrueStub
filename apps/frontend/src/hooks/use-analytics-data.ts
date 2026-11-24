@@ -19,14 +19,17 @@ interface UseAnalyticsDataOptions {
 }
 
 export interface PlatformHealthSummary {
-  totalVolume: number;
+  // USD/USDC-denominated only (see #627): non-dollar escrows are excluded
+  // from these headline totals and tracked per-currency in the asset
+  // breakdown instead.
+  totalVolumeUsd: number;
   activeEscrows: number;
   totalCreated: number;
   totalCompleted: number;
   totalDisputes: number;
   completionRate: number;
   avgReleaseHours: number;
-  totalValueLocked: number;
+  totalValueLockedUsd: number;
 }
 
 interface AnalyticsResponse {
@@ -38,14 +41,14 @@ interface AnalyticsResponse {
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
 
 const DEFAULT_PLATFORM_HEALTH: PlatformHealthSummary = {
-  totalVolume: 0,
+  totalVolumeUsd: 0,
   activeEscrows: 0,
   totalCreated: 0,
   totalCompleted: 0,
   totalDisputes: 0,
   completionRate: 0,
   avgReleaseHours: 0,
-  totalValueLocked: 0,
+  totalValueLockedUsd: 0,
 };
 
 interface UseAnalyticsDataReturn {
@@ -101,7 +104,7 @@ export const useAnalyticsData = ({
       return [
         {
           label: "USD / USDC Escrow Volume",
-          value: health.totalVolume,
+          value: health.totalVolumeUsd,
           change: calculateChange(latest.volume, previous.volume),
           trend: latest.volume >= previous.volume ? "up" : "down",
           icon: DollarSign,
