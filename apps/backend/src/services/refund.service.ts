@@ -48,6 +48,10 @@ import { getCorrelationId as getRequestId } from "../middleware/requestLogger";
 import { logger } from "../lib/logger";
 import { captureException } from "../lib/sentry";
 import { HasuraService } from "./hasura.service";
+import { queryWithTimeout } from "../lib/postgres";
+
+// Test-only in-memory store, kept out of this module (#516).
+export { InMemoryRefundStore, REFUND_STORE_MAX, REFUND_STORE_TTL_MS } from "./refund.memory-store";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -127,8 +131,7 @@ export class TrustlessWorkRefundExecutor implements RefundExecutor {
 /**
  * Pluggable storage backend for refund idempotency.
  *
- * Swap the default `InMemoryRefundStore` for a Redis- or DB-backed
- * implementation in multi-node deployments.
+ * The default is `PostgresRefundStore`; `InMemoryRefundStore` is for tests.
  */
 export interface RefundStore {
   has(refundId: string): Promise<boolean>;
@@ -162,73 +165,58 @@ export interface RefundStore {
   cleanupBefore(cutoff: Date): Promise<number>;
 }
 
-// ── In-memory default store ────────────────────────────────────────────────
+// ── Postgres store (default) ───────────────────────────────────────────────
 
-/** Default bounds for the in-memory store (#538), mirroring the webhook dedup map. */
-export const REFUND_STORE_MAX = 10_000;
-export const REFUND_STORE_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
-
-export class InMemoryRefundStore implements RefundStore {
-  private readonly store = new Map<string, ClaimedRefund>();
-
-  constructor(
-    private readonly maxSize = REFUND_STORE_MAX,
-    private readonly ttlMs = REFUND_STORE_TTL_MS,
-  ) {}
-
-  /** Drops expired records, then the oldest ones while over `maxSize`. */
-  private prune(): void {
-    const cutoff = Date.now() - this.ttlMs;
-    for (const [id, record] of this.store) {
-      if (new Date(record.claimedAt).getTime() < cutoff) {
-        this.store.delete(id);
-      }
-    }
-    // Map preserves insertion order, so the oldest entries come first.
-    while (this.store.size > this.maxSize) {
-      const oldest = this.store.keys().next().value;
-      if (oldest === undefined) break;
-      this.store.delete(oldest);
-    }
-  }
-
+/**
+ * Postgres-backed refund idempotency store (#516). The `refund_claims`
+ * primary key enforces idempotency, so claims survive restarts and are
+ * shared across backend instances.
+ */
+export class PostgresRefundStore implements RefundStore {
   async has(refundId: string): Promise<boolean> {
-    return this.store.has(refundId);
+    const result = await queryWithTimeout(
+      "SELECT 1 FROM refund_claims WHERE refund_id = $1",
+      [refundId]
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 
   async get(refundId: string): Promise<ClaimedRefund | undefined> {
-    return this.store.get(refundId);
+    const result = await queryWithTimeout<{ record: ClaimedRefund }>(
+      "SELECT record FROM refund_claims WHERE refund_id = $1",
+      [refundId]
+    );
+    return result.rows[0]?.record;
   }
 
   async set(refundId: string, record: ClaimedRefund): Promise<void> {
-    this.store.set(refundId, record);
+    await queryWithTimeout(
+      `INSERT INTO refund_claims (refund_id, escrow_id, claimed_at, record)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (refund_id) DO UPDATE
+         SET escrow_id = EXCLUDED.escrow_id,
+             claimed_at = EXCLUDED.claimed_at,
+             record = EXCLUDED.record`,
+      [refundId, record.escrowId, record.claimedAt, JSON.stringify(record)]
+    );
   }
 
   async insertIfAbsent(refundId: string, record: ClaimedRefund): Promise<boolean> {
-    // Single-threaded event loop: the has+set below cannot interleave with
-    // another insertIfAbsent call, so this is atomic for the in-memory store.
-    if (this.store.has(refundId)) {
-      return false;
-    }
-    this.store.set(refundId, record);
-    this.prune();
-    return true;
+    const result = await queryWithTimeout(
+      `INSERT INTO refund_claims (refund_id, escrow_id, claimed_at, record)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (refund_id) DO NOTHING`,
+      [refundId, record.escrowId, record.claimedAt, JSON.stringify(record)]
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 
   async cleanupBefore(cutoff: Date): Promise<number> {
-    let removed = 0;
-    for (const [id, record] of this.store) {
-      if (new Date(record.claimedAt) < cutoff) {
-        this.store.delete(id);
-        removed++;
-      }
-    }
-    return removed;
-  }
-
-  /** Visible for testing — returns the raw map size. */
-  get size(): number {
-    return this.store.size;
+    const result = await queryWithTimeout(
+      "DELETE FROM refund_claims WHERE claimed_at < $1",
+      [cutoff.toISOString()]
+    );
+    return result.rowCount ?? 0;
   }
 }
 
@@ -249,7 +237,7 @@ const STELLAR_ADDRESS = /^[GC][A-Z2-7]{55}$/;
 
 export class RefundService {
   constructor(
-    private readonly store: RefundStore = new InMemoryRefundStore(),
+    private readonly store: RefundStore = new PostgresRefundStore(),
     private readonly executor?: RefundExecutor,
     /**
      * Looks up the escrow's disputed balance so a wrong `amount` is rejected
@@ -426,7 +414,7 @@ export class RefundService {
 
 // Singleton — routes import this shared instance.  Claims execute on-chain.
 export const refundService = new RefundService(
-  new InMemoryRefundStore(),
+  new PostgresRefundStore(),
   new TrustlessWorkRefundExecutor(),
   (escrowId) => HasuraService.getEscrowAmountByContractId(escrowId),
 );
