@@ -1,0 +1,34 @@
+name: Env Schema Check
+
+on:
+  pull_request:
+    paths:
+      - "apps/backend/src/**"
+      - "scripts/check-env-schema-usage.mjs"
+      - ".github/workflows/env-schema-check.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/backend/src/**"
+      - "scripts/check-env-schema-usage.mjs"
+      - ".github/workflows/env-schema-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  env-schema-check:
+    name: Every env.X read exists in envSchema (#526)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Static check over the TypeScript sources: no dependency install needed.
+      - name: Cross-check env.X usage against envSchema
+        run: node scripts/check-env-schema-usage.mjs

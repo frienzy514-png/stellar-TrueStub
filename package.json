@@ -26,6 +26,7 @@
     "test": "yarn workspace @truestub/frontend test && yarn workspace @truestub/backend test && yarn test:contracts",
     "test:contracts": "cd contracts && cargo test",
     "typecheck": "yarn workspace @truestub/frontend typecheck && yarn workspace @truestub/backend typecheck",
+    "check:env-schema": "node scripts/check-env-schema-usage.mjs",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "migrate:up": "yarn workspace @truestub/backend migrate:up",
