@@ -2,6 +2,17 @@
 
 Node/TypeScript backend for the ticket-resale platform.
 
+> **Operational warning:** Run exactly one backend instance. Refund claim
+> idempotency state and changelog entries are held in memory: they are not
+> shared across replicas and are lost on restart, including an in-flight
+> refund's `pending` record. Disputes, ownership transfers, and webhook
+> delivery dedup use persistent stores (#515, #517, #518); the remaining
+> refund-persistence requirements are tracked in
+> [#608](https://github.com/Quanwritescodes/stellar-TrueStub/issues/608) and
+> [#610](https://github.com/Quanwritescodes/stellar-TrueStub/issues/610). Do
+> not enable multiple replicas with `ALLOW_UNSAFE_MULTI_INSTANCE=true` as a
+> workaround.
+
 ## Running with docker-compose
 
 ## Scheduled verification job
