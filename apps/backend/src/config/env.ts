@@ -148,7 +148,11 @@ export function validateEnv(rawEnv: NodeJS.ProcessEnv = process.env): Env {
   const result = envSchema.safeParse(nonEmpty);
 
   if (!result.success) {
-    const errorMessages = result.error.errors
+    // Zod 4 exposes validated failures on `.issues` (`.errors` was removed).
+    // Reading `.errors` here threw a TypeError that masked every validation
+    // problem — including a bad Hasura admin secret — behind
+    // "Cannot read properties of undefined (reading 'map')".
+    const errorMessages = result.error.issues
       .map((err) => `  - ${err.path.join(".")}: ${err.message}`)
       .join("\n");
 

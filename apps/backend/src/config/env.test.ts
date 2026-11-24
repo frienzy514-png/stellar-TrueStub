@@ -106,6 +106,31 @@ describe("Backend Environment Validation", () => {
     );
   });
 
+  // Regression for the Zod 4 validation path: reading the removed `.errors`
+  // property threw a TypeError that replaced the real diagnostics, so an
+  // operator with several bad variables only saw
+  // "Cannot read properties of undefined (reading 'map')" and had to fix
+  // them one boot at a time.
+  it("reports every invalid variable in one formatted message", () => {
+    let message = "";
+    try {
+      validateEnv({
+        ...REQUIRED,
+        PORT: "not-a-number",
+        HASURA_GRAPHQL_URL: "not-a-valid-url",
+        SENTRY_DSN: "also-not-a-url",
+      });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+
+    expect(message).toMatch(/Invalid environment variables/);
+    expect(message).toMatch(/PORT/);
+    expect(message).toMatch(/HASURA_GRAPHQL_URL/);
+    expect(message).toMatch(/SENTRY_DSN/);
+    expect(message).not.toMatch(/Cannot read properties of undefined/);
+  });
+
   describe("CORS_ORIGINS in production (#558)", () => {
     it("refuses to boot in production when CORS_ORIGINS is unset", () => {
       expect(() => validateEnv({ ...REQUIRED, NODE_ENV: "production" })).toThrow(/CORS_ORIGINS/);
