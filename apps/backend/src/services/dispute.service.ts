@@ -238,6 +238,36 @@ export function resolveTransition(
 
 // ── Storage ────────────────────────────────────────────────────────────────
 
+/**
+ * Simple in-memory store for use in tests and local development.
+ * Production uses PostgresDisputeStore, which persists across restarts.
+ */
+export class InMemoryDisputeStore implements DisputeStore {
+  private readonly store = new Map<string, Dispute>();
+
+  async get(disputeId: string): Promise<Dispute | undefined> {
+    return this.store.get(disputeId);
+  }
+
+  async set(disputeId: string, dispute: Dispute): Promise<void> {
+    this.store.set(disputeId, dispute);
+  }
+
+  async insertIfAbsent(disputeId: string, dispute: Dispute): Promise<boolean> {
+    if (this.store.has(disputeId)) return false;
+    this.store.set(disputeId, dispute);
+    return true;
+  }
+
+  async listByEscrow(escrowId: string): Promise<Dispute[]> {
+    return [...this.store.values()].filter((d) => d.escrowId === escrowId);
+  }
+
+  async listAll(): Promise<Dispute[]> {
+    return [...this.store.values()];
+  }
+}
+
 export interface DisputeStore {
   get(disputeId: string): Promise<Dispute | undefined>;
   set(disputeId: string, dispute: Dispute): Promise<void>;
