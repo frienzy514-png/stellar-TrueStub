@@ -32,9 +32,12 @@ interface AssetBreakdownEntry {
 }
 
 const PAGE_SIZE = 500;
+const BASE_ACTIVE_STATUSES = [
+  "pending", "funded", "active", "disputed", "created", "in_progress", "in_review", "held", "reserved"
+];
 const ACTIVE_STATUSES = [
-  "pending", "funded", "active", "disputed",
-  "PENDING", "FUNDED", "ACTIVE", "DISPUTED",
+  ...BASE_ACTIVE_STATUSES,
+  ...BASE_ACTIVE_STATUSES.map((s) => s.toUpperCase()),
 ];
 const COMPLETED_STATUSES = new Set(["completed", "released", "resolved"]);
 const DOLLAR_DENOMINATED_CURRENCIES = new Set(["USD", "USDC"]);
