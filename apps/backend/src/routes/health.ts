@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { checkDisputeResolverBalance } from "../services/dispute-resolver-balance.service";
 import { checkDeepHealth } from "../services/deep-health.service";
+import { sampleInMemoryStoreSizes } from "../services/in-memory-store-monitor";
 
 export const healthRouter = Router();
 
@@ -28,4 +29,19 @@ healthRouter.get("/dispute-resolver-balance", async (_req, res) => {
       message: err instanceof Error ? err.message : "unknown error",
     });
   }
+});
+
+/**
+ * GET /health/stores — in-memory store size report (issue #523).
+ *
+ * Returns the current entry counts for every tracked in-process store so
+ * operators can observe store growth without reading process memory directly.
+ * This endpoint is intentionally unauthenticated (like /health) so monitoring
+ * agents can poll it without credentials.
+ *
+ * Example response:
+ *   { "refundClaims": 142, "changelogEntries": 37 }
+ */
+healthRouter.get("/stores", (_req, res) => {
+  res.json(sampleInMemoryStoreSizes());
 });

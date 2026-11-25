@@ -134,6 +134,8 @@ export interface RefundStore {
   has(refundId: string): Promise<boolean>;
   get(refundId: string): Promise<ClaimedRefund | undefined>;
   set(refundId: string, record: ClaimedRefund): Promise<void>;
+  /** Current number of records held in this store (issue #523 — monitoring). */
+  readonly size: number;
   /**
    * Atomically inserts `record` for `refundId`, relying on a database-level
    * unique constraint on `refundId` to reject duplicates.
@@ -258,6 +260,15 @@ export class RefundService {
      */
     private readonly getDisputedBalance?: (escrowId: string) => Promise<number | null>,
   ) {}
+
+  /**
+   * Current number of refund-claim records held in the backing store.
+   * Exposed for operational monitoring (issue #523) so operators can observe
+   * store growth without reading process memory directly.
+   */
+  get storeSize(): number {
+    return this.store.size;
+  }
 
   /**
    * Attempts to record a refund claim for `refundId`.
