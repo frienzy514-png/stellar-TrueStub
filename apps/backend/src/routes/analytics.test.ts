@@ -21,6 +21,7 @@ import request from 'supertest';
 import express from 'express';
 import {
   analyticsRouter,
+  analyticsCache,
   amountOf,
   rawAmountOf,
   releaseDurationHours,
@@ -172,6 +173,7 @@ describe('GET /api/analytics (mounted route)', () => {
 
   beforeEach(() => {
     requestMock.mockReset();
+    analyticsCache.clear();
     app = buildApp();
   });
 
@@ -320,5 +322,90 @@ describe('GET /api/analytics (mounted route)', () => {
       expect(res.status).toBe(502);
       expect(res.body.error).toBe('Failed to load platform analytics');
     });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cache behaviour (issue #624)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('GET /api/analytics — caching (closes #624)', () => {
+  let app: express.Express;
+
+  beforeEach(() => {
+    requestMock.mockReset();
+    analyticsCache.clear();
+    app = buildApp();
+  });
+
+  it('a second request for the same date range does NOT re-query Hasura (cache HIT)', async () => {
+    requestMock.mockResolvedValue({ escrow_transactions: [] });
+
+    const params = {
+      start: '2026-02-01T00:00:00.000Z',
+      end: '2026-02-01T23:59:59.999Z',
+    };
+
+    // First request — should call Hasura (once for period rows, once for active).
+    const first = await request(app).get('/api/analytics').query(params);
+    expect(first.status).toBe(200);
+    expect(requestMock).toHaveBeenCalledTimes(2); // period + active calls
+
+    requestMock.mockReset();
+
+    // Second request with identical params — should be served from cache.
+    const second = await request(app).get('/api/analytics').query(params);
+    expect(second.status).toBe(200);
+    expect(requestMock).not.toHaveBeenCalled(); // no Hasura call
+    expect(second.headers['x-cache']).toBe('HIT');
+  });
+
+  it('a first request sets X-Cache: MISS', async () => {
+    requestMock.mockResolvedValue({ escrow_transactions: [] });
+
+    const res = await request(app).get('/api/analytics').query({
+      start: '2026-03-01T00:00:00.000Z',
+      end: '2026-03-01T23:59:59.999Z',
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers['x-cache']).toBe('MISS');
+  });
+
+  it('different date ranges are cached independently', async () => {
+    requestMock.mockResolvedValue({ escrow_transactions: [] });
+
+    await request(app).get('/api/analytics').query({
+      start: '2026-04-01T00:00:00.000Z',
+      end: '2026-04-01T23:59:59.999Z',
+    });
+    await request(app).get('/api/analytics').query({
+      start: '2026-04-02T00:00:00.000Z',
+      end: '2026-04-02T23:59:59.999Z',
+    });
+
+    // Each distinct range triggers its own Hasura queries (2 calls each = 4 total).
+    expect(requestMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('a 502 (Hasura failure) is NOT cached — the next request re-queries', async () => {
+    requestMock.mockRejectedValueOnce(new Error('down'));
+
+    const params = {
+      start: '2026-05-01T00:00:00.000Z',
+      end: '2026-05-01T23:59:59.999Z',
+    };
+
+    const failed = await request(app).get('/api/analytics').query(params);
+    expect(failed.status).toBe(502);
+    expect(requestMock).toHaveBeenCalledTimes(2); // attempted but failed
+
+    requestMock.mockReset();
+    requestMock.mockResolvedValue({ escrow_transactions: [] });
+
+    // The retry must hit Hasura again — the error must not have been cached.
+    const retry = await request(app).get('/api/analytics').query(params);
+    expect(retry.status).toBe(200);
+    expect(requestMock).toHaveBeenCalled();
   });
 });

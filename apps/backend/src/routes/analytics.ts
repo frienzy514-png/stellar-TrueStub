@@ -1,6 +1,64 @@
 import { Router } from "express";
 import { hasuraClient } from "../lib/hasura";
 
+// ── Cache (issue #624) ────────────────────────────────────────────────────
+
+/**
+ * Short-TTL in-process cache for analytics query results.
+ *
+ * Analytics data is read-only, recomputable, and non-authoritative — a brief
+ * staleness window is acceptable for a platform-operator dashboard.  A 2-minute
+ * TTL dramatically reduces Hasura load from repeated dashboard refreshes
+ * without meaningfully harming the freshness operators need.
+ *
+ * The cache is keyed on the ISO-string pair "startIso|endIso" so different
+ * date ranges are cached independently.  Entries are evicted lazily on the
+ * next read once the TTL has elapsed; there is no background sweeper.
+ *
+ * Unlike the money-movement in-memory stores (refund claims, changelog), this
+ * cache is safe to run in-process: it is read-only, deterministically
+ * recomputable from Hasura, and losing it on restart is harmless.
+ */
+export const ANALYTICS_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+
+interface CacheEntry<T> {
+  value: T;
+  expiresAt: number;
+}
+
+export class AnalyticsCache<T> {
+  private readonly store = new Map<string, CacheEntry<T>>();
+
+  get(key: string): T | undefined {
+    const entry = this.store.get(key);
+    if (!entry) return undefined;
+    if (Date.now() > entry.expiresAt) {
+      this.store.delete(key);
+      return undefined;
+    }
+    return entry.value;
+  }
+
+  set(key: string, value: T, ttlMs: number): void {
+    this.store.set(key, { value, expiresAt: Date.now() + ttlMs });
+  }
+
+  /** Visible for testing. */
+  get size(): number {
+    return this.store.size;
+  }
+
+  /** Clears all entries — for testing. */
+  clear(): void {
+    this.store.clear();
+  }
+}
+
+// Module-level singleton so the cache survives across requests in the same
+// process lifetime.  Exported for tests to clear between cases.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const analyticsCache = new AnalyticsCache<unknown>();
+
 interface EscrowRow {
   amount: number | string;
   currency: string | null;
@@ -130,6 +188,16 @@ analyticsRouter.get("/", async (req, res) => {
     return res.status(400).json({ error: "A valid date range of at most 366 days is required" });
   }
 
+  // #624 — short-TTL cache: a dashboard refresh for the same date range within
+  // ANALYTICS_CACHE_TTL_MS is served from the cache instead of re-running the
+  // full (unbounded) Hasura pagination query.
+  const cacheKey = `${start.toISOString()}|${end.toISOString()}`;
+  const cached = analyticsCache.get(cacheKey);
+  if (cached !== undefined) {
+    res.set("X-Cache", "HIT");
+    return res.json(cached);
+  }
+
   try {
     const [periodRows, activeRows] = await Promise.all([
       fetchEscrows({ created_at: { _gte: start.toISOString(), _lte: end.toISOString() } }),
@@ -212,7 +280,7 @@ analyticsRouter.get("/", async (req, res) => {
     const totalCompleted = chartData.reduce((sum, bucket) => sum + bucket.escrowsCompleted, 0);
     const totalDisputes = chartData.reduce((sum, bucket) => sum + bucket.disputes, 0);
 
-    return res.json({
+    const payload = {
       escrowChartData: chartData,
       assetBreakdown: Array.from(assetBreakdown.values()).sort((a, b) =>
         a.currency.localeCompare(b.currency),
@@ -230,7 +298,14 @@ analyticsRouter.get("/", async (req, res) => {
         totalValueLocked: activeRows.reduce((sum, row) => sum + amountOf(row), 0),
       },
       hasData: periodRows.length > 0,
-    });
+    };
+
+    // #624 — only successful computations are cached; a 502 (Hasura failure)
+    // must never be served stale-free-but-wrong from the cache on a retry.
+    analyticsCache.set(cacheKey, payload, ANALYTICS_CACHE_TTL_MS);
+
+    res.set("X-Cache", "MISS");
+    return res.json(payload);
   } catch {
     return res.status(502).json({ error: "Failed to load platform analytics" });
   }
