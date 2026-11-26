@@ -1,6 +1,64 @@
 import { Router } from "express";
 import { hasuraClient } from "../lib/hasura";
 
+// ── Cache (issue #624) ────────────────────────────────────────────────────
+
+/**
+ * Short-TTL in-process cache for analytics query results.
+ *
+ * Analytics data is read-only, recomputable, and non-authoritative — a brief
+ * staleness window is acceptable for a platform-operator dashboard.  A 2-minute
+ * TTL dramatically reduces Hasura load from repeated dashboard refreshes
+ * without meaningfully harming the freshness operators need.
+ *
+ * The cache is keyed on the ISO-string pair "startIso|endIso" so different
+ * date ranges are cached independently.  Entries are evicted lazily on the
+ * next read once the TTL has elapsed; there is no background sweeper.
+ *
+ * Unlike the money-movement in-memory stores (refund claims, changelog), this
+ * cache is safe to run in-process: it is read-only, deterministically
+ * recomputable from Hasura, and losing it on restart is harmless.
+ */
+export const ANALYTICS_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+
+interface CacheEntry<T> {
+  value: T;
+  expiresAt: number;
+}
+
+export class AnalyticsCache<T> {
+  private readonly store = new Map<string, CacheEntry<T>>();
+
+  get(key: string): T | undefined {
+    const entry = this.store.get(key);
+    if (!entry) return undefined;
+    if (Date.now() > entry.expiresAt) {
+      this.store.delete(key);
+      return undefined;
+    }
+    return entry.value;
+  }
+
+  set(key: string, value: T, ttlMs: number): void {
+    this.store.set(key, { value, expiresAt: Date.now() + ttlMs });
+  }
+
+  /** Visible for testing. */
+  get size(): number {
+    return this.store.size;
+  }
+
+  /** Clears all entries — for testing. */
+  clear(): void {
+    this.store.clear();
+  }
+}
+
+// Module-level singleton so the cache survives across requests in the same
+// process lifetime.  Exported for tests to clear between cases.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const analyticsCache = new AnalyticsCache<unknown>();
+
 interface EscrowRow {
   amount: number | string;
   currency: string | null;
@@ -32,9 +90,12 @@ interface AssetBreakdownEntry {
 }
 
 const PAGE_SIZE = 500;
+const BASE_ACTIVE_STATUSES = [
+  "pending", "funded", "active", "disputed", "created", "in_progress", "in_review", "held", "reserved"
+];
 const ACTIVE_STATUSES = [
-  "pending", "funded", "active", "disputed",
-  "PENDING", "FUNDED", "ACTIVE", "DISPUTED",
+  ...BASE_ACTIVE_STATUSES,
+  ...BASE_ACTIVE_STATUSES.map((s) => s.toUpperCase()),
 ];
 const COMPLETED_STATUSES = new Set(["completed", "released", "resolved"]);
 const DOLLAR_DENOMINATED_CURRENCIES = new Set(["USD", "USDC"]);
@@ -90,6 +151,32 @@ export function currencyOf(row: EscrowRow): string {
   return currency ? currency : UNKNOWN_CURRENCY;
 }
 
+/**
+ * Two amount accessors exist on purpose — they are NOT interchangeable, and the
+ * different response sections rely on each one for a specific reason (#628).
+ *
+ * `amountOf` returns the amount only for dollar-denominated currencies
+ * (USD/USDC, see DOLLAR_DENOMINATED_CURRENCIES) and `0` for anything else. It
+ * backs the headline platform rollups — the daily chart's `volume` and the
+ * `platformHealth` volume / TVL figures — which are deliberately scoped to
+ * USD/USDC (#627). This platform supports non-dollar escrows (XLM, EURC, …),
+ * but no price-conversion source is available to normalize them into a common
+ * unit, so summing them straight into a single "total" would mix incompatible
+ * currencies and produce a meaningless number. Non-dollar escrows are
+ * therefore excluded from the dollar-denominated rollups rather than summed
+ * incorrectly; the per-asset breakdown carries their real amounts instead.
+ *
+ * `rawAmountOf` returns the raw numeric amount regardless of currency. It
+ * backs the per-asset breakdown, where every row is grouped under its own
+ * currency so cross-currency mixing never happens and each asset's true
+ * volume is preserved.
+ *
+ * Rule of thumb: reach for `rawAmountOf` whenever the result is partitioned by
+ * currency; reach for `amountOf` only for the USD/USDC-denominated headline
+ * totals. If a true cross-currency total is ever needed, add a conversion step
+ * first — do not collapse these two functions into one that sums raw amounts
+ * across currencies.
+ */
 export function amountOf(row: EscrowRow): number {
   if (!DOLLAR_DENOMINATED_CURRENCIES.has(row.currency?.toUpperCase() ?? "")) return 0;
   const amount = Number(row.amount);
@@ -128,6 +215,16 @@ analyticsRouter.get("/", async (req, res) => {
     end.getTime() - start.getTime() > 366 * 24 * 60 * 60 * 1000
   ) {
     return res.status(400).json({ error: "A valid date range of at most 366 days is required" });
+  }
+
+  // #624 — short-TTL cache: a dashboard refresh for the same date range within
+  // ANALYTICS_CACHE_TTL_MS is served from the cache instead of re-running the
+  // full (unbounded) Hasura pagination query.
+  const cacheKey = `${start.toISOString()}|${end.toISOString()}`;
+  const cached = analyticsCache.get(cacheKey);
+  if (cached !== undefined) {
+    res.set("X-Cache", "HIT");
+    return res.json(cached);
   }
 
   try {
@@ -212,13 +309,20 @@ analyticsRouter.get("/", async (req, res) => {
     const totalCompleted = chartData.reduce((sum, bucket) => sum + bucket.escrowsCompleted, 0);
     const totalDisputes = chartData.reduce((sum, bucket) => sum + bucket.disputes, 0);
 
-    return res.json({
+    const payload = {
       escrowChartData: chartData,
       assetBreakdown: Array.from(assetBreakdown.values()).sort((a, b) =>
         a.currency.localeCompare(b.currency),
       ),
       platformHealth: {
-        totalVolume: chartData.reduce((sum, bucket) => sum + bucket.volume, 0),
+        // These headline totals are USD/USDC-denominated only: `bucket.volume`
+        // and `amountOf(row)` both zero out non-dollar currencies (see #627,
+        // and the amountOf/rawAmountOf distinction documented above). No
+        // price-conversion source exists to normalize XLM/EURC/etc. into a
+        // common unit, so they are intentionally excluded from the rollup
+        // rather than summed incorrectly. The full, per-currency picture
+        // lives in `assetBreakdown` (which uses `rawAmountOf`).
+        totalVolumeUsd: chartData.reduce((sum, bucket) => sum + bucket.volume, 0),
         activeEscrows: activeRows.length,
         totalCreated,
         totalCompleted,
@@ -227,10 +331,17 @@ analyticsRouter.get("/", async (req, res) => {
         avgReleaseHours: completedDurationCount
           ? completedDurationTotal / completedDurationCount
           : 0,
-        totalValueLocked: activeRows.reduce((sum, row) => sum + amountOf(row), 0),
+        totalValueLockedUsd: activeRows.reduce((sum, row) => sum + amountOf(row), 0),
       },
       hasData: periodRows.length > 0,
-    });
+    };
+
+    // #624 — only successful computations are cached; a 502 (Hasura failure)
+    // must never be served stale-free-but-wrong from the cache on a retry.
+    analyticsCache.set(cacheKey, payload, ANALYTICS_CACHE_TTL_MS);
+
+    res.set("X-Cache", "MISS");
+    return res.json(payload);
   } catch {
     return res.status(502).json({ error: "Failed to load platform analytics" });
   }

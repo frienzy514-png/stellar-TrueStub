@@ -4,6 +4,15 @@ Short, on-call-oriented procedures for diagnosing and recovering from
 production incidents. Each runbook is self-contained: an on-call person with
 no prior context on this codebase should be able to follow it.
 
+> **Current storage limitation:** Run exactly one backend instance. Refund
+> claim/idempotency state and changelog entries are process-local and are lost
+> on restart (including an in-flight refund's `pending` record). Separate
+> replicas do not share refund idempotency state. Disputes, ownership transfers,
+> and webhook delivery dedup now use persistent stores (#515, #517, #518), so
+> a restart should not erase those records. Refund-persistence requirements are
+> tracked in [#608](https://github.com/Quanwritescodes/stellar-TrueStub/issues/608)
+> and [#610](https://github.com/Quanwritescodes/stellar-TrueStub/issues/610).
+
 - [Stuck or failed refunds](#stuck-or-failed-refunds)
 - [Double refund detected](#double-refund-detected)
 - [Lost dispute state after a restart](#lost-dispute-state-after-a-restart)
@@ -291,11 +300,11 @@ Choose one per affected escrow, with the parties' agreement:
 
 ## Lost dispute state after a restart
 
-Dispute records are held in `InMemoryDisputeStore`
-(`apps/backend/src/services/dispute.service.ts`). A restart or redeploy
-while disputes are open erases them from the backend. The escrows still
-exist on-chain, so the funds are safe, but the platform no longer knows
-which disputes were open.
+Disputes now use a persistent store (`PostgresDisputeStore`); a normal restart
+or redeploy should not erase them (#515). If an open dispute is missing after
+a restart, treat it as a persistence or database incident rather than assuming
+the restart cleared it. The escrows still exist on-chain, so verify their
+state there while investigating.
 
 ### 1. Identify affected escrows
 
@@ -314,10 +323,10 @@ which disputes were open.
   already submitted, and tell them what to expect next.
 - Do not promise an outcome until the manual remediation below is complete.
 
-### 3. Manual remediation until persistence lands
+### 3. Manual remediation if a dispute record is unrecoverable
 
-- Re-create the dispute decision manually from the escrow state on-chain and
-  the parties' confirmed evidence.
+- Re-create the dispute record and decision manually from the escrow state
+  on-chain and the parties' confirmed evidence.
 - Resolve each escrow through the normal resolver flow, using the dispute
   resolver key, and record the transaction hash against the escrow.
 - Log every manual action in the incident log with the operator's name,
@@ -328,6 +337,5 @@ which disputes were open.
 - Confirm every escrow on the list is either resolved on-chain or back in an
   agreed state.
 - Tell the affected users the outcome in writing.
-- Track persistence for dispute records as the root fix. Until it ships, use
-  [Pre-restart checklist](DEPLOYMENT.md#pre-restart-checklist) before every
-  restart.
+- Use [Pre-restart checklist](DEPLOYMENT.md#pre-restart-checklist) when a
+  restart could affect other process-local state, especially refund claims.

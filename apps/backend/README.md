@@ -2,6 +2,17 @@
 
 Node/TypeScript backend for the ticket-resale platform.
 
+> **Operational warning:** Run exactly one backend instance. Refund claim
+> idempotency state and changelog entries are held in memory: they are not
+> shared across replicas and are lost on restart, including an in-flight
+> refund's `pending` record. Disputes, ownership transfers, and webhook
+> delivery dedup use persistent stores (#515, #517, #518); the remaining
+> refund-persistence requirements are tracked in
+> [#608](https://github.com/Quanwritescodes/stellar-TrueStub/issues/608) and
+> [#610](https://github.com/Quanwritescodes/stellar-TrueStub/issues/610). Do
+> not enable multiple replicas with `ALLOW_UNSAFE_MULTI_INSTANCE=true` as a
+> workaround.
+
 ## Running with docker-compose
 
 ## Scheduled verification job
@@ -71,6 +82,7 @@ compose file. Empty values are treated as unset.
 | `TRUSTLESS_WORK_WEBHOOK_SECRET` | no | `POST /webhooks/escrow-status` rejects every delivery until set. |
 | `TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS` | no | Optional comma-separated IPs/CIDRs allowed to call `POST /webhooks/escrow-status` (defense-in-depth on top of HMAC; unset = no IP check). Malformed entries fail startup. See `SECURITY.md`. |
 | `TRUSTLESS_WORK_API_URL`, `STELLAR_NETWORK` | no | Default to testnet. |
+| `DISPUTE_RESOLVER_WALLET_ADDRESS`, `DISPUTE_RESOLVER_LOW_BALANCE_THRESHOLD` | no | Dispute-resolver wallet balance monitor (#420). The address must be a Stellar `G...` account id; unset disables the monitor. The threshold is a non-negative number. See [`docs/ENV_SCHEMA_AUDIT.md`](../../docs/ENV_SCHEMA_AUDIT.md). |
 | `SENTRY_DSN`, `CRITICAL_ALERT_WEBHOOK_URL` | no | Error tracking / refund-transfer failure alerts. |
 | `CORS_ORIGINS`, `LOG_LEVEL`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX` | no | Defaults: `http://localhost:3000`, `info`, `900000`, `100`. |
 | `EMAIL_PROVIDER`, `SENDGRID_API_KEY`, `NOTIFICATION_FROM_EMAIL` | no | Notification delivery. |

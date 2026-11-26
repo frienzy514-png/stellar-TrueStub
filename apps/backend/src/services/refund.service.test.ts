@@ -127,6 +127,24 @@ describe("RefundService — idempotency guard (#153)", () => {
       // not merely by an application-level check-then-write.
       expect(rejection.reason).toBeInstanceOf(AppError);
     });
+
+    it("allows the same refundId through separate service instances with independent in-memory stores (#520)", async () => {
+      const first = makeService();
+      const second = makeService();
+
+      const results = await Promise.all([
+        first.service.claimRefund(basePayload),
+        second.service.claimRefund(basePayload),
+      ]);
+
+      expect(results).toHaveLength(2);
+      expect(results.map((record) => record.refundId)).toEqual([
+        basePayload.refundId,
+        basePayload.refundId,
+      ]);
+      expect(await first.service.getClaimStatus(basePayload.refundId)).toBeDefined();
+      expect(await second.service.getClaimStatus(basePayload.refundId)).toBeDefined();
+    });
   });
 
   describe("getClaimStatus", () => {

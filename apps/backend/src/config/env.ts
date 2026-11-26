@@ -88,6 +88,22 @@ export const envSchema = z.object({
     .optional(),
   STELLAR_NETWORK: z.enum(["testnet", "mainnet"]).default("testnet"),
 
+  // Dispute-resolver wallet balance monitoring (#420). These are the Stellar
+  // public address of the platform's dispute-resolver wallet and the balance
+  // below which the monitor raises a low-balance alert. Both were previously
+  // read straight from `process.env`, so a typo or a malformed value was only
+  // discovered by a silent `undefined` at runtime (#526). The address is
+  // validated as a Stellar `G...` account id and the threshold is coerced to a
+  // number; the monitor is skipped when the address is unset.
+  DISPUTE_RESOLVER_WALLET_ADDRESS: z
+    .string()
+    .regex(/^G[A-Z2-7]{55}$/, "DISPUTE_RESOLVER_WALLET_ADDRESS must be a Stellar public key (G...)")
+    .optional(),
+  DISPUTE_RESOLVER_LOW_BALANCE_THRESHOLD: z.coerce
+    .number()
+    .nonnegative("DISPUTE_RESOLVER_LOW_BALANCE_THRESHOLD must be zero or greater")
+    .optional(),
+
   // Frontend's independently-configured network (NEXT_PUBLIC_TRUSTLESS_NETWORK),
   // surfaced to the backend so the startup check (#414) can confirm both
   // services agree on testnet vs. mainnet. Optional: when unset the check is
@@ -148,7 +164,11 @@ export function validateEnv(rawEnv: NodeJS.ProcessEnv = process.env): Env {
   const result = envSchema.safeParse(nonEmpty);
 
   if (!result.success) {
-    const errorMessages = result.error.errors
+    // Zod 4 exposes validated failures on `.issues` (`.errors` was removed).
+    // Reading `.errors` here threw a TypeError that masked every validation
+    // problem — including a bad Hasura admin secret — behind
+    // "Cannot read properties of undefined (reading 'map')".
+    const errorMessages = result.error.issues
       .map((err) => `  - ${err.path.join(".")}: ${err.message}`)
       .join("\n");
 

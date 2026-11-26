@@ -165,7 +165,7 @@ export const AnalyticsDashboard: React.FC = () => {
             <div className="space-y-1">
                 <span className="text-xs text-muted-foreground">Active USD / USDC Locked</span>
               <p className="text-lg sm:text-xl font-bold text-white">
-                {formatCurrency(platformHealth.totalValueLocked)}
+                {formatCurrency(platformHealth.totalValueLockedUsd)}
               </p>
             </div>
             <div className="space-y-1">
@@ -183,7 +183,7 @@ export const AnalyticsDashboard: React.FC = () => {
             <div className="space-y-1">
               <span className="text-xs text-muted-foreground">USD / USDC Period Volume</span>
               <p className="text-lg sm:text-xl font-bold text-blue-400">
-                {formatCurrency(platformHealth.totalVolume)}
+                {formatCurrency(platformHealth.totalVolumeUsd)}
               </p>
             </div>
           </div>

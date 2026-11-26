@@ -23,9 +23,15 @@ import { disputesRouter } from "./routes/disputes";
 import { usersRouter } from "./routes/users";
 import { recoveryCodesRouter } from "./routes/recovery-codes";
 import { adminUsersRouter } from "./routes/admin-users";
+// sync-user upserts the authenticated caller's own profile into Hasura on
+// login. It was exported from routes/sync-user.ts but never mounted here — the
+// structural test added in routes-mounting.test.ts (#626) now enforces that
+// every *Router-exporting file under routes/ is wired in below.
+import { syncUserRouter } from "./routes/sync-user";
 // Issue #630 — platform-wide operator analytics (admin-only by design)
 import { analyticsRouter } from "./routes/analytics";
 import { startDisputeResolverBalanceMonitor } from "./services/dispute-resolver-balance.service";
+import { startInMemoryStoreMonitor } from "./services/in-memory-store-monitor";
 import { assertFirebaseAdminConfigured } from "./config/firebase-startup-check";
 import { assertDatabaseReachable } from "./config/database-startup-check";
 import { warnIfTrustlessWorkUnconfigured } from "./config/trustless-work-startup-check";
@@ -64,6 +70,10 @@ export function createApp(): Express {
   // #528 — auth is enforced at the mount like every other sensitive route, so a
   // handler added to users.ts later cannot ship without a token check.
   app.use("/api/users", writeRateLimiter, requireAuth, usersRouter);
+  // #626 — sync-user was exported but never mounted. Auth is enforced at the
+  // mount like every other sensitive write route (#528); the handler also
+  // verifies the Firebase token itself, so a valid token is required.
+  app.use("/api/sync-user", writeRateLimiter, requireAuth, syncUserRouter);
   app.use("/api/admin/users", authRateLimiter, requireAdmin, adminUsersRouter);
   // #630 — `/api/analytics` aggregates every escrow on the platform with no
   // per-user/tenant filter. That is intentional: it is an operator-only view,
@@ -94,11 +104,30 @@ async function startServer(): Promise<void> {
     .then(() => {
       warnIfTrustlessWorkUnconfigured();
       app.listen(env.PORT, () => {
+        logger.warn(
+          {
+            inMemoryState: [
+              "RefundService (src/services/refund.service.ts)",
+              "ChangelogService (src/services/changelog.service.ts)",
+            ],
+            persistentState: [
+              "DisputeService (src/services/dispute.service.ts; #515)",
+              "OwnershipTransferService (src/services/ownership-transfer.service.ts; #517)",
+              "webhook delivery dedup (src/routes/webhooks.ts; #518)",
+            ],
+          },
+          "Backend storage warning: refund claims and changelog entries are process-local and lost on restart; run exactly one instance until the remaining in-memory state is persisted"
+        );
         logger.info({ port: env.PORT, env: env.NODE_ENV }, "TrueStub backend listening");
 
         // #518 — prune old webhook delivery dedup rows on a schedule instead of
         // evicting them from an in-process Map.
         startProcessedWebhookEventCleanup();
+
+        // #523 — periodically log the size of every in-process store so
+        // operators can observe growth and alert on unexpectedly large counts.
+        startInMemoryStoreMonitor();
+        logger.info("In-memory store size monitor started");
 
         // #420 — Periodically check the dispute-resolver wallet balance so a low
         // balance alerts before it causes a failed refund.
