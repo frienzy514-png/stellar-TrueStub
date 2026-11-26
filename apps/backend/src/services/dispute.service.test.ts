@@ -9,6 +9,7 @@
 
 import {
   DisputeService,
+  InMemoryDisputeStore,
   DISPUTE_ERROR_CODES,
   DISPUTE_TRANSITIONS,
   FINAL_STATES,
@@ -21,31 +22,7 @@ import {
 import { AppError } from "../middleware/errorHandler";
 
 /** Test-only store; production uses PostgresDisputeStore. */
-class TestDisputeStore implements DisputeStore {
-  private readonly store = new Map<string, Dispute>();
-
-  async get(disputeId: string): Promise<Dispute | undefined> {
-    return this.store.get(disputeId);
-  }
-
-  async set(disputeId: string, dispute: Dispute): Promise<void> {
-    this.store.set(disputeId, dispute);
-  }
-
-  async insertIfAbsent(disputeId: string, dispute: Dispute): Promise<boolean> {
-    if (this.store.has(disputeId)) return false;
-    this.store.set(disputeId, dispute);
-    return true;
-  }
-
-  async listByEscrow(escrowId: string): Promise<Dispute[]> {
-    return [...this.store.values()].filter((d) => d.escrowId === escrowId);
-  }
-
-  async listAll(): Promise<Dispute[]> {
-    return [...this.store.values()];
-  }
-}
+class TestDisputeStore extends InMemoryDisputeStore {}
 
 function makeService() {
   const store = new TestDisputeStore();
@@ -245,6 +222,46 @@ describe("DisputeService — state machine (#156)", () => {
         expect(Object.keys(DISPUTE_TRANSITIONS[state])).toHaveLength(0);
       }
     });
+  });
+});
+
+// ── Persistence across restarts (#511) ────────────────────────────────────
+//
+// Proves that DisputeService survives a "restart" by sharing a durable store
+// across two service instances. The first instance opens a dispute; the second
+// instance — constructed fresh, as a restarted process would be — must still
+// be able to read and transition it.
+describe("DisputeService — persistence across restarts (#511)", () => {
+  it("dispute opened by one instance is readable and transitionable by a new instance", async () => {
+    // A shared store represents durable storage (Postgres in production).
+    const sharedStore = new InMemoryDisputeStore();
+
+    // First instance opens the dispute.
+    const firstInstance = new DisputeService(sharedStore);
+    const opened = await firstInstance.openDispute({
+      disputeId: "dispute-restart-1",
+      escrowId: "escrow-restart-1",
+      raisedBy: "buyer-restart",
+      reason: "Item not received",
+    });
+    expect(opened.state).toBe("OPEN");
+
+    // Simulate a restart: construct a brand-new service instance backed by
+    // the same durable store. In production this is PostgresDisputeStore.
+    const restartedInstance = new DisputeService(sharedStore);
+
+    // The restarted instance can read the dispute that the first instance created.
+    const retrieved = await restartedInstance.getDispute("dispute-restart-1");
+    expect(retrieved).toBeDefined();
+    expect(retrieved!.state).toBe("OPEN");
+    expect(retrieved!.escrowId).toBe("escrow-restart-1");
+
+    // The restarted instance can also transition the dispute.
+    const resolved = await restartedInstance.transition("dispute-restart-1", "resolve", {
+      resolution: "Refund approved",
+    });
+    expect(resolved.state).toBe("RESOLVED");
+    expect(resolved.resolution).toBe("Refund approved");
   });
 });
 
