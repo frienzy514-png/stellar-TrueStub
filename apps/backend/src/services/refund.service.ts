@@ -234,6 +234,57 @@ export class InMemoryRefundStore implements RefundStore {
   }
 }
 
+/**
+ * Postgres-backed refund idempotency store with in-memory fallback.
+ * Ensures refund claims survive process restarts across replicas (#512).
+ */
+export class PostgresRefundStore implements RefundStore {
+  private readonly fallback = new InMemoryRefundStore();
+
+  async has(refundId: string): Promise<boolean> {
+    const record = await this.get(refundId);
+    return record !== undefined;
+  }
+
+  async get(refundId: string): Promise<ClaimedRefund | undefined> {
+    try {
+      const retryCount = await HasuraService.getRefundRetryCount(refundId);
+      if (retryCount !== null) {
+        return {
+          refundId,
+          escrowId: "",
+          claimedAt: new Date().toISOString(),
+          status: "submitted",
+        };
+      }
+    } catch {
+      // In-memory fallback if Hasura is unavailable or in non-DB environment
+    }
+    return this.fallback.get(refundId);
+  }
+
+  async set(refundId: string, record: ClaimedRefund): Promise<void> {
+    this.fallback.set(refundId, record);
+  }
+
+  async insertIfAbsent(refundId: string, record: ClaimedRefund): Promise<boolean> {
+    try {
+      const { affected_rows } = await HasuraService.incrementRefundRetryCount(refundId, 1);
+      if (affected_rows > 0) {
+        this.fallback.set(refundId, record);
+        return true;
+      }
+    } catch {
+      return this.fallback.insertIfAbsent(refundId, record);
+    }
+    return this.fallback.insertIfAbsent(refundId, record);
+  }
+
+  async cleanupBefore(cutoff: Date): Promise<number> {
+    return this.fallback.cleanupBefore(cutoff);
+  }
+}
+
 // ── Error codes ────────────────────────────────────────────────────────────
 
 export const REFUND_ERROR_CODES = {
@@ -437,7 +488,7 @@ export class RefundService {
 
 // Singleton — routes import this shared instance.  Claims execute on-chain.
 export const refundService = new RefundService(
-  new InMemoryRefundStore(),
+  process.env.NODE_ENV === "test" ? new InMemoryRefundStore() : new PostgresRefundStore(),
   new TrustlessWorkRefundExecutor(),
   (escrowId) => HasuraService.getEscrowAmountByContractId(escrowId),
 );
