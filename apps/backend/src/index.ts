@@ -95,6 +95,20 @@ async function startServer(): Promise<void> {
     .then(() => {
       warnIfTrustlessWorkUnconfigured();
       app.listen(env.PORT, () => {
+        logger.warn(
+          {
+            inMemoryState: [
+              "RefundService (src/services/refund.service.ts)",
+              "ChangelogService (src/services/changelog.service.ts)",
+            ],
+            persistentState: [
+              "DisputeService (src/services/dispute.service.ts; #515)",
+              "OwnershipTransferService (src/services/ownership-transfer.service.ts; #517)",
+              "webhook delivery dedup (src/routes/webhooks.ts; #518)",
+            ],
+          },
+          "Backend storage warning: refund claims and changelog entries are process-local and lost on restart; run exactly one instance until the remaining in-memory state is persisted"
+        );
         logger.info({ port: env.PORT, env: env.NODE_ENV }, "TrueStub backend listening");
 
         // #518 — prune old webhook delivery dedup rows on a schedule instead of
