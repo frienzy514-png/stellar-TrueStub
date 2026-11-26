@@ -185,6 +185,8 @@ export interface ChangelogStore {
   set(entryId: string, entry: ChangelogEntry): Promise<void>;
   delete(entryId: string): Promise<boolean>;
   listByResource(resourceId: string): Promise<ChangelogEntry[]>;
+  /** Returns the current number of entries held in this store. */
+  readonly size: number;
 }
 
 export class InMemoryChangelogStore implements ChangelogStore {
@@ -235,6 +237,15 @@ export class ChangelogService {
    */
   onEvent(listener: (event: ChangelogEvent) => void): void {
     this.listeners.push(listener);
+  }
+
+  /**
+   * Current number of entries held in the backing store.
+   * Exposed for operational monitoring (issue #523) so operators can observe
+   * store growth without reading process memory directly.
+   */
+  get storeSize(): number {
+    return this.store.size;
   }
 
   /**

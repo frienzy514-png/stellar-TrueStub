@@ -26,6 +26,7 @@ import { adminUsersRouter } from "./routes/admin-users";
 // Issue #630 — platform-wide operator analytics (admin-only by design)
 import { analyticsRouter } from "./routes/analytics";
 import { startDisputeResolverBalanceMonitor } from "./services/dispute-resolver-balance.service";
+import { startInMemoryStoreMonitor } from "./services/in-memory-store-monitor";
 import { assertFirebaseAdminConfigured } from "./config/firebase-startup-check";
 import { assertDatabaseReachable } from "./config/database-startup-check";
 import { warnIfTrustlessWorkUnconfigured } from "./config/trustless-work-startup-check";
@@ -99,6 +100,11 @@ async function startServer(): Promise<void> {
         // #518 — prune old webhook delivery dedup rows on a schedule instead of
         // evicting them from an in-process Map.
         startProcessedWebhookEventCleanup();
+
+        // #523 — periodically log the size of every in-process store so
+        // operators can observe growth and alert on unexpectedly large counts.
+        startInMemoryStoreMonitor();
+        logger.info("In-memory store size monitor started");
 
         // #420 — Periodically check the dispute-resolver wallet balance so a low
         // balance alerts before it causes a failed refund.
