@@ -23,6 +23,11 @@ import { disputesRouter } from "./routes/disputes";
 import { usersRouter } from "./routes/users";
 import { recoveryCodesRouter } from "./routes/recovery-codes";
 import { adminUsersRouter } from "./routes/admin-users";
+// sync-user upserts the authenticated caller's own profile into Hasura on
+// login. It was exported from routes/sync-user.ts but never mounted here — the
+// structural test added in routes-mounting.test.ts (#626) now enforces that
+// every *Router-exporting file under routes/ is wired in below.
+import { syncUserRouter } from "./routes/sync-user";
 // Issue #630 — platform-wide operator analytics (admin-only by design)
 import { analyticsRouter } from "./routes/analytics";
 import { startDisputeResolverBalanceMonitor } from "./services/dispute-resolver-balance.service";
@@ -65,6 +70,10 @@ export function createApp(): Express {
   // #528 — auth is enforced at the mount like every other sensitive route, so a
   // handler added to users.ts later cannot ship without a token check.
   app.use("/api/users", writeRateLimiter, requireAuth, usersRouter);
+  // #626 — sync-user was exported but never mounted. Auth is enforced at the
+  // mount like every other sensitive write route (#528); the handler also
+  // verifies the Firebase token itself, so a valid token is required.
+  app.use("/api/sync-user", writeRateLimiter, requireAuth, syncUserRouter);
   app.use("/api/admin/users", authRateLimiter, requireAdmin, adminUsersRouter);
   // #630 — `/api/analytics` aggregates every escrow on the platform with no
   // per-user/tenant filter. That is intentional: it is an operator-only view,
