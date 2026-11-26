@@ -151,6 +151,32 @@ export function currencyOf(row: EscrowRow): string {
   return currency ? currency : UNKNOWN_CURRENCY;
 }
 
+/**
+ * Two amount accessors exist on purpose — they are NOT interchangeable, and the
+ * different response sections rely on each one for a specific reason (#628).
+ *
+ * `amountOf` returns the amount only for dollar-denominated currencies
+ * (USD/USDC, see DOLLAR_DENOMINATED_CURRENCIES) and `0` for anything else. It
+ * backs the headline platform rollups — the daily chart's `volume` and the
+ * `platformHealth` volume / TVL figures — which are deliberately scoped to
+ * USD/USDC (#627). This platform supports non-dollar escrows (XLM, EURC, …),
+ * but no price-conversion source is available to normalize them into a common
+ * unit, so summing them straight into a single "total" would mix incompatible
+ * currencies and produce a meaningless number. Non-dollar escrows are
+ * therefore excluded from the dollar-denominated rollups rather than summed
+ * incorrectly; the per-asset breakdown carries their real amounts instead.
+ *
+ * `rawAmountOf` returns the raw numeric amount regardless of currency. It
+ * backs the per-asset breakdown, where every row is grouped under its own
+ * currency so cross-currency mixing never happens and each asset's true
+ * volume is preserved.
+ *
+ * Rule of thumb: reach for `rawAmountOf` whenever the result is partitioned by
+ * currency; reach for `amountOf` only for the USD/USDC-denominated headline
+ * totals. If a true cross-currency total is ever needed, add a conversion step
+ * first — do not collapse these two functions into one that sums raw amounts
+ * across currencies.
+ */
 export function amountOf(row: EscrowRow): number {
   if (!DOLLAR_DENOMINATED_CURRENCIES.has(row.currency?.toUpperCase() ?? "")) return 0;
   const amount = Number(row.amount);
