@@ -106,6 +106,69 @@ describe("Backend Environment Validation", () => {
     );
   });
 
+  // Regression for the Zod 4 validation path: reading the removed `.errors`
+  // property threw a TypeError that replaced the real diagnostics, so an
+  // operator with several bad variables only saw
+  // "Cannot read properties of undefined (reading 'map')" and had to fix
+  // them one boot at a time.
+  it("reports every invalid variable in one formatted message", () => {
+    let message = "";
+    try {
+      validateEnv({
+        ...REQUIRED,
+        PORT: "not-a-number",
+        HASURA_GRAPHQL_URL: "not-a-valid-url",
+        SENTRY_DSN: "also-not-a-url",
+      });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+
+    expect(message).toMatch(/Invalid environment variables/);
+    expect(message).toMatch(/PORT/);
+    expect(message).toMatch(/HASURA_GRAPHQL_URL/);
+    expect(message).toMatch(/SENTRY_DSN/);
+    expect(message).not.toMatch(/Cannot read properties of undefined/);
+  });
+
+  // #526 — these two were previously read straight from process.env, so the
+  // index.ts reference to a non-schema key was always undefined and a bad
+  // threshold silently disabled the low-balance alert.
+  describe("dispute-resolver balance monitor variables (#420/#526)", () => {
+    const VALID_ADDRESS = `G${"A".repeat(55)}`;
+
+    it("accepts a Stellar address and coerces the threshold to a number", () => {
+      const parsed = validateEnv({
+        ...REQUIRED,
+        DISPUTE_RESOLVER_WALLET_ADDRESS: VALID_ADDRESS,
+        DISPUTE_RESOLVER_LOW_BALANCE_THRESHOLD: "25",
+      });
+      expect(parsed.DISPUTE_RESOLVER_WALLET_ADDRESS).toBe(VALID_ADDRESS);
+      expect(parsed.DISPUTE_RESOLVER_LOW_BALANCE_THRESHOLD).toBe(25);
+    });
+
+    it("leaves both unset when omitted, so the monitor stays disabled", () => {
+      const parsed = validateEnv({ ...REQUIRED });
+      expect(parsed.DISPUTE_RESOLVER_WALLET_ADDRESS).toBeUndefined();
+      expect(parsed.DISPUTE_RESOLVER_LOW_BALANCE_THRESHOLD).toBeUndefined();
+    });
+
+    it("rejects an address that is not a Stellar account id", () => {
+      expect(() =>
+        validateEnv({ ...REQUIRED, DISPUTE_RESOLVER_WALLET_ADDRESS: "not-a-stellar-address" }),
+      ).toThrow(/DISPUTE_RESOLVER_WALLET_ADDRESS/);
+    });
+
+    it("rejects a non-numeric or negative threshold instead of ignoring it", () => {
+      expect(() =>
+        validateEnv({ ...REQUIRED, DISPUTE_RESOLVER_LOW_BALANCE_THRESHOLD: "not-a-number" }),
+      ).toThrow(/DISPUTE_RESOLVER_LOW_BALANCE_THRESHOLD/);
+      expect(() =>
+        validateEnv({ ...REQUIRED, DISPUTE_RESOLVER_LOW_BALANCE_THRESHOLD: "-1" }),
+      ).toThrow(/DISPUTE_RESOLVER_LOW_BALANCE_THRESHOLD/);
+    });
+  });
+
   describe("CORS_ORIGINS in production (#558)", () => {
     it("refuses to boot in production when CORS_ORIGINS is unset", () => {
       expect(() => validateEnv({ ...REQUIRED, NODE_ENV: "production" })).toThrow(/CORS_ORIGINS/);

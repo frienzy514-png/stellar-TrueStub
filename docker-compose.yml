@@ -73,6 +73,10 @@ services:
       TRUSTLESS_WORK_WEBHOOK_SECRET: ${TRUSTLESS_WORK_WEBHOOK_SECRET:-}
       TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS: ${TRUSTLESS_WORK_WEBHOOK_ALLOWED_IPS:-}
       STELLAR_NETWORK: ${STELLAR_NETWORK:-testnet}
+      # Dispute-resolver wallet balance monitor (#420). Optional: the monitor is
+      # skipped when the address is unset. Validated by the env schema (#526).
+      DISPUTE_RESOLVER_WALLET_ADDRESS: ${DISPUTE_RESOLVER_WALLET_ADDRESS:-}
+      DISPUTE_RESOLVER_LOW_BALANCE_THRESHOLD: ${DISPUTE_RESOLVER_LOW_BALANCE_THRESHOLD:-}
       # Observability — optional
       SENTRY_DSN: ${SENTRY_DSN:-}
       CRITICAL_ALERT_WEBHOOK_URL: ${CRITICAL_ALERT_WEBHOOK_URL:-}

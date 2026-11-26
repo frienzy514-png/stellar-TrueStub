@@ -111,4 +111,39 @@ describe("Hasura transport with a configured environment", () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect((init.headers as Record<string, string>)["x-hasura-admin-secret"]).toBe(LEGACY_SECRET);
   });
+
+  // #524 — the transport used to read `env.HASURA_ADMIN_SECRET`, a key that is
+  // not in the schema, so `requireHasuraConfig()` always saw `undefined`. The
+  // canonical name must win even when an operator also has the legacy alias in
+  // their environment.
+  it("prefers the canonical secret over the legacy alias in the request header", async () => {
+    process.env.HASURA_ADMIN_SECRET = LEGACY_SECRET;
+    const { hasuraRequest } = loadConfiguredHasura();
+
+    await hasuraRequest("query { ping }");
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>)["x-hasura-admin-secret"]).toBe(ADMIN_SECRET);
+  });
+
+  it("fails with an actionable error and no request when the admin secret is missing", async () => {
+    delete process.env.HASURA_GRAPHQL_ADMIN_SECRET;
+    delete process.env.HASURA_ADMIN_SECRET;
+    const { hasuraRequest } = loadConfiguredHasura();
+
+    await expect(hasuraRequest("query { ping }")).rejects.toThrow(
+      "HASURA_GRAPHQL_URL and HASURA_GRAPHQL_ADMIN_SECRET must be configured for Hasura requests"
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("fails with the same actionable error when the URL is missing", async () => {
+    delete process.env.HASURA_GRAPHQL_URL;
+    const { hasuraRequest } = loadConfiguredHasura();
+
+    await expect(hasuraRequest("query { ping }")).rejects.toThrow(
+      /HASURA_GRAPHQL_URL and HASURA_GRAPHQL_ADMIN_SECRET must be configured/
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

@@ -1,3 +1,4 @@
+import { env } from '../config/env';
 import { logger } from '../lib/logger';
 import { captureLowBalanceAlert } from '../lib/sentry';
 import { getAccountBalance } from '../lib/trustless-work';
@@ -22,17 +23,6 @@ export interface DisputeResolverBalanceCheckResult {
   error?: unknown;
 }
 
-function parseThreshold(raw: string | undefined): number | undefined {
-  if (raw === undefined || raw.trim() === '') {
-    return undefined;
-  }
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed)) {
-    return undefined;
-  }
-  return parsed;
-}
-
 /**
  * Performs a single balance check for the dispute-resolver wallet.
  *
@@ -42,7 +32,7 @@ function parseThreshold(raw: string | undefined): number | undefined {
  * - Triggers a low-balance alert when the balance is below the threshold.
  */
 export async function checkDisputeResolverBalance(): Promise<DisputeResolverBalanceCheckResult> {
-  const walletAddress = process.env.DISPUTE_RESOLVER_WALLET_ADDRESS;
+  const walletAddress = env.DISPUTE_RESOLVER_WALLET_ADDRESS;
 
   if (!walletAddress || walletAddress.trim() === '') {
     logger.debug(
@@ -51,7 +41,9 @@ export async function checkDisputeResolverBalance(): Promise<DisputeResolverBala
     return { skipped: true, low: false };
   }
 
-  const threshold = parseThreshold(process.env.DISPUTE_RESOLVER_LOW_BALANCE_THRESHOLD);
+  // Validated and coerced by the schema: a non-numeric threshold now fails
+  // startup instead of being silently ignored here (#526).
+  const threshold = env.DISPUTE_RESOLVER_LOW_BALANCE_THRESHOLD;
 
   try {
     const balance = await getAccountBalance(walletAddress);
